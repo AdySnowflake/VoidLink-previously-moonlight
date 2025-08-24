@@ -22,7 +22,7 @@ jobs:
 
       - name: Build
         run: |
-          xcodebuild -scheme "VoidLink" -configuration Release -sdk iphoneos archive -archivePath ./build/vl.xcarchive CODE_SIGN_IDENTITY="" CODE_SIGN_REQUIRED="NO" CODE_SIGN_ENTITLEMENTS="" CODE_SIGNING_ALLOWED="NO" MARKETING_VERSION=$GITHUB_ENV
+          xcodebuild -scheme "VoidLink" -configuration Release -sdk iphoneos archive -archivePath ./build/vl.xcarchive CODE_SIGN_IDENTITY="" CODE_SIGN_REQUIRED="NO" CODE_SIGN_ENTITLEMENTS="" CODE_SIGNING_ALLOWED="NO" MARKETING_VERSION=$COMMIT_TIME
           mkdir -p ./build/Payload
           mv ./build/vl.xcarchive/Products/Applications/VoidLink.app ./build/Payload
           cd ./build && zip -r VoidLink-$COMMIT_TIME.ipa ./Payload && cd ..
