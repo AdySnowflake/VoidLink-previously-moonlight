@@ -31,6 +31,96 @@
         }
       }
     },
+    "2Dp-Qg-chi.segmentTitles[0]" : {
+      "comment" : "Class = \"UISegmentedControl\"; 2Dp-Qg-chi.segmentTitles[0] = \"Off\"; ObjectID = \"2Dp-Qg-chi\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Off"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "关闭"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "關閉"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "關閉"
+          }
+        }
+      }
+    },
+    "2Dp-Qg-chi.segmentTitles[1]" : {
+      "comment" : "Class = \"UISegmentedControl\"; 2Dp-Qg-chi.segmentTitles[1] = \"Legacy\"; ObjectID = \"2Dp-Qg-chi\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Legacy"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "传统模式"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "傳統模式"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "傳統模式"
+          }
+        }
+      }
+    },
+    "2Dp-Qg-chi.segmentTitles[2]" : {
+      "comment" : "Class = \"UISegmentedControl\"; 2Dp-Qg-chi.segmentTitles[2] = \"Queue Buffering\"; ObjectID = \"2Dp-Qg-chi\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Queue Buffering"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "队列缓冲"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "佇列緩衝"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "佇列緩衝"
+          }
+        }
+      }
+    },
     "2w1-Vw-GVy.text" : {
       "comment" : "Class = \"UILabel\"; text = \"HDR\"; ObjectID = \"2w1-Vw-GVy\";",
       "extractionState" : "extracted_with_value",
@@ -405,6 +495,66 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "陀螺儀靈敏度"
+          }
+        }
+      }
+    },
+    "53H-ST-OtY.segmentTitles[0]" : {
+      "comment" : "Class = \"UISegmentedControl\"; 53H-ST-OtY.segmentTitles[0] = \"Balanced\"; ObjectID = \"53H-ST-OtY\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Balanced"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平衡"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平衡"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平衡"
+          }
+        }
+      }
+    },
+    "53H-ST-OtY.segmentTitles[1]" : {
+      "comment" : "Class = \"UISegmentedControl\"; 53H-ST-OtY.segmentTitles[1] = \"Performance\"; ObjectID = \"53H-ST-OtY\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Performance"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "性能"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "效能"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "效能"
           }
         }
       }
@@ -909,6 +1059,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "滑鼠按下"
+          }
+        }
+      }
+    },
+    "Ce3-FM-vIh.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Frames to Buffer\"; ObjectID = \"Ce3-FM-vIh\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Frames to Buffer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缓冲帧数"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "緩衝影格數"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "緩衝影格數"
           }
         }
       }
@@ -1585,6 +1765,36 @@
         }
       }
     },
+    "H8S-aI-EBo.segmentTitles[4]" : {
+      "comment" : "Class = \"UISegmentedControl\"; H8S-aI-EBo.segmentTitles[4] = \"no click\"; ObjectID = \"H8S-aI-EBo\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "no click"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无点击"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無點擊"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無點擊"
+          }
+        }
+      }
+    },
     "hAo-1k-oYF.text" : {
       "comment" : "Class = \"UILabel\"; text = \"90° Display Rotation\"; ObjectID = \"hAo-1k-oYF\";",
       "extractionState" : "extracted_with_value",
@@ -2161,6 +2371,36 @@
         }
       }
     },
+    "MaN-f7-I3g.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Frame Pacing\"; ObjectID = \"MaN-f7-I3g\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Frame Pacing"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "帧步进控制"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "影格步調"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "影格步調"
+          }
+        }
+      }
+    },
     "Mm0-xf-9eh.segmentTitles[0]" : {
       "comment" : "Class = \"UISegmentedControl\"; Mm0-xf-9eh.segmentTitles[0] = \"Slide From Left Edge\"; ObjectID = \"Mm0-xf-9eh\";",
       "extractionState" : "extracted_with_value",
@@ -2541,66 +2781,6 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "test"
-          }
-        }
-      }
-    },
-    "OOg-A3-DdM.segmentTitles[0]" : {
-      "comment" : "Class = \"UISegmentedControl\"; OOg-A3-DdM.segmentTitles[0] = \"Lowest Latency\"; ObjectID = \"OOg-A3-DdM\";",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Lowest Latency"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "低延迟"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "低延遲"
-          }
-        },
-        "zh-HK" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "低延遲"
-          }
-        }
-      }
-    },
-    "OOg-A3-DdM.segmentTitles[1]" : {
-      "comment" : "Class = \"UISegmentedControl\"; OOg-A3-DdM.segmentTitles[1] = \"Smoothest Video\"; ObjectID = \"OOg-A3-DdM\";",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Smoothest Video"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最高流畅度"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最高流暢度"
-          }
-        },
-        "zh-HK" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最高流暢度"
           }
         }
       }
@@ -3133,6 +3313,36 @@
         }
       }
     },
+    "t7a-18-5wz.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Performance Graphs  \"; ObjectID = \"t7a-18-5wz\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Performance Graphs  "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "性能图表"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "效能圖表"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "效能圖表"
+          }
+        }
+      }
+    },
     "tAd-bm-2IO.text" : {
       "comment" : "Class = \"UILabel\"; text = \"Local Mouse Pointer\"; ObjectID = \"tAd-bm-2IO\";",
       "extractionState" : "extracted_with_value",
@@ -3171,6 +3381,36 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "test"
+          }
+        }
+      }
+    },
+    "v8l-hf-kiR.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Rendering Mode (Experimental)\"; ObjectID = \"v8l-hf-kiR\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rendering Mode (Experimental)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "渲染模式（实验性）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "渲染模式（實驗性）"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "渲染模式（實驗性）"
           }
         }
       }
@@ -3277,6 +3517,36 @@
         }
       }
     },
+    "Ylu-hT-Cuz.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"The recommended value is 2. 1 frame provides the lowest latency, but may require an Ethernet connection.\"; ObjectID = \"Ylu-hT-Cuz\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The recommended value is 2. 1 frame provides the lowest latency, but may require an Ethernet connection."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "建议值为2。1帧提供最低延迟，但可能需要以太网连接。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "建議值為2。1影格提供最低延遲，但可能需要乙太網路連線。"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "建議值為2。1影格提供最低延遲，但可能需要乙太網路連線。"
+          }
+        }
+      }
+    },
     "yY7-Sf-Zes.segmentTitles[0]" : {
       "comment" : "Class = \"UISegmentedControl\"; yY7-Sf-Zes.segmentTitles[0] = \"Slide From Left Edge\"; ObjectID = \"yY7-Sf-Zes\";",
       "extractionState" : "extracted_with_value",
@@ -3375,36 +3645,6 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "test"
-          }
-        }
-      }
-    },
-    "ZWC-Gw-pSq.text" : {
-      "comment" : "Class = \"UILabel\"; text = \"Frame Pacing Preference\"; ObjectID = \"ZWC-Gw-pSq\";",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Frame Pacing Preference"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "帧步进控制"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "影格步進控制"
-          }
-        },
-        "zh-HK" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "影格步進控制"
           }
         }
       }

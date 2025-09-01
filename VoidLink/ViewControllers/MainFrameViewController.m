@@ -28,6 +28,7 @@
 #import "IdManager.h"
 #import "ConnectionHelper.h"
 #import "LocalizationHelper.h"
+#import "Plot.h"
 #import "CustomEdgeSlideGestureRecognizer.h"
 #import "DataManager.h"
 #import "ThemeManager.h"
@@ -75,7 +76,7 @@
     id navBarAppearanceStandard;
     bool _viewJustAppeared;
     TemporaryApp * launchedApp;
-    
+
     NSTimer *_foregroundHostUpdateTimer;
 
 #if TARGET_OS_TV
@@ -819,7 +820,6 @@ static NSMutableSet* hostList;
     _streamConfig.bitRate = [streamSettings.bitrate intValue];
     _streamConfig.optimizeGameSettings = streamSettings.optimizeGames;
     _streamConfig.playAudioOnPC = streamSettings.playAudioOnPC;
-    _streamConfig.useFramePacing = streamSettings.useFramePacing;
     _streamConfig.swapABXYButtons = streamSettings.swapABXYButtons;
     _streamConfig.asyncNativeTouchPriority = streamSettings.asyncNativeTouchPriority; // new streamConfig segment
     _streamConfig.gyroMode = [streamSettings.gyroMode intValue];
@@ -915,11 +915,20 @@ static NSMutableSet* hostList;
 #endif
 }
 
+- (NSInteger)requestForBitrate:(NSInteger)bitrateKbps{
+    HttpManager* hMan = [[HttpManager alloc] initWithHost:launchedApp.host];
+    HttpResponse* bitrateResponse = [[HttpResponse alloc] init];
+    HttpRequest* bitrateRequest = [HttpRequest requestForResponse: bitrateResponse withUrlRequest:[hMan newBirateRequest:bitrateKbps forClient:@"unknown"]];
+    [hMan executeRequestSynchronously:bitrateRequest];
+    NSLog(@"bitrate request status code: %ld", (long)bitrateResponse.statusCode);
+    return bitrateResponse.statusCode;
+}
+
 - (HttpResponse* )requestToQuitApp:(TemporaryApp* )app{
     HttpManager* hMan = [[HttpManager alloc] initWithHost:app.host];
     HttpResponse* quitResponse = [[HttpResponse alloc] init];
     HttpRequest* quitRequest = [HttpRequest requestForResponse: quitResponse withUrlRequest:[hMan newQuitAppRequest]];
-    
+
     // Exempt this host from discovery while handling the quit operation
     [self->_discMan pauseDiscoveryForHost:app.host];
     [hMan executeRequestSynchronously:quitRequest];
@@ -1168,7 +1177,7 @@ static NSMutableSet* hostList;
     [streamFrameViewController setUserInteractionEnabledForStreamView:!_settingsExpandedInStreamView || position == FrontViewPositionLeft];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.resolutionStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.fpsStack];
-    [settingsViewController widget:settingsViewController.bitrateSlider setEnabled:!self.settingsExpandedInStreamView];
+    // [settingsViewController widget:settingsViewController.bitrateSlider setEnabled:!self.settingsExpandedInStreamView];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.optimizeGamesStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.audioOnPcStack];
     [settingsViewController.codecSelector setEnabled:!_settingsExpandedInStreamView];
@@ -1176,11 +1185,14 @@ static NSMutableSet* hostList;
     [settingsViewController.hdrSwitch setEnabled:!_settingsExpandedInStreamView && [settingsViewController hdrSupported]];
     [settingsViewController.gyroModeSelector setEnabled:!_settingsExpandedInStreamView || ![streamFrameViewController shallDisableGyroHotSwitch]];
     [settingsViewController.emulatedControllerTypeSelector setEnabled:!_settingsExpandedInStreamView];
-    [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.framepacingStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.citrixX1MouseStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.externalDisplayModeStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.audioConfigStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.pipStack];
+    [settingsViewController.renderingBackendSelector setEnabled:!_settingsExpandedInStreamView];
+    // Enable frame pacing mode selector only if not in stream view AND not in performance mode
+    BOOL shouldEnableFramePacing = !_settingsExpandedInStreamView && (settingsViewController.renderingBackendSelector.selectedSegmentIndex != RENDER_METAL);
+    [settingsViewController.framePacingModeSelector setEnabled:shouldEnableFramePacing];
 }
 
 - (void)revealController:(SWRevealViewController *)revealController didMoveToPosition:(FrontViewPosition)position {
@@ -1700,9 +1712,9 @@ static NSMutableSet* hostList;
 {
     if (!_background || _viewJustAppeared) {
         // This will kick off box art caching
-        
+
         _viewJustAppeared = false;
-        
+
         [_foregroundHostUpdateTimer invalidate];
         _foregroundHostUpdateTimer = nil;
         
@@ -1770,11 +1782,11 @@ static NSMutableSet* hostList;
 - (void)viewDidAppear:(BOOL)animated
 {
     [super viewDidAppear:NO];
-    
+
     _viewJustAppeared = true;
-    
+
     [self beginForegroundRefresh];
-    
+
     // [self setupHostViewTitle];
     // [self reloadScrollHostView]; //remove this for proper test
     [self attachWaterMark];
