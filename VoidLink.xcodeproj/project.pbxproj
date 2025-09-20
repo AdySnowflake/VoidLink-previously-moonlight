@@ -7,8 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1817B61E2E6FD04D000D938D /* SafeTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1817B61D2E6FD04D000D938D /* SafeTimer.swift */; };
 		1829CE3F2E2154DF0074A99A /* SceneDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 1829CE3E2E2154DF0074A99A /* SceneDelegate.m */; };
 		18341A042DEB662C0094E5F2 /* FixedTintImageView.m in Sources */ = {isa = PBXBuildFile; fileRef = 18341A032DEB662C0094E5F2 /* FixedTintImageView.m */; };
+		1850C82A2E667E4000845308 /* MicHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1850C8292E667E4000845308 /* MicHandler.swift */; };
 		187F4B282E04658A00EECC59 /* WidgetPanelStackView.m in Sources */ = {isa = PBXBuildFile; fileRef = 187F4B272E04658A00EECC59 /* WidgetPanelStackView.m */; };
 		1888C1922E24C33100108730 /* AboutViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1888C1912E24C33100108730 /* AboutViewController.swift */; };
 		1888C1932E24C41000108730 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1888C1902E24C2C800108730 /* AboutView.swift */; };
@@ -151,10 +153,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		1817B61D2E6FD04D000D938D /* SafeTimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeTimer.swift; sourceTree = "<group>"; };
 		1829CE3D2E2154DF0074A99A /* SceneDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SceneDelegate.h; sourceTree = "<group>"; };
 		1829CE3E2E2154DF0074A99A /* SceneDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SceneDelegate.m; sourceTree = "<group>"; };
 		18341A022DEB65AB0094E5F2 /* FixedTintImageView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FixedTintImageView.h; sourceTree = "<group>"; };
 		18341A032DEB662C0094E5F2 /* FixedTintImageView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FixedTintImageView.m; sourceTree = "<group>"; };
+		1850C8292E667E4000845308 /* MicHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicHandler.swift; sourceTree = "<group>"; };
 		187F4B232E04633100EECC59 /* WidgetPanelStackView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WidgetPanelStackView.h; sourceTree = "<group>"; };
 		187F4B272E04658A00EECC59 /* WidgetPanelStackView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = WidgetPanelStackView.m; sourceTree = "<group>"; };
 		1888C1902E24C2C800108730 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
@@ -687,8 +691,10 @@
 				9819CC21254F180F008A7C8E /* AbsoluteTouchHandler.m */,
 				988FCD3F293B091B003050E2 /* KeyboardInputField.h */,
 				988FCD40293B091B003050E2 /* KeyboardInputField.m */,
+				1850C8292E667E4000845308 /* MicHandler.swift */,
 				84E1CDEB2C4F67D300547904 /* CommandManager.swift */,
 				84203F222C5F24C00032EEED /* OnScreenWidgetView.swift */,
+				1817B61D2E6FD04D000D938D /* SafeTimer.swift */,
 			);
 			path = Input;
 			sourceTree = "<group>";
@@ -1014,12 +1020,14 @@
 				FB89462919F646E200339C8A /* mkcert.c in Sources */,
 				FB9AFD281A7C84ED00872C98 /* HttpResponse.m in Sources */,
 				FB89463019F646E200339C8A /* StreamConfiguration.m in Sources */,
+				1850C82A2E667E4000845308 /* MicHandler.swift in Sources */,
 				FBD3495319FF36FB002D2A60 /* SWRevealViewController.m in Sources */,
 				84203F232C5F24C00032EEED /* OnScreenWidgetView.swift in Sources */,
 				97E21BB52E2186A3000D5DCA /* imgui_impl_metal.mm in Sources */,
 				9777AAF32E2CF7A400D7FBAF /* Shaders-Linear.metal in Sources */,
 				84FD0B512C31338D006B5BE5 /* LocalizationHelper.m in Sources */,
 				97E20DEA2E216532000D5DCA /* SceneDelegate.m in Sources */,
+				1817B61E2E6FD04D000D938D /* SafeTimer.swift in Sources */,
 				FBD3495019FF2174002D2A60 /* SettingsViewController.m in Sources */,
 				843CC7F02C1E757D00BBC475 /* NativeTouchPointer.m in Sources */,
 				FB89462C19F646E200339C8A /* HttpManager.m in Sources */,
@@ -1271,6 +1279,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/third_party/imgui/examples/libs/glfw/lib-vc2010-32",
 					"$(PROJECT_DIR)/third_party/imgui/examples/libs/glfw/lib-vc2010-64",
+					"$(PROJECT_DIR)/libs/opus/lib",
 				);
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
 					"$(inherited)",
@@ -1336,6 +1345,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/third_party/imgui/examples/libs/glfw/lib-vc2010-32",
 					"$(PROJECT_DIR)/third_party/imgui/examples/libs/glfw/lib-vc2010-64",
+					"$(PROJECT_DIR)/libs/opus/lib",
 				);
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
 					"$(inherited)",

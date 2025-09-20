@@ -90,9 +90,11 @@
     self.enablePIP = settings.enablePIP;
     self.frameQueueSize = settings.frameQueueSize;
     self.playAudioOnPC = settings.playAudioOnPC;
+    self.redirectMic = settings.redirectMic;
     self.enableHdr = settings.enableHdr;
     self.optimizeGames = settings.optimizeGames;
     self.multiController = settings.multiController;
+    self.buttonVisualFeedback = settings.buttonVisualFeedback;
     self.swapABXYButtons = settings.swapABXYButtons;
     self.onscreenControls = settings.onscreenControls;
     self.gyroMode = settings.gyroMode;

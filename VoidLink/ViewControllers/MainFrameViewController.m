@@ -820,7 +820,9 @@ static NSMutableSet* hostList;
     _streamConfig.bitRate = [streamSettings.bitrate intValue];
     _streamConfig.optimizeGameSettings = streamSettings.optimizeGames;
     _streamConfig.playAudioOnPC = streamSettings.playAudioOnPC;
+    _streamConfig.redirectMic = streamSettings.redirectMic;
     _streamConfig.swapABXYButtons = streamSettings.swapABXYButtons;
+    _streamConfig.buttonVisualFeedback = streamSettings.buttonVisualFeedback;
     _streamConfig.asyncNativeTouchPriority = streamSettings.asyncNativeTouchPriority; // new streamConfig segment
     _streamConfig.gyroMode = [streamSettings.gyroMode intValue];
     _streamConfig.emulatedControllerType = streamSettings.emulatedControllerType.intValue;
@@ -1180,6 +1182,7 @@ static NSMutableSet* hostList;
     // [settingsViewController widget:settingsViewController.bitrateSlider setEnabled:!self.settingsExpandedInStreamView];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.optimizeGamesStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.audioOnPcStack];
+    [settingsViewController.touchModeSelector setEnabled:!_settingsExpandedInStreamView || !_sessionLaunchedWithAbsoluteTouch];
     [settingsViewController.codecSelector setEnabled:!_settingsExpandedInStreamView];
     [settingsViewController.yuv444Switch setEnabled:!_settingsExpandedInStreamView];
     [settingsViewController.hdrSwitch setEnabled:!_settingsExpandedInStreamView && [settingsViewController hdrSupported]];
@@ -1193,6 +1196,9 @@ static NSMutableSet* hostList;
     // Enable frame pacing mode selector only if not in stream view AND not in performance mode
     BOOL shouldEnableFramePacing = !_settingsExpandedInStreamView && (settingsViewController.renderingBackendSelector.selectedSegmentIndex != RENDER_METAL);
     [settingsViewController.framePacingModeSelector setEnabled:shouldEnableFramePacing];
+    // Disable mic switch if sunshine does not support mic redirection
+    [settingsViewController.redirectMicSwitch setEnabled:!_settingsExpandedInStreamView||streamFrameViewController.micStreamInitialized];
+    if(_settingsExpandedInStreamView && !streamFrameViewController.micStreamInitialized) [settingsViewController.redirectMicSwitch setOn:false];
 }
 
 - (void)revealController:(SWRevealViewController *)revealController didMoveToPosition:(FrontViewPosition)position {
@@ -1515,10 +1521,46 @@ static NSMutableSet* hostList;
     [_upButton setAction:@selector(switchToHostView)];
 }
 
-- (void)viewDidLoad{
-    [ThemeManager setUserInterfaceStyle:UIScreen.mainScreen.traitCollection.userInterfaceStyle];
+- (void)updateTheme {
+    self.view.backgroundColor = [ThemeManager appBackgroundColor];
+    self.hostCollectionVC.view.backgroundColor = [ThemeManager appBackgroundColor];
+    self.collectionView.backgroundColor = [ThemeManager appBackgroundColor];
 
+    if (@available(iOS 13.0, *)) {
+        [navBarAppearanceStandard setValue:[ThemeManager appBackgroundColor] forKey:@"backgroundColor"];
+        NSDictionary* titleTextAttributes = @{
+            NSForegroundColorAttributeName: [ThemeManager textColor]
+        };
+        [navBarAppearanceStandard setValue:titleTextAttributes forKey:@"titleTextAttributes"];
+    }
+    
+    _settingsButton.tintColor = [ThemeManager appPrimaryColor];
+    _upButton.tintColor = [ThemeManager appPrimaryColor];
+    ((UIButton*)_addHostButton.customView).backgroundColor = [ThemeManager appPrimaryColor];
+    ((UIButton*)_helpButton.customView).tintColor = [ThemeManager appPrimaryColor];
+
+    [self applyNavBarAppearance];
+    [self updateTitle];
+    if (hostViewTitleLabel) {
+        hostViewTitleLabel.textColor = [ThemeManager textColor];
+    }
+    [self.hostCollectionVC updateTheme];
+}
+
+// Called when the system's theme (light/dark mode) changes
+// will not be active if the app is streaming
+- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+            [ThemeManager setUserInterfaceStyle:self.traitCollection.userInterfaceStyle];
+        }
+    }
+}
+
+- (void)viewDidLoad{
     [super viewDidLoad];
+    
     //[OrientationHelper updateOrientationToLandscape];
     // self.navigationController.delegate = self;
     [[NSNotificationCenter defaultCenter] addObserver:self
@@ -1534,7 +1576,7 @@ static NSMutableSet* hostList;
     [self setupNavBar];
     
     // Set the gesture
-    if(![self isIPhonePortrait]) [self.view addGestureRecognizer:self.revealViewController.panGestureRecognizer]; // to prevent buggy settings view in iphone portrait mode;
+    [self.view addGestureRecognizer:self.revealViewController.panGestureRecognizer];
     
     // Get callbacks associated with the viewController
     [self.revealViewController setDelegate:self];
@@ -1840,6 +1882,11 @@ static NSMutableSet* hostList;
 {
     [super viewWillAppear:NO];
 
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(updateTheme)
+                                                 name:ThemeDidChangeNotification
+                                               object:nil];
+
     /* this makes background color works*/
     
     if(!_settingsViewExpanded){
@@ -1859,13 +1906,12 @@ static NSMutableSet* hostList;
     // this view via an error dialog from the stream
     // view, so we won't get a return to active notification
     // for that which would normally fire beginForegroundRefresh.
-    self.view.backgroundColor = [ThemeManager appBackgroundColor];
-    self.hostCollectionVC.view.backgroundColor = [ThemeManager appBackgroundColor];
-    self.collectionView.backgroundColor = [ThemeManager appBackgroundColor];
-
+    
     [self.view addSubview:self.collectionView];
     [self initHostCollection];
     if(!_enteredAppView) [self switchToHostView];
+    
+    [self updateTheme];
 }
 
 - (void)viewDidDisappear:(BOOL)animated

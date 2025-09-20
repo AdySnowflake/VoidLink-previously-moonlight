@@ -88,6 +88,7 @@
     CustomTapGestureRecognizer *_oscLayoutTapRecoginizer;
     LayoutOnScreenControlsViewController *_layoutOnScreenControlsVC;
     ToolboxViewController* toolBoxViewController;
+    MicHandler* micHandler;
 #else
     UITapGestureRecognizer *_menuTapGestureRecognizer;
     UITapGestureRecognizer *_menuDoubleTapGestureRecognizer;
@@ -176,7 +177,7 @@
 
 
 - (bool)isOscLayoutToolEnabled{
-    return (_settings.touchMode.intValue == RelativeTouch || _settings.touchMode.intValue == NativeTouch || _settings.touchMode.intValue == AbsoluteTouch) && _settings.onscreenControls.intValue == OnScreenControlsLevelCustom;
+    return (_settings.touchMode.intValue == RelativeTouch || _settings.touchMode.intValue == NativeTouch || _settings.touchMode.intValue == NativeTouch || _settings.touchMode.intValue == TouchDisabled) && _settings.onscreenControls.intValue == OnScreenControlsLevelCustom;
 }
 
 - (void)setupPiPControllerWithRenderer:(VideoDecoderRenderer *)videoRenderer {    // Ensure we have the renderer and its layer
@@ -307,7 +308,7 @@
 
 - (void)configZoomGestureAndAddStreamView{
     if (_settings.touchMode.intValue == AbsoluteTouch) {
-        _scrollView = [[UIScrollView alloc] initWithFrame:self.view.frame];
+        if(!_scrollView) _scrollView = [[UIScrollView alloc] initWithFrame:self.view.frame];
 #if !TARGET_OS_TV
         [_scrollView.panGestureRecognizer setMinimumNumberOfTouches:2];
         [_scrollView.panGestureRecognizer setMaximumNumberOfTouches:2]; // reduce competing with keyboardToggleRecognizer in StreamView.
@@ -316,15 +317,21 @@
         [_scrollView setShowsVerticalScrollIndicator:NO];
         [_scrollView setDelegate:self];
         [_scrollView setMaximumZoomScale:10.0f];
-        
-        // Add StreamView inside a UIScrollView for absolute mode
-        [_scrollView addSubview:_streamView];
-        // Insert at index 0 to ensure it doesn't cover OSC controls (CALayers)
-        [self.view insertSubview:_scrollView atIndex:0];
+        if(!_mainFrameViewcontroller.settingsExpandedInStreamView){
+            // Add StreamView inside a UIScrollView for absolute mode
+            [_scrollView addSubview:_streamView];
+            // Insert at index 0 to ensure it doesn't cover OSC controls (CALayers)
+            [self.view insertSubview:_scrollView atIndex:0];
+        }
     }
     else{
         // Add streamView directly to self.view in other touch modes
         // Insert at index 0 to ensure it doesn't cover OSC controls (CALayers)
+        if([_streamView.superview isKindOfClass:[UIScrollView class]]){
+            [_streamView removeFromSuperview];
+            NSLog(@"removeFromSuperview %f", CACurrentMediaTime());
+        }
+        
         [self.view insertSubview:_streamView atIndex:0];
     }
 }
@@ -348,6 +355,8 @@
         _settings = [[[DataManager alloc] init] getSettings];  //StreamFrameViewController retrieve the settings here.
     }
     overlayLevel = _settings.statsOverlayLevel.intValue;
+    [self setupOverlayView];
+    
     if(viewIsBeingResized) viewIsBeingResized = false;
     else [self configOscLayoutTool];
     [self updateToolboxSpecialEntries];
@@ -356,7 +365,12 @@
     [self->_streamView disableOnScreenControls]; //don't know why but this must be called outside the streamview class, just put it here. execute in streamview class cause hang
     [self.mainFrameViewcontroller reloadStreamConfig]; // reload streamconfig
     
-    NSLog(@"viewJustloaded: %d", viewJustLoaded);
+    if([MicHandler permissionGranted] && _settings.redirectMic){
+        [micHandler startTapping];
+    }
+    else [micHandler stopTappingWithStopEngine:false];
+    
+    NSLog(@"viewJustloaded: %d, redirectMic:%d", viewJustLoaded, _settings.redirectMic);
     if(!viewJustLoaded) [_controllerSupport updateControllerSupport:self.streamConfig delegate:self];
     else viewJustLoaded = false;
     // reload controllerSupport obj, this is mandatory for OSC reload,especially when the stream view is launched without OSC
@@ -560,6 +574,11 @@
 
 }
 
+- (void)updateTheme {
+    self.view.backgroundColor = [ThemeManager appBackgroundColor];
+    _stageLabel.textColor = [[ThemeManager textColor] colorWithAlphaComponent:0.9];
+    _spinner.color = [ThemeManager textColor];
+}
 
 - (void)viewDidLoad
 {
@@ -570,7 +589,7 @@
     [self.navigationController setNavigationBarHidden:YES animated:YES];
     
     [UIApplication sharedApplication].idleTimerDisabled = YES;
-    
+        
     _settings = [[[DataManager alloc] init] getSettings];  //StreamFrameViewController retrieve the settings here.
     
     _stageLabel = [[UILabel alloc] init];
@@ -701,9 +720,7 @@
     _stageLabel.textColor = [UIColor systemGrayColor];
     _spinner.color = [UIColor systemGrayColor];
     
-    self.view.backgroundColor = [ThemeManager appBackgroundColor];
-    _stageLabel.textColor = [[ThemeManager textColor] colorWithAlphaComponent:0.9];
-    _spinner.color = [ThemeManager textColor];
+    [self updateTheme];
     
     [self.view addSubview:_stageLabel];
     [self.view addSubview:_spinner];
@@ -722,6 +739,8 @@
         [self.view insertSubview:self.metalViewController.view atIndex:0];
         [self.metalViewController didMoveToParentViewController:self];
     }
+    
+    _mainFrameViewcontroller.sessionLaunchedWithAbsoluteTouch = _settings.touchMode.intValue == AbsoluteTouch;
 }
 
 - (void)keyboardWillShow:(NSNotification *)notification{
@@ -857,13 +876,13 @@
     });
 }
 
-- (void)updateOverlayText:(NSString*)text {
+- (void)setupOverlayView{
     if (_overlayView == nil) {
         _overlayView = [[PaddedLabel alloc] initWithFrame:CGRectZero];
-        [_overlayView setTextInsets:UIEdgeInsetsMake(10, 15, 10, 15)];
+        [_overlayView setTextInsets:UIEdgeInsetsMake([_mainFrameViewcontroller isIPhone]?4:6, 12, [_mainFrameViewcontroller isIPhone]?4:6, 12)];
         [_overlayView setUserInteractionEnabled:NO];
         [_overlayView setNumberOfLines:100];
-        [_overlayView.layer setCornerRadius:12];
+        [_overlayView.layer setCornerRadius:[_mainFrameViewcontroller isIPhone]?7:10];
         [_overlayView.layer setMasksToBounds:YES];
         
         // HACK: If not using stats overlay, center the text
@@ -876,13 +895,19 @@
 #if TARGET_OS_TV
         [_overlayView setFont:[UIFont systemFontOfSize:24 weight:UIFontWeightMedium]];
 #else
-        [_overlayView setFont:[UIFont systemFontOfSize:12 weight:UIFontWeightMedium]];
-
+        [_overlayView setFont:[UIFont systemFontOfSize: [_mainFrameViewcontroller isIPhone]?10:12 weight:UIFontWeightMedium]];
 #endif
         [_overlayView setAlpha:(float)[_settings.graphOpacity intValue]/ 100.0];
         [self.view addSubview:_overlayView];
     }
+    if (@available(iOS 13.0, *)) {
+       if(overlayLevel == 1) _overlayView.font = [UIFont monospacedSystemFontOfSize:[_mainFrameViewcontroller isIPhone]?10:12 weight:UIFontWeightMedium];
+    }
     
+    [_overlayView setHidden:YES];
+}
+
+- (void)updateOverlayText:(NSString*)text {
     if (text != nil) {
         // We set our bounds to the maximum width in order to work around a bug where
         // sizeToFit interacts badly with the UITextView's line breaks, causing the
@@ -893,7 +918,7 @@
                                            _overlayView.frame.size.height)];
         [_overlayView setText:text];
         [_overlayView sizeToFit];
-        [_overlayView setCenter:CGPointMake(self.view.frame.size.width / 2, (12 + (_overlayView.frame.size.height / 2)))];
+        [_overlayView setCenter:CGPointMake(self.view.frame.size.width / 2, (4 + (_overlayView.frame.size.height / 2)))];
         [_overlayView setHidden:NO];
     }
     else {
@@ -919,6 +944,8 @@
     
     _extWindow = nil;
     
+    if(_streamConfig.redirectMic) [micHandler stopTappingWithStopEngine:true];
+
     self.mainFrameViewcontroller.settingsExpandedInStreamView = false; // reset this flag to false
 }
 
@@ -1111,7 +1138,6 @@
 - (void)disconnectRemoteSession {
     Log(LOG_I, @"Settings view disconnect the session in stream view");
     [self returnToMainFrame];
-    
 }
 
 - (void)disconnectAndQuitApp{
@@ -1250,6 +1276,21 @@
 }
 
 - (void) stageComplete:(const char*)stageName {
+    _micStreamInitialized = false;
+    if(strcmp(stageName, "mic stream establishment")==0){
+        dispatch_time_t delay = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC));
+        dispatch_after(delay, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            if(self->_streamConfig.redirectMic){
+                    self->_micStreamInitialized = true;
+                    self->micHandler = [MicHandler new];
+                    [self->micHandler startTapping];
+            }
+        });
+    }
+    
+    if(strcmp(stageName, "mic stream unsupported or unintialized")==0){
+        _micStreamInitialized = false;
+    }
 }
 
 - (void) stageFailed:(const char*)stageName withError:(int)errorCode portTestFlags:(int)portTestFlags {
@@ -1460,7 +1501,7 @@
 - (void)toggleStatsOverlay{
     // Toggle the values on the current in-memory settings object for a temporary effect
     _settings.statsOverlayEnabled = !_settings.statsOverlayEnabled;
-    _settings.enableGraphs = _settings.statsOverlayEnabled;
+    // _settings.enableGraphs = _settings.statsOverlayEnabled;
     
     // Reconfigure the UI using the current in-memory settings, without reloading from disk
     [self reConfigStreamViewRealtimeAndReloadSettings:NO];

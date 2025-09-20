@@ -15,12 +15,10 @@
 
 @property (nonatomic, strong) UIStackView *rootStackView;
 @property (nonatomic, strong) UILabel *titleLabel;
-@property (nonatomic, strong) UIImageView *iconImageView;
 @property (nonatomic, strong) UIButton *toggleButton;
 @property (nonatomic, strong) UIButton *toggleArea;
 @property (nonatomic, strong) NSLayoutConstraint *heightConstraint;
 @property (nonatomic, strong) UIView *headerView;
-@property (nonatomic, strong) UIView *separatorLine;
 
 @end
 
@@ -49,7 +47,7 @@
     _sectionTitle = @"Section";
     _expanded = YES;
     _backgroundColor = [UIColor clearColor];
-    _rootStackViewSpacing = [self isIPhone] ? 10 : 18;
+    _rootStackViewSpacing = [self isIPhone] ? 10 : 13.8;
     _subStackViews = [NSMutableArray array];
     _headerViewHeight = 37;
     _headerViewVerticalSpacing = 25;

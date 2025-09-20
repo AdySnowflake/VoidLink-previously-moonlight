@@ -52,8 +52,10 @@
 @property (nonatomic) BOOL reverseMouseWheelDirection;
 @property (nonatomic, retain) NSNumber * asyncNativeTouchPriority;
 @property (nonatomic) BOOL multiController;
+@property (nonatomic) BOOL buttonVisualFeedback;
 @property (nonatomic) BOOL swapABXYButtons;
 @property (nonatomic) BOOL playAudioOnPC;
+@property (nonatomic) BOOL redirectMic;
 @property (nonatomic) BOOL optimizeGames;
 @property (nonatomic) BOOL enableHdr;
 @property (nonatomic) BOOL btMouseSupport;
