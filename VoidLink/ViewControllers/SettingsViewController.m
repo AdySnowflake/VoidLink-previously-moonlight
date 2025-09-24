@@ -704,6 +704,8 @@ BOOL isCustomResolution(int resolutionSelected) {
     [self addSetting:self.performanceGraphStack ofId:@"performanceGraphStack" withInfoTag:YES withDynamicLabel:NO to:experimentalSection];
     [self addDynamicLabelForStack:self.graphOpacityStack];
 
+    [self addSetting:self.sendDummyEventStack ofId:@"sendDummyEventStack" withInfoTag:YES withDynamicLabel:NO to:experimentalSection];
+    
     [experimentalSection addToParentStack:_parentStack];
     [experimentalSection setExpanded:YES];
 }
@@ -1143,6 +1145,10 @@ BOOL isCustomResolution(int resolutionSelected) {
     }
     if([sender.superview.accessibilityIdentifier isEqualToString: @"redirectMicStack"]){
         tipText = [LocalizationHelper localizedStringForKey:@"redirectMicStackTip"];
+        showOnlineDocAction = false;
+    }
+    if([sender.superview.accessibilityIdentifier isEqualToString: @"sendDummyEventStack"]){
+        tipText = [LocalizationHelper localizedStringForKey:@"sendDummyEventStackTip"];
         showOnlineDocAction = false;
     }
 
@@ -1675,13 +1681,16 @@ BOOL isCustomResolution(int resolutionSelected) {
     [self.touchModeSelector addTarget:self action:@selector(touchModeChanged:) forControlEvents:UIControlEventValueChanged];
     [self touchModeChanged:self.touchModeSelector];
 
-    self.enableOswSwitchStack.hidden = !(currentSettings.touchMode.intValue == NativeTouch || currentSettings.touchMode.intValue == NativeTouchOnly);
+    self.enableOswSwitchStack.hidden = !(currentSettings.touchMode.intValue == NativeTouch || currentSettings.touchMode.intValue == NativeTouchOnly); // do not use setHidden to stack wrapped by a settingStack
+    
     [self.enableOswForNativeTouchSwitch setOn:currentSettings.touchMode.intValue != NativeTouchOnly];
     [self.enableOswForNativeTouchSwitch addTarget:self action:@selector(enableOswForNativeTouchSwitchFlipped:) forControlEvents:UIControlEventValueChanged];
     [self enableOswForNativeTouchSwitchFlipped:self.enableOswForNativeTouchSwitch];
 
     [self.externalDisplayModeSelector setSelectedSegmentIndex:currentSettings.externalDisplayMode.integerValue];
     [self.localMousePointerModeSelector setSelectedSegmentIndex:currentSettings.localMousePointerMode.integerValue];
+    
+    [self.sendDummyEventSwitch setOn:currentSettings.sendDummyEvent];// Load old setting
     
     settingsViewJustLoaded = false;
 }
@@ -1985,10 +1994,11 @@ BOOL isCustomResolution(int resolutionSelected) {
     // bool customOscEnabled = [self isOswEnabled] && [self.onScreenWidgetSelector selectedSegmentIndex] == OnScreenControlsLevelCustom;
     bool isNativeTouch = sender.selectedSegmentIndex == NativeTouch;
     //bool asyncNativeTouchEnabled = [self.asyncNativeTouchPrioritySelector selectedSegmentIndex] != AsyncNativeTouchOff;
+    if(self.enableOswSwitchStack.hidden != !isNativeTouch && isNativeTouch) [self highlightEmergingStack:self.enableOswSwitchStack];
     self.enableOswSwitchStack.hidden = !isNativeTouch;
+    
     [self setHidden:!isNativeTouch forStack:self.pointerVelocityDividerStack];
 
-    // [self.asyncNativeTouchPrioritySelector setEnabled:![self showOswSelector]]; // this selector stay aligned with oscSelector
     [self touchMoveEventIntervalSliderMoved:self.touchMoveEventIntervalSlider];
     [self setHidden:!isNativeTouch forStack:self.pointerVelocityDividerStack];
     [self setHidden:!isNativeTouch forStack:self.pointerVelocityFactorStack];
@@ -2010,30 +2020,42 @@ BOOL isCustomResolution(int resolutionSelected) {
     if(hidden){
         stack.hidden = YES;
         [self->hiddenStacks addObject:stack];
-        if(!settingsViewJustLoaded){
-            if([stack.superview.superview isKindOfClass:[MenuSectionView class]]){
-                MenuSectionView* section = (MenuSectionView* )stack.superview.superview;
-                [section updateViewForFoldState];
+        if(!settingsViewJustLoaded){ // when settingsViewJustLoaded is true, height will be updated somewhere else
+            UIView* superView = stack.superview;
+            while(superView){
+                if([superView isKindOfClass:[MenuSectionView class]]){
+                    MenuSectionView* section = (MenuSectionView* ) superView;
+                    [section updateViewForFoldState];
+                    break;
+                }
+                superView = superView.superview;
             }
         }
     }
     else{
         stack.hidden = NO;
         if(!settingsViewJustLoaded){
-            if([stack.superview.superview isKindOfClass:[MenuSectionView class]]){
-                MenuSectionView* section = (MenuSectionView* )stack.superview.superview;
-                [section updateViewForFoldState];
+            UIView* superView = stack.superview;
+            while(superView){
+                if([superView isKindOfClass:[MenuSectionView class]]){
+                    MenuSectionView* section = (MenuSectionView* ) superView;
+                    [section updateViewForFoldState];
+                    break;
+                }
+                superView = superView.superview;
             }
-            if([hiddenStacks containsObject:stack]){
-                [self highlightedBackgroundForView:stack animateWithDuration:0.2];
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
-                               dispatch_get_main_queue(), ^{
-                    [self clearBackgroundColorForView:stack animateWithDuration:0.2];
-                });
-            }
+            if([hiddenStacks containsObject:stack]) [self highlightEmergingStack:stack];
         }
         [hiddenStacks removeObject:stack];
     }
+}
+
+- (void)highlightEmergingStack:(UIStackView* )stack{
+    [self highlightedBackgroundForView:stack animateWithDuration:0.2];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        [self clearBackgroundColorForView:stack animateWithDuration:0.2];
+    });
 }
 
 - (void)redirectMicSwitchFlipped:(UISwitch* )sender{
@@ -2476,6 +2498,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     }
     NSInteger externalDisplayMode = [self.externalDisplayModeSelector selectedSegmentIndex];
     NSInteger localMousePointerMode = [self.localMousePointerModeSelector selectedSegmentIndex];
+    BOOL sendDummyEvent = self.sendDummyEventSwitch.isOn;
     NSInteger backgroundSessionTimer = self.backgroundSessionTimerSlider.value == self.backgroundSessionTimerSlider.maximumValue ? (uint32_t) INT16_MAX : (uint32_t)self.backgroundSessionTimerSlider.value;
     
     [dataMan saveSettingsWithBitrate:_bitrate
@@ -2522,6 +2545,7 @@ BOOL isCustomResolution(int resolutionSelected) {
                         graphOpacity:graphOpacity
                     renderingBackend:renderingBackend
                      framePacingMode:framePacingMode
+                      sendDummyEvent:sendDummyEvent
               backgroundSessionTimer:backgroundSessionTimer];
 }
 
