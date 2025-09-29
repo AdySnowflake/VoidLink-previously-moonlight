@@ -821,6 +821,7 @@ static NSMutableSet* hostList;
     _streamConfig.optimizeGameSettings = streamSettings.optimizeGames;
     _streamConfig.playAudioOnPC = streamSettings.playAudioOnPC;
     _streamConfig.redirectMic = streamSettings.redirectMic;
+    _streamConfig.localVolume = streamSettings.localVolume.floatValue;
     _streamConfig.swapABXYButtons = streamSettings.swapABXYButtons;
     _streamConfig.buttonVisualFeedback = streamSettings.buttonVisualFeedback;
     _streamConfig.asyncNativeTouchPriority = streamSettings.asyncNativeTouchPriority; // new streamConfig segment
@@ -1199,6 +1200,8 @@ static NSMutableSet* hostList;
     // Disable mic switch if sunshine does not support mic redirection
     [settingsViewController.redirectMicSwitch setEnabled:!_settingsExpandedInStreamView||streamFrameViewController.micStreamInitialized];
     if(_settingsExpandedInStreamView && !streamFrameViewController.micStreamInitialized) [settingsViewController.redirectMicSwitch setOn:false];
+    [settingsViewController setHidden:!settingsViewController.redirectMicSwitch.isOn forStack:settingsViewController.useBuiltinMicStack];
+    [settingsViewController.useBuiltinMicSwitch setEnabled:!_settingsExpandedInStreamView];
 }
 
 - (void)revealController:(SWRevealViewController *)revealController didMoveToPosition:(FrontViewPosition)position {
@@ -1208,7 +1211,6 @@ static NSMutableSet* hostList;
 
     if (position == FrontViewPositionLeft) {
         [settingsViewController saveSettings];
-        [self setNeedsUpdateAllowedOrientation]; // handle allow portratit on & off
         _settingsButton.enabled = YES; // make sure these 2 buttons are enabled after closing setting view.
         _upButton.enabled = YES; // here is the select new host button
     }
@@ -1648,6 +1650,8 @@ static NSMutableSet* hostList;
     // [settingsViewController updateResolutionTable];
     
     UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleMenuResize:)];
+    longPress.delaysTouchesBegan = false;
+    longPress.delaysTouchesEnded = false;
     [self.view addGestureRecognizer:longPress];
 
 
@@ -1655,6 +1659,8 @@ static NSMutableSet* hostList;
     SettingsViewController *viewController = [storyboard instantiateViewControllerWithIdentifier:@"settingsViewController"];
     // 强制加载视图
     __unused UIView *view = viewController.view;
+    
+    snapshot = nil;
 }
 
 -(void)viewDidLayoutSubviews{
@@ -2219,15 +2225,17 @@ static NSMutableSet* hostList;
         }
         return;
     }
-
+    
     bool isPortrait = screenHeight>screenWidth;
 
     CGFloat limitedWidth = MIN(MAX(locationInSuperView.x, isPortrait ? 200 : 280),isPortrait ? screenWidth*0.75 : screenWidth/2);
     if(gesture.state == UIGestureRecognizerStateChanged){
         if(snapshot) snapshot.center = CGPointMake(limitedWidth, snapshot.center.y);
     }
-    if(gesture.state == UIGestureRecognizerStateEnded || gesture.state == UIGestureRecognizerStateCancelled){
+    if(gesture.state == UIGestureRecognizerStateEnded){
+        if(!snapshot) return;
         [snapshot removeFromSuperview];
+        snapshot = nil;
         self.revealViewController.rearViewRevealWidth = limitedWidth;
         [self.revealViewController setupNavigationBar];
         if(self.revealViewController.isStreaming) [self.revealViewController buttonsInStreaming];

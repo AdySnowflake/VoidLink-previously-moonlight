@@ -135,6 +135,18 @@
 @property (strong, nonatomic) IBOutlet UIStackView *sendDummyEventStack;
 @property (strong, nonatomic) IBOutlet UISwitch *sendDummyEventSwitch;
 
+@property (strong, nonatomic) IBOutlet UIStackView *localVolumeStack;
+@property (strong, nonatomic) IBOutlet UISlider *localVolumeSlider;
+
+@property (strong, nonatomic) IBOutlet UIStackView *useBuiltinMicStack;
+@property (strong, nonatomic) IBOutlet UISwitch *useBuiltinMicSwitch;
+
+@property (strong, nonatomic) IBOutlet UIStackView *micVolumeStack;
+@property (strong, nonatomic) IBOutlet UISlider *micVolumeSlider;
+
+@property (strong, nonatomic) IBOutlet UIStackView *rememberFoldStateStack;
+@property (strong, nonatomic) IBOutlet UISwitch *rememberFoldStateSwitch;
+
 @property (nonatomic, strong) MicHandler *micHandler;
 
 

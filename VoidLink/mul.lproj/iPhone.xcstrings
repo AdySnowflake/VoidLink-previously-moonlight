@@ -697,6 +697,36 @@
         }
       }
     },
+    "9Kq-ys-dnF.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Remember Menu Fold/Expand\"; ObjectID = \"9Kq-ys-dnF\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Remember Menu Fold/Expand"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "记住菜单折叠状态"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記住選單摺疊狀態"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記住選單摺疊狀態"
+          }
+        }
+      }
+    },
     "53H-ST-OtY.segmentTitles[0]" : {
       "comment" : "Class = \"UISegmentedControl\"; 53H-ST-OtY.segmentTitles[0] = \"Balanced\"; ObjectID = \"53H-ST-OtY\";",
       "extractionState" : "extracted_with_value",
@@ -1561,6 +1591,36 @@
         }
       }
     },
+    "GbY-52-itv.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Local Volume\"; ObjectID = \"GbY-52-itv\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Local Volume"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地音量"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地音量"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地音量"
+          }
+        }
+      }
+    },
     "ghM-zc-sr6.title" : {
       "comment" : "Class = \"UIBarButtonItem\"; title = \"Delete\"; ObjectID = \"ghM-zc-sr6\";",
       "extractionState" : "extracted_with_value",
@@ -1587,6 +1647,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "刪除"
+          }
+        }
+      }
+    },
+    "GiW-tl-1GX.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Use Built-in Mic\"; ObjectID = \"GiW-tl-1GX\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Use Built-in Mic"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用内置麦克风"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用內建麥克風"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用內建麥克風"
           }
         }
       }
@@ -2127,6 +2217,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "設定"
+          }
+        }
+      }
+    },
+    "n6Z-cT-3a1.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Mic Volume\"; ObjectID = \"n6Z-cT-3a1\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Mic Volume"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "麦克风音量"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "麥克風音量"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "麥克風音量"
           }
         }
       }
@@ -3734,7 +3854,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "称点移动事件间隔"
+            "value" : "触控移动事件间隔"
           }
         },
         "zh-Hant" : {

@@ -13,7 +13,7 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "异步多点触控"
           }
         },
@@ -43,7 +43,7 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "关闭"
           }
         },
@@ -103,7 +103,7 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "队列缓冲"
           }
         },
@@ -175,7 +175,7 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "被窗口捕获"
           }
         },
@@ -631,19 +631,19 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "内置"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "內建"
           }
         },
         "zh-HK" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "內建"
           }
         }
@@ -675,6 +675,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "手把"
+          }
+        }
+      }
+    },
+    "AeU-kl-XFa.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Local Volume\"; ObjectID = \"AeU-kl-XFa\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Local Volume"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地音量"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地音量"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地音量"
           }
         }
       }
@@ -921,6 +951,36 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "啟用"
+          }
+        }
+      }
+    },
+    "bfV-QT-eKw.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Use Built-in Mic\"; ObjectID = \"bfV-QT-eKw\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Use Built-in Mic"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用内置麦克风"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用內建麥克風"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用內建麥克風"
           }
         }
       }
@@ -2101,7 +2161,7 @@
         },
         "zh-Hans" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "麦克风重定向(实验性)"
           }
         },
@@ -3049,6 +3109,36 @@
         }
       }
     },
+    "pP6-Pl-0In.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Mic Volume\"; ObjectID = \"pP6-Pl-0In\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Mic Volume"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "麦克风音量"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "麥克風音量"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "麥克風音量"
+          }
+        }
+      }
+    },
     "Pwa-YK-6Q2.text" : {
       "comment" : "Class = \"UILabel\"; text = \"Alpha\"; ObjectID = \"Pwa-YK-6Q2\";",
       "extractionState" : "extracted_with_value",
@@ -3441,6 +3531,36 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Height"
+          }
+        }
+      }
+    },
+    "shy-hG-9wY.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Remember Menu Fold/Expand\"; ObjectID = \"shy-hG-9wY\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Remember Menu Fold/Expand"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "记住菜单折叠状态"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記住選單摺疊狀態"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記住選單摺疊狀態"
           }
         }
       }

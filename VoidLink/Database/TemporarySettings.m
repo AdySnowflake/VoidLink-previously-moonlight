@@ -91,6 +91,7 @@
     self.frameQueueSize = settings.frameQueueSize;
     self.playAudioOnPC = settings.playAudioOnPC;
     self.redirectMic = settings.redirectMic;
+    self.useBuiltinMic = settings.useBuiltinMic;
     self.enableHdr = settings.enableHdr;
     self.optimizeGames = settings.optimizeGames;
     self.multiController = settings.multiController;
@@ -116,6 +117,8 @@
     self.touchPointerVelocityFactor = settings.touchPointerVelocityFactor;
     self.mousePointerVelocityFactor = settings.mousePointerVelocityFactor;
     self.gyroSensitivity = settings.gyroSensitivity;
+    self.localVolume = settings.localVolume;
+    self.micVolume = settings.micVolume;
     self.pointerVelocityModeDivider = settings.pointerVelocityModeDivider;
     self.unlockDisplayOrientation = settings.unlockDisplayOrientation;
     self.resolutionSelected = settings.resolutionSelected;
@@ -126,6 +129,7 @@
     self.renderingBackend = settings.renderingBackend;
     self.framePacingMode = settings.framePacingMode;
     self.sendDummyEvent = settings.sendDummyEvent;
+    self.rememberFoldState = settings.rememberFoldState;
     self.backgroundSessionTimer = settings.backroundSessionTimer;
 #endif
     self.uniqueId = settings.uniqueId;

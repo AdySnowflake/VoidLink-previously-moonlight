@@ -76,6 +76,8 @@ typedef NS_ENUM(NSInteger, WidgetSizeTransition) {
       touchPointerVelocityFactor:(CGFloat)touchPointerVelocityFactor
       mousePointerVelocityFactor:(CGFloat)mousePointerVelocityFactor
                  gyroSensitivity:(CGFloat)gyroSensitivity
+                     localVolume:(CGFloat)localVolume
+                       micVolume:(CGFloat)micVolume
           touchMoveEventInterval:(NSInteger)touchMoveEventInterval
       reverseMouseWheelDirection:(BOOL)reverseMouseWheelDirection
         asyncNativeTouchPriority:(NSInteger)asyncNativeTouchPriority
@@ -87,6 +89,7 @@ typedef NS_ENUM(NSInteger, WidgetSizeTransition) {
                  swapABXYButtons:(BOOL)swapABXYButtons
                        audioOnPC:(BOOL)audioOnPC
                      redirectMic:(BOOL)redirectMic
+                   useBuiltinMic:(BOOL)useBuiltinMic
                   preferredCodec:(uint32_t)preferredCodec
                     enableYUV444:(BOOL)enableYUV444
                        enablePIP:(BOOL)enablePIP
@@ -105,7 +108,8 @@ typedef NS_ENUM(NSInteger, WidgetSizeTransition) {
                     graphOpacity:(NSInteger)graphOpacity
                 renderingBackend:(NSInteger)renderingBackend
                  framePacingMode:(NSInteger)framePacingMode
-               sendDummyEvent:(BOOL)sendDummyEvent
+                  sendDummyEvent:(BOOL)sendDummyEvent
+               rememberFoldState:(BOOL)rememberFoldState
           backgroundSessionTimer:(NSInteger)backgroundSessionTimer;
 
 - (NSArray*) getHosts;

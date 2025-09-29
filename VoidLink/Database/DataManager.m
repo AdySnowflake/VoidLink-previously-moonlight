@@ -71,6 +71,8 @@
       touchPointerVelocityFactor:(CGFloat)touchPointerVelocityFactor
       mousePointerVelocityFactor:(CGFloat)mousePointerVelocityFactor
                  gyroSensitivity:(CGFloat)gyroSensitivity
+                     localVolume:(CGFloat)localVolume
+                       micVolume:(CGFloat)micVolume
           touchMoveEventInterval:(NSInteger)touchMoveEventInterval
       reverseMouseWheelDirection:(BOOL)reverseMouseWheelDirection
         asyncNativeTouchPriority:(NSInteger)asyncNativeTouchPriority
@@ -82,6 +84,7 @@
                  swapABXYButtons:(BOOL)swapABXYButtons
                        audioOnPC:(BOOL)audioOnPC
                      redirectMic:(BOOL)redirectMic
+                   useBuiltinMic:(BOOL)useBuiltinMic
                   preferredCodec:(uint32_t)preferredCodec
                     enableYUV444:(BOOL)enableYUV444
                        enablePIP:(BOOL)enablePIP
@@ -100,7 +103,8 @@
                     graphOpacity:(NSInteger)graphOpacity
                 renderingBackend:(NSInteger)renderingBackend
                  framePacingMode:(NSInteger)framePacingMode
-               sendDummyEvent:(BOOL)sendDummyEvent
+                  sendDummyEvent:(BOOL)sendDummyEvent
+               rememberFoldState:(BOOL)rememberFoldState
           backgroundSessionTimer:(NSInteger)backgroundSessionTimer{
 
     [_managedObjectContext performBlockAndWait:^{
@@ -121,6 +125,8 @@
         settingsToSave.touchPointerVelocityFactor = [NSNumber numberWithFloat:touchPointerVelocityFactor];
         settingsToSave.mousePointerVelocityFactor = [NSNumber numberWithFloat:mousePointerVelocityFactor];
         settingsToSave.gyroSensitivity = [NSNumber numberWithFloat:gyroSensitivity];
+        settingsToSave.localVolume = [NSNumber numberWithFloat:localVolume];
+        settingsToSave.micVolume = [NSNumber numberWithFloat:micVolume];
         settingsToSave.touchMoveEventInterval = [NSNumber numberWithInteger:touchMoveEventInterval];
         settingsToSave.reverseMouseWheelDirection = reverseMouseWheelDirection;
         settingsToSave.asyncNativeTouchPriority = [NSNumber numberWithInteger:asyncNativeTouchPriority];
@@ -132,6 +138,7 @@
         settingsToSave.swapABXYButtons = swapABXYButtons;
         settingsToSave.playAudioOnPC = audioOnPC;
         settingsToSave.redirectMic = redirectMic;
+        settingsToSave.useBuiltinMic = useBuiltinMic;
         settingsToSave.preferredCodec = preferredCodec;
         settingsToSave.enableYUV444 = enableYUV444;
         settingsToSave.enablePIP = enablePIP;
@@ -153,6 +160,7 @@
         settingsToSave.renderingBackend = [NSNumber numberWithInteger:renderingBackend];
         settingsToSave.framePacingMode = [NSNumber numberWithInteger:framePacingMode];
         settingsToSave.sendDummyEvent = sendDummyEvent;
+        settingsToSave.rememberFoldState = rememberFoldState;
         [self saveData];
     }];
 }
