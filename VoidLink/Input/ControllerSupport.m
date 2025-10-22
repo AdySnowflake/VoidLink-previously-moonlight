@@ -53,6 +53,7 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
     OnScreenControls *_osc;
     VoidController *_oscController;
     NSMutableSet* _activeGCControllers;
+    TemporarySettings* tempSettings;
     
 #define EMULATING_SELECT     0x1
 #define EMULATING_SPECIAL    0x2
@@ -75,16 +76,40 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
 -(void) rumble:(unsigned short)controllerNumber lowFreqMotor:(unsigned short)lowFreqMotor highFreqMotor:(unsigned short)highFreqMotor
 {
     VoidController* voidController = [_voidControllers objectForKey:[NSNumber numberWithInteger:controllerNumber]];
+    
+    HapticEnginePreference preference = tempSettings.hapticEngine.intValue;
+        
     if (voidController == nil && controllerNumber == 0 && _oscEnabled) {
-        // TODO: Rumble emulation for OSC
+        // no physical controller connected:
+        if(preference != RumbleOff){
+            [_oscController.lowFreqMotor setMotorAmplitude:lowFreqMotor];
+            [_oscController.highFreqMotor setMotorAmplitude:highFreqMotor];
+        }
     }
+    
     if (voidController == nil) {
         // No connected controller for this player
         return;
     }
     
-    [voidController.lowFreqMotor setMotorAmplitude:lowFreqMotor];
-    [voidController.highFreqMotor setMotorAmplitude:highFreqMotor];
+    // physical controller connected:
+    switch (preference) {
+        case HapticEngineAuto:
+            // if controller has no haptic profile, it already falled bakc to device engine
+            [voidController.lowFreqMotor setMotorAmplitude:lowFreqMotor];
+            [voidController.highFreqMotor setMotorAmplitude:highFreqMotor];
+            break;
+        case RumbleDevice:
+            [_oscController.lowFreqMotor setMotorAmplitude:lowFreqMotor];
+            [_oscController.highFreqMotor setMotorAmplitude:highFreqMotor];
+        case LeftRightSwapped:
+            [voidController.lowFreqMotor setMotorAmplitude:highFreqMotor];
+            [voidController.highFreqMotor setMotorAmplitude:lowFreqMotor];
+        case RumbleOff:
+            break;
+        default:
+            break;
+    }
 }
 
 -(void) rumbleTriggers:(uint16_t)controllerNumber leftTrigger:(uint16_t)leftTrigger rightTrigger:(uint16_t)rightTrigger
@@ -101,15 +126,20 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
     [controller.rightTriggerMotor setMotorAmplitude:rightTrigger];
 }
 
+- (bool)isLandscapeNow {
+    return CGRectGetWidth([[UIScreen mainScreen]bounds]) > CGRectGetHeight([[UIScreen mainScreen]bounds]);
+}
+
 -(void)updateTimerStateForController:(VoidController* )voidController{
-    if (@available(iOS 14.0, tvOS 14.0, *)) {
+    // if (@available(iOS 14.0, tvOS 14.0, *)) {
+    if (true) {
         if(_gyroMode == GyroModeOff){
             [self stopTimerForController:voidController];
             return;
         }
         
         if(voidController.gamepad.motion.hasAttitudeAndRotationRate) [voidController.motionTypes addObject:@(LI_MOTION_TYPE_ACCEL)];
-        if(voidController.gamepad.motion.hasRotationRate) [voidController.motionTypes addObject:@(LI_MOTION_TYPE_GYRO)];
+        if (@available(iOS 14.0, *)) if(voidController.gamepad.motion.hasRotationRate) [voidController.motionTypes addObject:@(LI_MOTION_TYPE_GYRO)];
 
         for(NSNumber* motionTypeObj in voidController.motionTypes){
             uint8_t motionType = motionTypeObj.intValue;
@@ -147,19 +177,28 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
                             voidController.lastDeviceAccelSample = deviceAccelSample;
                             
                             // Convert g to m/s^2
-                            if(UIApplication.sharedApplication.windows.firstObject.windowScene.interfaceOrientation == 4){ //check for landscape left or landscape right
+                            if (@available(iOS 13.0, *)) {
+                                if(UIApplication.sharedApplication.windows.firstObject.windowScene.interfaceOrientation == 4){ //check for landscape left or landscape right
+                                    LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
+                                                                LI_MOTION_TYPE_ACCEL,
+                                                                deviceAccelSample.y * -9.80665f * self->_gyroSensitivity,
+                                                                deviceAccelSample.z * -9.80665f * self->_gyroSensitivity,
+                                                                deviceAccelSample.x * -9.80665f * self->_gyroSensitivity);
+                                }
+                                else{
+                                    LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
+                                                                LI_MOTION_TYPE_ACCEL,
+                                                                deviceAccelSample.y * +9.80665f * self->_gyroSensitivity,
+                                                                deviceAccelSample.z * -9.80665f * self->_gyroSensitivity,
+                                                                deviceAccelSample.x * +9.80665f * self->_gyroSensitivity);
+                                }
+                            }
+                            else{
                                 LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
                                                             LI_MOTION_TYPE_ACCEL,
                                                             deviceAccelSample.y * -9.80665f * self->_gyroSensitivity,
                                                             deviceAccelSample.z * -9.80665f * self->_gyroSensitivity,
                                                             deviceAccelSample.x * -9.80665f * self->_gyroSensitivity);
-                            }
-                            else{
-                                LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
-                                                            LI_MOTION_TYPE_ACCEL,
-                                                            deviceAccelSample.y * +9.80665f * self->_gyroSensitivity,
-                                                            deviceAccelSample.z * -9.80665f * self->_gyroSensitivity,
-                                                            deviceAccelSample.x * +9.80665f * self->_gyroSensitivity);
                             }
                         }];
                     });}
@@ -187,19 +226,28 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
                             
                             // Convert rad/s to deg/s
                             //NSLog(@"sending built-in gyro data, accelSample data 00: %f, playerIndex: %d",deviceGyroSample.x, voidController.playerIndex);
-                            if(UIApplication.sharedApplication.windows.firstObject.windowScene.interfaceOrientation == 4){//check for landscape left or landscape right
+                            if (@available(iOS 13.0, *)) {
+                                if(UIApplication.sharedApplication.windows.firstObject.windowScene.interfaceOrientation == 4){//check for landscape left or landscape right
+                                    LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
+                                                                LI_MOTION_TYPE_GYRO,
+                                                                deviceGyroSample.y * 57.2957795f * self->_gyroSensitivity,
+                                                                deviceGyroSample.z * 57.2957795f * self->_gyroSensitivity,
+                                                                deviceGyroSample.x * 57.2957795f * self->_gyroSensitivity);
+                                }
+                                else{
+                                    LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
+                                                                LI_MOTION_TYPE_GYRO,
+                                                                deviceGyroSample.y * -57.2957795f * self->_gyroSensitivity,
+                                                                deviceGyroSample.z * 57.2957795f * self->_gyroSensitivity,
+                                                                deviceGyroSample.x * -57.2957795f * self->_gyroSensitivity);
+                                }
+                            }
+                            else{
                                 LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
                                                             LI_MOTION_TYPE_GYRO,
                                                             deviceGyroSample.y * 57.2957795f * self->_gyroSensitivity,
                                                             deviceGyroSample.z * 57.2957795f * self->_gyroSensitivity,
                                                             deviceGyroSample.x * 57.2957795f * self->_gyroSensitivity);
-                            }
-                            else{
-                                LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
-                                                            LI_MOTION_TYPE_GYRO,
-                                                            deviceGyroSample.y * -57.2957795f * self->_gyroSensitivity,
-                                                            deviceGyroSample.z * 57.2957795f * self->_gyroSensitivity,
-                                                            deviceGyroSample.x * -57.2957795f * self->_gyroSensitivity);
                             }
                         }];
                         break;
@@ -209,72 +257,75 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
 #endif
             else{
                 NSLog(@"controller obj timer update: controller timer ");
-                switch (motionType) {
-                    case LI_MOTION_TYPE_ACCEL:
-                        [voidController.accelTimer invalidate];
-                        voidController.accelTimer = nil;
-                        
-                        if (voidController.reportRateHz && voidController.gamepad.motion.hasGravityAndUserAcceleration) {
-                            // Reset the last motion sample
-                            GCAcceleration emptyAccelSample = {};
-                            voidController.lastAccelSample = emptyAccelSample;
-                            NSLog(@"setup controller gyro accelTimer");
-                            dispatch_sync(dispatch_get_main_queue(), ^{
-                                voidController.hasAccelerometer = YES;
-                                voidController.accelTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 / voidController.reportRateHz repeats:YES block:^(NSTimer *timer) {
-                                    // Don't send duplicate samples
-                                    GCAcceleration lastAccelSample = voidController.lastAccelSample;
-                                    GCAcceleration accelSample = voidController.gamepad.motion.acceleration;
-                                    
-                                    if (memcmp(&accelSample, &lastAccelSample, sizeof(accelSample)) == 0) {
-                                        return;
-                                    }
-                                    voidController.lastAccelSample = accelSample;
-                                    
-                                    // Convert g to m/s^2
-                                    //NSLog(@"sending controller gyro data, accelSample data 00: %f, playerIndex: %ld, obj: %@",accelSample.x, (long)voidController.gamepad.playerIndex, voidController);
-                                    LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
-                                                                LI_MOTION_TYPE_ACCEL,
-                                                                accelSample.x * -9.80665f * self->_gyroSensitivity,
-                                                                accelSample.y * -9.80665f * self->_gyroSensitivity,
-                                                                accelSample.z * -9.80665f * self->_gyroSensitivity);
-                                }];
-                            });
-                        }
-                        break;
-                        
-                    case LI_MOTION_TYPE_GYRO:
-                        [voidController.gyroTimer invalidate];
-                        voidController.gyroTimer = nil;
-                        
-                        if (voidController.reportRateHz && voidController.gamepad.motion.hasRotationRate) {
-                            // Reset the last motion sample
-                            GCRotationRate emptyGyroSample = {};
-                            voidController.lastGyroSample = emptyGyroSample;
-                            //dispatch_sync(dispatch_get_main_queue(), ^{
-                            {dispatch_async(dispatch_get_main_queue(), ^{
-                                voidController.hasGyroscope = YES;
-                                voidController.gyroTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 / voidController.reportRateHz repeats:YES block:^(NSTimer *timer) {
-                                    // Don't send duplicate samples
-                                    GCRotationRate lastGyroSample = voidController.lastGyroSample;
-                                    GCRotationRate gyroSample = voidController.gamepad.motion.rotationRate;
-                                    if (memcmp(&gyroSample, &lastGyroSample, sizeof(gyroSample)) == 0) {
-                                        return;
-                                    }
-                                    voidController.lastGyroSample = gyroSample;
-                                    
-                                    // Convert rad/s to deg/s
-                                    // NSLog(@"sending controller gyro data, gyroSample data 00: %f, playerIndex: %ld, obj: %@",gyroSample.x, (long)voidController.gamepad.playerIndex, voidController);
-                                    LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
-                                                                LI_MOTION_TYPE_GYRO,
-                                                                gyroSample.x * 57.2957795f * self->_gyroSensitivity,
-                                                                gyroSample.z * 57.2957795f * self->_gyroSensitivity,
-                                                                gyroSample.y * -57.2957795f * self->_gyroSensitivity);
-                                }];
-                                //  });
-                            });}
-                        }
-                        break;
+                
+                if (@available(iOS 14.0, *)) {
+                    switch (motionType) {
+                        case LI_MOTION_TYPE_ACCEL:
+                            [voidController.accelTimer invalidate];
+                            voidController.accelTimer = nil;
+                            
+                            if (voidController.reportRateHz && voidController.gamepad.motion.hasGravityAndUserAcceleration) {
+                                // Reset the last motion sample
+                                GCAcceleration emptyAccelSample = {};
+                                voidController.lastAccelSample = emptyAccelSample;
+                                NSLog(@"setup controller gyro accelTimer");
+                                dispatch_sync(dispatch_get_main_queue(), ^{
+                                    voidController.hasAccelerometer = YES;
+                                    voidController.accelTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 / voidController.reportRateHz repeats:YES block:^(NSTimer *timer) {
+                                        // Don't send duplicate samples
+                                        GCAcceleration lastAccelSample = voidController.lastAccelSample;
+                                        GCAcceleration accelSample = voidController.gamepad.motion.acceleration;
+                                        
+                                        if (memcmp(&accelSample, &lastAccelSample, sizeof(accelSample)) == 0) {
+                                            return;
+                                        }
+                                        voidController.lastAccelSample = accelSample;
+                                        
+                                        // Convert g to m/s^2
+                                        //NSLog(@"sending controller gyro data, accelSample data 00: %f, playerIndex: %ld, obj: %@",accelSample.x, (long)voidController.gamepad.playerIndex, voidController);
+                                        LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
+                                                                    LI_MOTION_TYPE_ACCEL,
+                                                                    accelSample.x * -9.80665f * self->_gyroSensitivity,
+                                                                    accelSample.y * -9.80665f * self->_gyroSensitivity,
+                                                                    accelSample.z * -9.80665f * self->_gyroSensitivity);
+                                    }];
+                                });
+                            }
+                            break;
+                            
+                        case LI_MOTION_TYPE_GYRO:
+                            [voidController.gyroTimer invalidate];
+                            voidController.gyroTimer = nil;
+                            
+                            if (voidController.reportRateHz && voidController.gamepad.motion.hasRotationRate) {
+                                // Reset the last motion sample
+                                GCRotationRate emptyGyroSample = {};
+                                voidController.lastGyroSample = emptyGyroSample;
+                                //dispatch_sync(dispatch_get_main_queue(), ^{
+                                {dispatch_async(dispatch_get_main_queue(), ^{
+                                    voidController.hasGyroscope = YES;
+                                    voidController.gyroTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 / voidController.reportRateHz repeats:YES block:^(NSTimer *timer) {
+                                        // Don't send duplicate samples
+                                        GCRotationRate lastGyroSample = voidController.lastGyroSample;
+                                        GCRotationRate gyroSample = voidController.gamepad.motion.rotationRate;
+                                        if (memcmp(&gyroSample, &lastGyroSample, sizeof(gyroSample)) == 0) {
+                                            return;
+                                        }
+                                        voidController.lastGyroSample = gyroSample;
+                                        
+                                        // Convert rad/s to deg/s
+                                        // NSLog(@"sending controller gyro data, gyroSample data 00: %f, playerIndex: %ld, obj: %@",gyroSample.x, (long)voidController.gamepad.playerIndex, voidController);
+                                        LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
+                                                                    LI_MOTION_TYPE_GYRO,
+                                                                    gyroSample.x * 57.2957795f * self->_gyroSensitivity,
+                                                                    gyroSample.z * 57.2957795f * self->_gyroSensitivity,
+                                                                    gyroSample.y * -57.2957795f * self->_gyroSensitivity);
+                                    }];
+                                    //  });
+                                });}
+                            }
+                            break;
+                    }
                 }
             }
         }
@@ -283,7 +334,7 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
 
         // Set the motion sensor state if they require manual activation
         [self updateSensorSateForController:voidController];
-        NSLog(@"sensor active: %d", voidController.gamepad.motion.sensorsActive);
+        // NSLog(@"sensor active: %d", voidController.gamepad.motion.sensorsActive);
     }
 }
 
@@ -301,7 +352,7 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
 }
 
 - (void) setMotionEventState:(uint16_t)controllerNumber motionType:(uint8_t)motionType reportRateHz:(uint16_t)reportRateHz {
-    if (@available(iOS 14.0, tvOS 14.0, *)) {
+    //if (@available(iOS 14.0, tvOS 14.0, *)) {
         NSLog(@"gyroMode: %ld", (long)_gyroMode);
         
         VoidController* voidController = [_voidControllers objectForKey:[NSNumber numberWithInteger:controllerNumber]];
@@ -322,7 +373,7 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
         voidController.controllerNumber = controllerNumber;
 
         if(voidController == _oscController) [self updateTimerStateForController:voidController];
-    }
+    //}
 }
 
 -(void) setControllerLed:(uint16_t)controllerNumber r:(uint8_t)r g:(uint8_t)g b:(uint8_t)b {
@@ -1361,9 +1412,10 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
     _oscController.playerIndex = 0;
 
     DataManager* dataMan = [[DataManager alloc] init];
-    TemporarySettings* currentSettings = [dataMan getSettings];
-    _oscEnabled = _oscEnabled || (OnScreenControlsLevel)[currentSettings.onscreenControls integerValue] != OnScreenControlsLevelOff || streamConfig.gyroMode != GyroModeOff;
-    _gyroSensitivity = currentSettings.gyroSensitivity.floatValue;
+    tempSettings = [dataMan getSettings];
+
+    _oscEnabled = _oscEnabled || (OnScreenControlsLevel)[tempSettings.onscreenControls integerValue] != OnScreenControlsLevelOff || streamConfig.gyroMode != GyroModeOff;
+    _gyroSensitivity = tempSettings.gyroSensitivity.floatValue;
 }
 
 - (void)resetGyroInputForController:(VoidController* )voidController{
@@ -1409,7 +1461,7 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
     self = [super init];
     
     NSLog(@"controller support init");
-    
+        
     _delegate = delegate;
     _controllerStreamLock = [[NSLock alloc] init];
     _voidControllers = [[NSMutableDictionary alloc] init];
@@ -1553,6 +1605,7 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
 
     
     _oscController = [[VoidController alloc] init];
+    [self initializeControllerHaptics:_oscController];
     _gyroMode = AlwaysDevice;
 
     [self updateCommonConfig:streamConfig];
