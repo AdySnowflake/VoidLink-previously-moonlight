@@ -559,6 +559,36 @@
         }
       }
     },
+    "9Yx-H8-E3N.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Additional Left Click\"; ObjectID = \"9Yx-H8-E3N\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Additional Left Click"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "追加鼠标左单击"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "追加滑鼠左單擊"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "追加滑鼠左單擊"
+          }
+        }
+      }
+    },
     "53H-ST-OtY.segmentTitles[0]" : {
       "comment" : "Class = \"UISegmentedControl\"; 53H-ST-OtY.segmentTitles[0] = \"Balanced\"; ObjectID = \"53H-ST-OtY\";",
       "extractionState" : "extracted_with_value",
@@ -615,6 +645,48 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "效能"
+          }
+        }
+      }
+    },
+    "85A-d5-pLE.segmentTitles[0]" : {
+      "comment" : "Class = \"UISegmentedControl\"; 85A-d5-pLE.segmentTitles[0] = \"System\"; ObjectID = \"85A-d5-pLE\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "System"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系統"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系統"
+          }
+        }
+      }
+    },
+    "85A-d5-pLE.segmentTitles[1]" : {
+      "comment" : "Class = \"UISegmentedControl\"; 85A-d5-pLE.segmentTitles[1] = \"SDL\"; ObjectID = \"85A-d5-pLE\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "SDL"
           }
         }
       }
@@ -1983,6 +2055,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "實體滑鼠滾輪方向"
+          }
+        }
+      }
+    },
+    "fY9-M2-tiS.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Audio Engine\"; ObjectID = \"fY9-M2-tiS\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Audio Engine"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频引擎"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音訊引擎"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音訊引擎"
           }
         }
       }

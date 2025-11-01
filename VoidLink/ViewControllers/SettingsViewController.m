@@ -35,6 +35,7 @@
     NSInteger _bitrate;
     NSInteger _lastSelectedResolutionIndex;
     bool settingsViewJustLoaded;
+    bool settingsViewJustExpanded;
     uint16_t oswLayoutFingers;
     CustomEdgeSlideGestureRecognizer *slideToCloseSettingsViewRecognizer;
     NSMutableDictionary *_settingStackDict;
@@ -399,6 +400,8 @@ BOOL isCustomResolution(int resolutionSelected) {
 - (void)viewWillAppear:(BOOL)animated{
     [super viewWillAppear:NO];
     
+    settingsViewJustExpanded = true;
+    
     /*
     [self checkAndRequestMicPermission];
     self.micHandler = [MicHandler new];
@@ -458,6 +461,8 @@ BOOL isCustomResolution(int resolutionSelected) {
     [self.customResolutionSwitch setOn: isCustomResolution(self->tempSettings.resolutionSelected.intValue)];
     [self.resolutionSelector setEnabled:!self.customResolutionSwitch.isOn];
     [self touchModeChanged:self.touchModeSelector]; // a special fix for iOS 14 to set hidden for the "enableOswStack"
+    
+    settingsViewJustExpanded = false;
 }
 
 - (void)viewWillDisappear:(BOOL)animated{
@@ -713,6 +718,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     [self addSetting:self.singleTapSensitivityStack ofId:@"singleTapSensitivityStack" withInfoTag:NO withDynamicLabel:YES to:touchAndControlSection];
     [self addSetting:self.onScreenWidgetStack ofId:@"onScreenWidgetStack" withInfoTag:YES withDynamicLabel:YES to:touchAndControlSection];
     [self addSetting:self.buttonVisualFeedbackStack ofId:@"buttonVisualFeedbackStack" withInfoTag:NO withDynamicLabel:NO to:touchAndControlSection];
+    [self addSetting:self.appendLeftClickStack ofId:@"appendLeftClickStack" withInfoTag:YES withDynamicLabel:NO to:touchAndControlSection];
     [self addSetting:self.swapAbxyStack ofId:@"swapAbaxyStack" withInfoTag:NO withDynamicLabel:NO to:touchAndControlSection];
     [self addSetting:self.hapticEngineStack ofId:@"hapticEngineStack" withInfoTag:NO withDynamicLabel:NO to:touchAndControlSection];
     [self addSetting:self.emulatedControllerTypeStack ofId:@"emulatedControllerTypeStack" withInfoTag:YES withDynamicLabel:NO to:touchAndControlSection];
@@ -785,6 +791,8 @@ BOOL isCustomResolution(int resolutionSelected) {
     [self addSetting:self.redirectMicStack ofId:@"redirectMicStack" withInfoTag:YES withDynamicLabel:NO to:audioSection];
     [self addSetting:self.useBuiltinMicStack ofId:@"useBuiltinMicStack" withInfoTag:YES withDynamicLabel:NO to:audioSection];
     [self addSetting:self.micVolumeStack ofId:@"micVolumeStack" withInfoTag:NO withDynamicLabel:YES to:audioSection];
+    // [self addSetting:self.audioEngineStack ofId:@"audioEngineStack" withInfoTag:YES withDynamicLabel:NO to:audioSection];
+    // cancel audio engine selector due to system engine is unable to playback multi-channel audio
     [self addSetting:self.audioConfigStack ofId:@"audioConfigStack" withInfoTag:NO withDynamicLabel:NO to:audioSection];
     [audioSection addToParentStack:_parentStack];
     // [audioSection setExpanded:NO];
@@ -1274,6 +1282,10 @@ BOOL isCustomResolution(int resolutionSelected) {
         tipText = [LocalizationHelper localizedStringForKey:@"useBuiltinMicStackTip"];
         showOnlineDocAction = false;
     }
+    if([sender.superview.accessibilityIdentifier isEqualToString: @"appendLeftClickStack"]){
+        tipText = [LocalizationHelper localizedStringForKey:@"appendLeftClickStackTip"];
+        showOnlineDocAction = false;
+    }
 
     UIAlertController *tipsAlertController = [UIAlertController alertControllerWithTitle: [LocalizationHelper localizedStringForKey:@"Tips"] message:tipText preferredStyle:UIAlertControllerStyleAlert];
 
@@ -1534,6 +1546,7 @@ BOOL isCustomResolution(int resolutionSelected) {
         [self.view addGestureRecognizer:self->slideToCloseSettingsViewRecognizer];
 
         self->settingsViewJustLoaded = true;
+        self->settingsViewJustExpanded = true;
 
         // Always run settings in dark mode because we want the light fonts
         if (@available(iOS 13.0, tvOS 13.0, *)) {
@@ -1665,7 +1678,8 @@ BOOL isCustomResolution(int resolutionSelected) {
         [self.multiControllerSwitch setOn:self->tempSettings.multiController];
         [self.swapAbxySwitch setOn:self->tempSettings.swapABXYButtons];
         [self.buttonVisualFeedbackSwitch setOn:self->tempSettings.buttonVisualFeedback];
-        
+        [self.appendLeftClickSwitch setOn:self->tempSettings.appendLeftClick];
+
         [self.hapticEngineSelector setSelectedSegmentIndex:self->tempSettings.hapticEngine.intValue];
         bool hideHapticEngineStack = false;
         if(@available(iOS 13.0, tvOS 13.0, *)) hideHapticEngineStack = false;
@@ -1739,7 +1753,9 @@ BOOL isCustomResolution(int resolutionSelected) {
         [self.graphOpacityStepper setValue:(int)self->tempSettings.graphOpacity.intValue];
         [self.graphOpacityStepper addTarget:self action:@selector(graphOpacityStepperTapped:) forControlEvents:UIControlEventValueChanged];
         [self graphOpacityStepperTapped:self.graphOpacityStepper];
-
+        
+        self.audioEngineSelector.selectedSegmentIndex = self->tempSettings.audioEngine.intValue;
+        
         if (@available(iOS 18.0, tvOS 18.0, *)) {}else{
             [self.audioConfigSelector removeSegmentAtIndex:1 animated:false];
             [self.audioConfigSelector removeSegmentAtIndex:1 animated:false]; // segment 2 goes away when you remove index 2
@@ -1865,7 +1881,7 @@ BOOL isCustomResolution(int resolutionSelected) {
         
         
         self->motionControlSection.expandable = [self isCustomOswEnabled];
-        [self->motionControlSection setExpanded:[self isCustomOswEnabled]];
+        // [self->motionControlSection setExpanded:[self isCustomOswEnabled]];
         __weak typeof(self) weakSelf = self;
         self->motionControlSection.lockedSectionHandler = ^{
             [CountdownAlertController showAlertIn:weakSelf
@@ -1958,8 +1974,7 @@ BOOL isCustomResolution(int resolutionSelected) {
 - (bool)isCustomOswEnabled{
     bool customOswEnabled = [self isOswEnabled] && self.onScreenWidgetSelector.selectedSegmentIndex == OnScreenControlsLevelCustom;
     motionControlSection.expandable = customOswEnabled;
-    if(!settingsViewJustLoaded) [motionControlSection setExpanded:customOswEnabled];
-    NSLog(@"isCustomOswEnabled %d,  %f",customOswEnabled, CACurrentMediaTime());
+    if(!(settingsViewJustExpanded || settingsViewJustLoaded)) [motionControlSection setExpanded:customOswEnabled];
     return customOswEnabled;
 }
 
@@ -2079,12 +2094,12 @@ BOOL isCustomResolution(int resolutionSelected) {
     }
     
     bool customOscEnabled = [self isCustomOswEnabled];
-    NSLog(@"customOscEnabled %d", customOscEnabled);
+    // NSLog(@"customOscEnabled %d", customOscEnabled);
     UILabel* oswDynamicLabel = [self findDynamicLabelFromStack:self.onScreenWidgetStack];
     NSString* labelText = customOscEnabled ? [LocalizationHelper localizedStringForKey:@"%d finger tap", self->oswLayoutFingers] : @"";
     oswDynamicLabel.text = [NSString stringWithFormat:@"  %@  ", labelText];
     oswDynamicLabel.hidden = !customOscEnabled;
-    NSLog(@"oswDynamicLabel.hidden %d", oswDynamicLabel.hidden);
+    // NSLog(@"oswDynamicLabel.hidden %d", oswDynamicLabel.hidden);
     [self handleOswGestureChange];
     if(customOscEnabled && !settingsViewJustLoaded && !self.mainFrameViewController.settingsExpandedInStreamView) {
         // [self.keyboardToggleFingerNumSlider setValue:3.0];
@@ -2315,6 +2330,8 @@ BOOL isCustomResolution(int resolutionSelected) {
     [self setHidden:!(sender.selectedSegmentIndex == RelativeTouch) forStack:self.singleTapSensitivityStack];
     [self setHidden:![self isNotNativeTouchOnly] forStack:self.onScreenWidgetStack];
     [self setHidden:![self isNotNativeTouchOnly] forStack:self.buttonVisualFeedbackStack];
+    [self setHidden:!(([self isNotNativeTouchOnly] && sender.selectedSegmentIndex == NativeTouch)
+                      || sender.selectedSegmentIndex == AbsoluteTouch) forStack:self.appendLeftClickStack];
     [self handleOswGestureChange];
 }
 
@@ -2383,6 +2400,7 @@ BOOL isCustomResolution(int resolutionSelected) {
 - (void)enableOswForNativeTouchSwitchFlipped:(UISwitch *)sender{
     [self setHidden:!sender.isOn forStack:self.onScreenWidgetStack];
     [self setHidden:!sender.isOn forStack:self.buttonVisualFeedbackStack];
+    [self setHidden:!sender.isOn forStack:self.appendLeftClickStack];
     [self handleOswGestureChange];
 }
 
@@ -2851,6 +2869,8 @@ BOOL isCustomResolution(int resolutionSelected) {
     CGFloat singleTapSensitivity = self.singleTapSensitivitySlider.value;
     NSInteger hapticEngine = self.hapticEngineSelector.selectedSegmentIndex;
     CGFloat edgeSlidingSensitivity = self.edgeSlidingSensitivitySlider.value;
+    NSInteger audioEngine = self.audioEngineSelector.selectedSegmentIndex;
+    BOOL appendLeftClick = self.appendLeftClickSwitch.isOn;
     NSInteger backgroundSessionTimer = self.backgroundSessionTimerSlider.value == self.backgroundSessionTimerSlider.maximumValue ? (uint32_t) INT16_MAX : (uint32_t)self.backgroundSessionTimerSlider.value;
     
     [dataMan saveSettingsWithBitrate:_bitrate
@@ -2905,6 +2925,8 @@ BOOL isCustomResolution(int resolutionSelected) {
                   singleTapSensitivy:singleTapSensitivity
                         hapticEngine:hapticEngine
               edgeSlidingSensitivity:edgeSlidingSensitivity
+                         audioEngine:audioEngine
+                     appendLeftClick:appendLeftClick
               backgroundSessionTimer:backgroundSessionTimer];
 }
 
