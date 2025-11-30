@@ -21,6 +21,12 @@ typedef NS_ENUM(NSUInteger, UINavigationBarHeight) {
     UINavigationBarHeightIPhone = 44
 };
 
+typedef NS_ENUM(NSInteger, ControllerGyroSwitchMode) {
+    ControllerGyroSwitchDisabled,
+    ControllerGyroSwitchPressToToggle,
+    ControllerGyroSwitchHoldDown
+};
+
 typedef NS_ENUM(NSInteger, AudioEngine) {
     SystemAudioEngine,
     SDLAudioEngine
@@ -53,6 +59,11 @@ typedef NS_ENUM(NSInteger, HapticEnginePreference) {
     RumbleDevice,
     LeftRightSwapped,
     RumbleOff
+};
+
+typedef NS_ENUM(NSInteger, ControllerMouseStick) {
+    LeftStickToMouse,
+    RightStickToMouse,
 };
 
 typedef NS_ENUM(NSInteger, FramePacingMode) {
@@ -126,7 +137,21 @@ typedef NS_ENUM(NSInteger, WidgetSizeTransition) {
                     hapticEngine:(NSInteger)hapticEngine
           edgeSlidingSensitivity:(CGFloat)edgeSlidingSensitivity
                      audioEngine:(NSInteger)audioEngine
-                 appendLeftClick:(BOOL)appendLeftClick
+                 delayLeftClick:(BOOL)delayLeftClick
+                   duckOtherApps:(BOOL)duckOtherApps
+                muteInBackground:(BOOL)muteInBackground
+     relativeTouchSlideThreshold:(CGFloat)relativeTouchSlideThreshold
+                     enablePinch:(BOOL)enablePinch
+               scrollSensitivity:(CGFloat)scrollSensitivity
+                pinchSensitivity:(CGFloat)pinchSensitivity
+                ctrlDownForPinch:(BOOL)ctrlDownForPinch
+                leftClickDelayMs:(CGFloat)leftClickDelayMs
+              settingsMenuOffset:(CGFloat)settingsMenuOffset
+             passthroughGestures:(BOOL)passthroughGestures
+            mapControllerToMouse:(BOOL)mapControllerToMouse
+  controllerMousePointerVelocity:(CGFloat)controllerMousePointerVelocity
+             controllerMouseExpo:(CGFloat)controllerMouseExpo
+        controllerGyroSwitchMode:(NSInteger)controllerGyroSwitchMode
           backgroundSessionTimer:(NSInteger)backgroundSessionTimer;
 
 - (NSArray*) getHosts;

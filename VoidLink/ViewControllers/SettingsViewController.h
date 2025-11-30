@@ -68,7 +68,7 @@
 @property (strong, nonatomic) IBOutlet UISegmentedControl *resolutionSelector;
 @property (strong, nonatomic) IBOutlet UISwitch *customResolutionSwitch;
 @property (strong, nonatomic) IBOutlet UILabel *touchModeLabel;
-@property (strong, nonatomic) IBOutlet UISegmentedControl *touchModeSelector;
+@property (strong, nonatomic) IBOutlet UISegmentedControl *touchModeSelector1;
 @property (strong, nonatomic) IBOutlet UISwitch *enableOswForNativeTouchSwitch;
 @property (strong, nonatomic) IBOutlet UILabel *onscreenControllerLabel;
 @property (strong, nonatomic) IBOutlet UISegmentedControl *onScreenWidgetSelector;
@@ -181,8 +181,62 @@
 @property (strong, nonatomic) IBOutlet UIStackView *audioEngineStack;
 @property (strong, nonatomic) IBOutlet UISegmentedControl *audioEngineSelector;
 
-@property (strong, nonatomic) IBOutlet UIStackView *appendLeftClickStack;
-@property (strong, nonatomic) IBOutlet UISwitch *appendLeftClickSwitch;
+@property (strong, nonatomic) IBOutlet UIStackView *delayLeftClickStack;
+@property (strong, nonatomic) IBOutlet UISwitch *delayLeftClickSwitch;
+
+@property (strong, nonatomic) IBOutlet UIStackView *duckOtherAppStack;
+@property (strong, nonatomic) IBOutlet UISwitch *duckOtherAppSwitch;
+
+@property (strong, nonatomic) IBOutlet UIStackView *muteInBackgroundStack;
+@property (strong, nonatomic) IBOutlet UISwitch *muteInBackgroundSwitch;
+
+@property (strong, nonatomic) IBOutlet UIStackView *relativeTouchSlideThresholdStack;
+@property (strong, nonatomic) IBOutlet UISlider *relativeTouchSlideThresholdSlider;
+
+@property (strong, nonatomic) IBOutlet UIStackView *pinchGestureStack;
+@property (strong, nonatomic) IBOutlet UISwitch *pinchGestureSwitch;
+
+@property (strong, nonatomic) IBOutlet UIStackView *scrollSensitivityStack;
+@property (strong, nonatomic) IBOutlet UISlider *scrollSensitivitySlider;
+
+@property (strong, nonatomic) IBOutlet UIStackView *pinchSensitivityStack;
+@property (strong, nonatomic) IBOutlet UISlider *pinchSensitivitySlider;
+
+@property (strong, nonatomic) IBOutlet UIStackView *touchModeStack2;
+@property (strong, nonatomic) IBOutlet UISegmentedControl *touchModeSelector2;
+
+@property (strong, nonatomic) IBOutlet UIStackView *ctrlDownForPinchStack;
+@property (strong, nonatomic) IBOutlet UISwitch *ctrlDownForPinchSwitch;
+
+@property (strong, nonatomic) IBOutlet UIStackView *leftClickDelayStack;
+@property (strong, nonatomic) IBOutlet UISlider *leftClickDelaySlider;
+
+@property (strong, nonatomic) IBOutlet UIStackView *passthroughGesturesStack;
+@property (strong, nonatomic) IBOutlet UISwitch *passthroughGesturesSwitch;
+
+@property (strong, nonatomic) IBOutlet UIStackView *controllerToMouseStack;
+@property (strong, nonatomic) IBOutlet UISwitch *controllerToMouseSwitch;
+
+@property (strong, nonatomic) IBOutlet UIStackView *controllerMouseVelocityStack;
+@property (strong, nonatomic) IBOutlet UISlider *controllerMouseVelocitySlider;
+
+@property (strong, nonatomic) IBOutlet UIStackView *controllerMouseExpoStack;
+@property (strong, nonatomic) IBOutlet UISlider *controllerMouseExpoSlider;
+
+@property (strong, nonatomic) IBOutlet UIStackView *controllerGyroSwitchButtonStack;
+@property (strong, nonatomic) IBOutlet UISegmentedControl *controllerGyroSwitchButtonSetter;
+
+@property (strong, nonatomic) IBOutlet UIStackView *synthPhysicalInputStack;
+@property (strong, nonatomic) IBOutlet UISwitch *synthPhysicalInputSwitch;
+
+@property (strong, nonatomic) IBOutlet UIStackView *reverseHoldButtonStack;
+@property (strong, nonatomic) IBOutlet UISwitch *reverseHoldButtonSwitch;
+
+@property (strong, nonatomic) IBOutlet UIStackView *leftStickMinOffsetStack;
+@property (strong, nonatomic) IBOutlet UISlider *leftStickMinOffsetSlider;
+
+@property (strong, nonatomic) IBOutlet UIStackView *rightStickMinOffsetStack;
+@property (strong, nonatomic) IBOutlet UISlider *rightStickMinOffsetSlider;
 
 @property (strong, nonatomic) IBOutlet UIStackView *testStack;
 

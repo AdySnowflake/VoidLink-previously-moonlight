@@ -140,7 +140,25 @@
     self.hapticEngine = settings.hapticEngine;
     self.uniqueId = settings.uniqueId;
     self.audioEngine = settings.audioEngine;
-    self.appendLeftClick = settings.appendLeftClick;
+    self.delayLeftClick = settings.delayLeftClick;
+    self.duckOtherApps = settings.duckOtherApps;
+    self.muteInBackground = settings.muteInBackground;
+    self.relativeTouchSlideThreshold = settings.relativeTouchSlideThreshold;
+    self.enablePinch = settings.enablePinch;
+    self.scrollSensitivity = settings.scrollSensitivity;
+    self.pinchSensitivity = settings.pinchSensitivity;
+    self.leftClickDelayMs = settings.leftClickDelayMs;
+    self.ctrlDownForPinch = settings.ctrlDownForPinch;
+    self.settingsMenuOffset = settings.settingsMenuOffset;
+    self.passthroughGestures = settings.passthroughGestures;
+    self.mapControllerToMouse = settings.mapControllerToMouse;
+    self.controllerMouseLeftButton = settings.controllerMouseLeftButton;
+    self.controllerMouseRightButton = settings.controllerMouseRightButton;
+    self.controllerMouseSwitch = settings.controllerMouseSwitch;
+    self.controllerMouseStick = settings.controllerMouseStick;
+    self.controllerMousePointerVelocity = settings.controllerMousePointerVelocity;
+    self.controllerMouseExpo = settings.controllerMouseExpo;
+
 #endif
     
     return self;

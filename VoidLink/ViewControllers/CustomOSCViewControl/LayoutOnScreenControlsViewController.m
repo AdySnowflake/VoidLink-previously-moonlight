@@ -153,8 +153,10 @@ typedef NS_ENUM(NSUInteger, BorderWidthSliderMode) {
             widgetView.mouseButtonAction = buttonState.mouseButtonAction;
             widgetView.sensitivityFactorX = buttonState.sensitivityFactorX;
             widgetView.sensitivityFactorY = buttonState.sensitivityFactorY;
+            widgetView.slideThreshold = buttonState.slideThreshold;
             widgetView.yawFactor = buttonState.yawFactor;
             widgetView.pitchFactor = buttonState.pitchFactor;
+            widgetView.rollFactor = buttonState.rollFactor;
             widgetView.trackballDecelerationRate = buttonState.decelerationRate;
             widgetView.stickIndicatorOffset = buttonState.stickIndicatorOffset;
             widgetView.minStickOffset = buttonState.minStickOffset;
@@ -582,13 +584,6 @@ typedef NS_ENUM(NSUInteger, BorderWidthSliderMode) {
     }];
     
     [alertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-        textField.placeholder = [LocalizationHelper localizedStringForKey:@"Minimum stick offset (0~32766)"];
-        textField.keyboardType = UIKeyboardTypeASCIICapable;
-        textField.autocorrectionType = UITextAutocorrectionTypeNo;
-        textField.spellCheckingType = UITextSpellCheckingTypeNo;
-    }];
-    
-    [alertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {
         textField.placeholder = [LocalizationHelper localizedStringForKey:@"Shape (r - round, s - square)"];
         textField.keyboardType = UIKeyboardTypeASCIICapable;
         textField.autocorrectionType = UITextAutocorrectionTypeNo;
@@ -616,8 +611,7 @@ typedef NS_ENUM(NSUInteger, BorderWidthSliderMode) {
                                                      handler:^(UIAlertAction *action) {
         [widgetInitParams setObject: alertController.textFields[0].text forKey:@"cmdString"]; // convert to uppercase
         [widgetInitParams setObject: alertController.textFields[1].text forKey:@"buttonLabel"]; // convert to uppercase
-        [widgetInitParams setObject: alertController.textFields[2].text forKey:@"minStickOffsetString"]; // convert to uppercase
-        [widgetInitParams setObject: alertController.textFields[3].text forKey:@"shape"]; // convert to uppercase
+        [widgetInitParams setObject: alertController.textFields[2].text forKey:@"shape"]; // convert to uppercase
         [self createWidgetFromParams:widgetInitParams];
     }];
     [alertController addAction:readInstruction];
@@ -652,15 +646,7 @@ typedef NS_ENUM(NSUInteger, BorderWidthSliderMode) {
         textField.spellCheckingType = UITextSpellCheckingTypeNo;
         textField.text = self->selectedWidgetView.widgetLabel;
     }];
-    
-    [alertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-        textField.placeholder = [LocalizationHelper localizedStringForKey:@"Minimum stick offset (0~32766)"];
-        textField.keyboardType = UIKeyboardTypeASCIICapable;
-        textField.autocorrectionType = UITextAutocorrectionTypeNo;
-        textField.spellCheckingType = UITextSpellCheckingTypeNo;
-        if(self->selectedWidgetView.minStickOffset > 0) textField.text = [NSString stringWithFormat:@"%d", (int)self->selectedWidgetView.minStickOffset];
-    }];
-    
+        
     [alertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {
         textField.placeholder = [LocalizationHelper localizedStringForKey:@"Shape (r - round, s - square)"];
         textField.keyboardType = UIKeyboardTypeASCIICapable;
@@ -676,8 +662,7 @@ typedef NS_ENUM(NSUInteger, BorderWidthSliderMode) {
                                                             handler:^(UIAlertAction *action) {
         [widgetInitParams setObject: alertController.textFields[0].text forKey:@"cmdString"];
         [widgetInitParams setObject: alertController.textFields[1].text forKey:@"buttonLabel"];
-        [widgetInitParams setObject: alertController.textFields[2].text forKey:@"minStickOffsetString"];
-        [widgetInitParams setObject: alertController.textFields[3].text forKey:@"shape"];
+        [widgetInitParams setObject: alertController.textFields[2].text forKey:@"shape"];
         [self updateWidget:self->selectedWidgetView byParams:widgetInitParams createNew:true];
     }];
 
@@ -686,20 +671,23 @@ typedef NS_ENUM(NSUInteger, BorderWidthSliderMode) {
                                                      handler:^(UIAlertAction *action) {
         [widgetInitParams setObject: alertController.textFields[0].text forKey:@"cmdString"];
         [widgetInitParams setObject: alertController.textFields[1].text forKey:@"buttonLabel"];
-        [widgetInitParams setObject: alertController.textFields[2].text forKey:@"minStickOffsetString"];
-        [widgetInitParams setObject: alertController.textFields[3].text forKey:@"shape"];
+        [widgetInitParams setObject: alertController.textFields[2].text forKey:@"shape"];
         [self updateWidget:self->selectedWidgetView byParams:widgetInitParams createNew:false];
     }];
     
+    UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:[LocalizationHelper localizedStringForKey:@"Cancel"]
+                                                       style:UIAlertActionStyleDefault
+                                                     handler:^(UIAlertAction *action) {}];
+    
     [alertController addAction:createNewAction];
     [alertController addAction:modifyAction];
+    [alertController addAction:cancelAction];
     [self presentViewController:alertController animated:YES completion:nil];
 }
 
 - (bool) isWidgetParamsValid:(NSMutableDictionary* )widgetInitParams{
     NSString *cmdString = [widgetInitParams[@"cmdString"] uppercaseString]; // convert to uppercase
     NSString *buttonLabel = widgetInitParams[@"buttonLabel"];
-    NSString *minStickOffsetString = widgetInitParams[@"minStickOffsetString"];
     NSString *widgetShape = [widgetInitParams[@"shape"] lowercaseString];
         
     widgetInitParams[@"cmdString"] = cmdString;
@@ -713,11 +701,6 @@ typedef NS_ENUM(NSUInteger, BorderWidthSliderMode) {
     bool paramInvalid = noValidKeyboardString && noValidMouseButtonString && noValidTouchPadString && noValidOscButtonString && noValidFunctionalButtonString && noValidSuperComboButtonString && noValidMotionControlButtonString;
     
     if([buttonLabel isEqualToString:@""]) widgetInitParams[@"buttonLabel"] = [[cmdString lowercaseString] capitalizedString];
-
-    NSCharacterSet *nonDigitCharacterSet = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
-    NSString *trimmedString = [minStickOffsetString stringByTrimmingCharactersInSet:nonDigitCharacterSet];
-    if(trimmedString.length != minStickOffsetString.length) paramInvalid = true;
-    widgetInitParams[@"minStickOffsetString"] = trimmedString;
     
     NSSet* validShapes = [NSSet setWithObjects:@"round", @"square", @"largesquare", nil];
     if([widgetShape isEqualToString:@"r"]) widgetShape = @"round";
@@ -744,14 +727,22 @@ typedef NS_ENUM(NSUInteger, BorderWidthSliderMode) {
     newWidget.autoTapInterval = widget.autoTapInterval;
     newWidget.sensitivityFactorX = widget.sensitivityFactorX;
     newWidget.sensitivityFactorY = widget.sensitivityFactorY;
+    newWidget.slideThreshold = widget.slideThreshold;
     newWidget.yawFactor = widget.yawFactor;
     newWidget.pitchFactor = widget.pitchFactor;
+    newWidget.rollFactor = widget.rollFactor;
     newWidget.trackballDecelerationRate = widget.trackballDecelerationRate;
     newWidget.stickIndicatorOffset = widget.stickIndicatorOffset;
-    newWidget.minStickOffset = [widgetInitParams[@"minStickOffsetString"] floatValue];
+    newWidget.minStickOffset = widget.minStickOffset;
     [newWidget setVibrationWithStyle:widget.vibrationStyle];
     newWidget.mouseButtonAction = widget.mouseButtonAction;
     newWidget.buttonMode = widget.buttonMode;
+    
+    if (newWidget.widgetType != widget.widgetType){
+        newWidget = nil;
+        return;
+    }
+
     [self.view insertSubview:newWidget belowSubview:self.widgetPanelStack];
     [newWidget accessWidgetAttributes];
 
@@ -779,7 +770,6 @@ typedef NS_ENUM(NSUInteger, BorderWidthSliderMode) {
     widgetView.identifier = [UUIDHelper newUUID];
     widgetView.guidelineDelegate = (id<OnScreenWidgetGuidelineUpdateDelegate>)self;
     widgetView.translatesAutoresizingMaskIntoConstraints = NO; // weird but this is mandatory, or you will find no key views added to the right place
-    widgetView.minStickOffset = [widgetInitParams[@"minStickOffsetString"] floatValue];
     [self.onScreenWidgetViews addObject:widgetView];
     // Add the widgetView to the view controller's view
     [self.view insertSubview:widgetView belowSubview:self.widgetPanelStack];
@@ -901,6 +891,23 @@ typedef NS_ENUM(NSUInteger, BorderWidthSliderMode) {
         [self autoFitLabel:self.sensitivityYLabel];
     }
     
+    self.minStickOffsetStack.hidden = !selectedWidgetView.hasMinStickOffset;
+    if(selectedWidgetView.hasMinStickOffset){
+        [self.minStickOffsetSlider setValue:selectedWidgetView.minStickOffset];
+        [self.minStickOffsetLabel setText:[LocalizationHelper localizedStringForKey:@"Minimum offset: %.0f", self->selectedWidgetView.minStickOffset]];
+        [self autoFitLabel:self.minStickOffsetLabel];
+    }
+    
+    self.slideThresholdStack.hidden = !selectedWidgetView.hasSlideThreshold;
+    if(selectedWidgetView.hasSlideThreshold){
+        [self.slideThresholdSlider setMinimumValue:selectedWidgetView.slideThresholdMin];
+        [self.slideThresholdSlider setMaximumValue:selectedWidgetView.slideThresholdMax];
+        [self.slideThresholdSlider setValue:self->selectedWidgetView.slideThreshold];
+        [self.slideThresholdLabel setText:[LocalizationHelper localizedStringForKey:@"Slide threshold: %.1f", self->selectedWidgetView.slideThreshold]];
+        [self autoFitLabel:self.slideThresholdLabel];
+    }
+
+    
     self.yawFactorStack.hidden = !selectedWidgetView.hasYawFactor;
     if(selectedWidgetView.hasYawFactor){
         [self.yawFactorSlider setMinimumValue:selectedWidgetView.yawFactorMin];
@@ -917,6 +924,15 @@ typedef NS_ENUM(NSUInteger, BorderWidthSliderMode) {
         [self.pitchFactorSlider setValue:self->selectedWidgetView.pitchFactor];
         [self.pitchFactorLabel setText:[LocalizationHelper localizedStringForKey:@"Pitch factor: %.2f", self->selectedWidgetView.pitchFactor]];
         [self autoFitLabel:self.pitchFactorLabel];
+    }
+    
+    self.rollFactorStack.hidden = !selectedWidgetView.hasRollFactor;
+    if(selectedWidgetView.hasRollFactor){
+        [self.rollFactorSlider setMinimumValue:selectedWidgetView.rollFactorMin];
+        [self.rollFactorSlider setMaximumValue:selectedWidgetView.rollFactorMax];
+        [self.rollFactorSlider setValue:self->selectedWidgetView.rollFactor];
+        [self.rollFactorLabel setText:[LocalizationHelper localizedStringForKey:@"Roll factor: %.2f", self->selectedWidgetView.rollFactor]];
+        [self autoFitLabel:self.rollFactorLabel];
     }
 
     
@@ -966,7 +982,7 @@ typedef NS_ENUM(NSUInteger, BorderWidthSliderMode) {
     [self autoFitLabel:self.decelerationRateLabel];
     [self decelerationRateSliderMoved:self.decelerationRateSlider];
     
-    self.mouseDownButtonStack.hidden = !selectedWidgetView.isMousePad;
+    self.mouseDownButtonStack.hidden = !selectedWidgetView.isMousePadWithButtonActions;
     self.mouseButtonDownSelector.selectedSegmentIndex = selectedWidgetView.mouseButtonAction;
     
     self.buttonModeStack.hidden = selectedWidgetView.widgetType != WidgetTypeEnumButton;
@@ -1156,6 +1172,18 @@ typedef NS_ENUM(NSUInteger, BorderWidthSliderMode) {
     return;
 }
 
+- (void)minStickOffsetSliderMoved:(UISlider* )sender{
+    [self.minStickOffsetLabel setText:[LocalizationHelper localizedStringForKey:@"Minimum offset: %.0f", sender.value]];
+    if(self->selectedWidgetView != nil && self->widgetViewSelected) self->selectedWidgetView.minStickOffset = sender.value;
+    return;
+}
+
+- (void)slideThresholdSliderMoved:(UISlider* )sender{
+    [self.slideThresholdLabel setText:[LocalizationHelper localizedStringForKey:@"Slide threshold: %.1f", sender.value]];
+    if(self->selectedWidgetView != nil && self->widgetViewSelected) self->selectedWidgetView.slideThreshold = sender.value;
+    return;
+}
+
 - (void)yawFactorSliderMoved:(UISlider* )sender{;
     [self.yawFactorLabel setText:[LocalizationHelper localizedStringForKey:@"Yaw factor: %.2f", sender.value]];
     [self.pitchFactorLabel setText:[LocalizationHelper localizedStringForKey:@"Pitch factor: %.2f", sender.value]];
@@ -1171,6 +1199,12 @@ typedef NS_ENUM(NSUInteger, BorderWidthSliderMode) {
 - (void)pitchFactorSliderMoved:(UISlider* )sender{
     [self.pitchFactorLabel setText:[LocalizationHelper localizedStringForKey:@"Pitch factor: %.2f", sender.value]];
     if(self->selectedWidgetView != nil && self->widgetViewSelected) self->selectedWidgetView.pitchFactor = sender.value;
+    return;
+}
+
+- (void)rollFactorSliderMoved:(UISlider* )sender{
+    [self.rollFactorLabel setText:[LocalizationHelper localizedStringForKey:@"Roll factor: %.2f", sender.value]];
+    if(self->selectedWidgetView != nil && self->widgetViewSelected) self->selectedWidgetView.rollFactor = sender.value;
     return;
 }
 
@@ -1307,14 +1341,26 @@ typedef NS_ENUM(NSUInteger, BorderWidthSliderMode) {
     self.sensitivityYLabel.text = [LocalizationHelper localizedStringForKey:@"SensitivityY"];
     self.sensitivityYStack.hidden = YES;
     
+    [self.minStickOffsetSlider addTarget:self action:@selector(minStickOffsetSliderMoved:) forControlEvents:(UIControlEventValueChanged)];
+    self.minStickOffsetLabel.text = [LocalizationHelper localizedStringForKey:@"Minimum offset"];
+    self.minStickOffsetStack.hidden = YES;
+    
+    [self.slideThresholdSlider addTarget:self action:@selector(slideThresholdSliderMoved:) forControlEvents:(UIControlEventValueChanged)];
+    self.slideThresholdLabel.text = [LocalizationHelper localizedStringForKey:@"Slide threshold"];
+    self.slideThresholdStack.hidden = YES;
+    
     [self.yawFactorSlider addTarget:self action:@selector(yawFactorSliderMoved:) forControlEvents:(UIControlEventValueChanged)];
-    self.yawFactorLabel.text = [LocalizationHelper localizedStringForKey:@"SensitivityYaw"];
+    self.yawFactorLabel.text = [LocalizationHelper localizedStringForKey:@"Yaw Factor"];
     self.yawFactorStack.hidden = YES;
     
     [self.pitchFactorSlider addTarget:self action:@selector(pitchFactorSliderMoved:) forControlEvents:(UIControlEventValueChanged)];
-    self.pitchFactorLabel.text = [LocalizationHelper localizedStringForKey:@"SensitivityPitch"];
+    self.pitchFactorLabel.text = [LocalizationHelper localizedStringForKey:@"Pitch Factor"];
     self.pitchFactorStack.hidden = YES;
     
+    [self.rollFactorSlider addTarget:self action:@selector(rollFactorSliderMoved:) forControlEvents:(UIControlEventValueChanged)];
+    self.rollFactorLabel.text = [LocalizationHelper localizedStringForKey:@"Roll Factor"];
+    self.rollFactorStack.hidden = YES;
+
     [self.decelerationRateSlider addTarget:self action:@selector(decelerationRateSliderMoved:) forControlEvents:(UIControlEventValueChanged)];
     self.decelerationRateLabel.text = [LocalizationHelper localizedStringForKey:@"Deceleration Rate"];
     self.decelerationRateStack.hidden = YES;

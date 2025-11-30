@@ -78,6 +78,10 @@
     TemporaryApp * launchedApp;
 
     NSTimer *_foregroundHostUpdateTimer;
+    
+    id _controllerConnectObserver;
+    id _controllerDisconnectObserver;
+
 
 #if TARGET_OS_TV
     UITapGestureRecognizer* _menuRecognizer;
@@ -1134,20 +1138,6 @@ static NSMutableSet* hostList;
     }
 }
 
-
-- (void)handleOrientationChange {
-    // UIDeviceOrientation targetOrientation = [[UIDevice currentDevice] orientation];
-    // if([self isIPhone] && UIDeviceOrientationIsPortrait(targetOrientation)) [self simulateSettingsButtonPressClose]; // on iphone, force close settings views if target orietation is portrait.
-    double delayInSeconds = 0.7;
-    // Convert the delay into a dispatch_time_t value
-    dispatch_time_t delayTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
-    // Perform some task after the delay
-    dispatch_after(delayTime, dispatch_get_main_queue(), ^{// Code to execute after the delay
-        // [self updateResolutionAccordingly];
-        // [self.settingsButton setEnabled:![self isIPhonePortrait]]; //make sure settings button is disabled in iphone portrait mode.
-    });
-}
-
 // currently obselete:
 - (void) setNeedsUpdateAllowedOrientation{
     if (@available(iOS 16.0, *)) {
@@ -1183,7 +1173,8 @@ static NSMutableSet* hostList;
     // [settingsViewController widget:settingsViewController.bitrateSlider setEnabled:!self.settingsExpandedInStreamView];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.optimizeGamesStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.audioOnPcStack];
-    [settingsViewController.touchModeSelector setEnabled:!_settingsExpandedInStreamView || !_sessionLaunchedWithAbsoluteTouch];
+    [settingsViewController.touchModeSelector1 setEnabled:!_settingsExpandedInStreamView || !(settingsViewController.touchModeSelector1.selectedSegmentIndex == AbsoluteTouch && !settingsViewController.passthroughGesturesSwitch.isOn)];
+    [settingsViewController.touchModeSelector2 setEnabled:settingsViewController.touchModeSelector1.enabled];
     [settingsViewController.codecSelector setEnabled:!_settingsExpandedInStreamView];
     [settingsViewController.yuv444Switch setEnabled:!_settingsExpandedInStreamView];
     [settingsViewController.hdrSwitch setEnabled:!_settingsExpandedInStreamView && [settingsViewController hdrSupported]];
@@ -1192,6 +1183,7 @@ static NSMutableSet* hostList;
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.citrixX1MouseStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.externalDisplayModeStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.audioConfigStack];
+    [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.duckOtherAppStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.pipStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.appThemeStack];
     [settingsViewController.renderingBackendSelector setEnabled:!_settingsExpandedInStreamView];
@@ -1203,6 +1195,7 @@ static NSMutableSet* hostList;
     if(_settingsExpandedInStreamView && !streamFrameViewController.micStreamInitialized) [settingsViewController.redirectMicSwitch setOn:false];
     [settingsViewController setHidden:!settingsViewController.redirectMicSwitch.isOn forStack:settingsViewController.useBuiltinMicStack];
     [settingsViewController.useBuiltinMicSwitch setEnabled:!_settingsExpandedInStreamView];
+    [settingsViewController.passthroughGesturesSwitch setEnabled:!_settingsExpandedInStreamView];
 }
 
 - (void)revealController:(SWRevealViewController *)revealController didMoveToPosition:(FrontViewPosition)position {
@@ -1282,7 +1275,7 @@ static NSMutableSet* hostList;
     // Create and configure the label
     if (@available(iOS 13.0, *)) return;
     else {
-        [self->waterMark removeFromSuperview];
+        [self->waterMark removeFromSuperview]; // removed before activate contraint
         self->waterMark = [[UILabel alloc] init];
         self->waterMark.translatesAutoresizingMaskIntoConstraints = NO;
         self->waterMark.numberOfLines = 1;
@@ -1425,31 +1418,6 @@ static NSMutableSet* hostList;
     return [self isIPhone] ? UINavigationBarHeightIPhone : UINavigationBarHeightIPad;
 }
 
-- (void)setupHostViewTitle{
-    self->hostViewTitleLabel = [[UILabel alloc] init];
-
-    hostViewTitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    hostViewTitleLabel.numberOfLines = 1;
-    hostViewTitleLabel.font = [UIFont systemFontOfSize:30 weight:UIFontWeightSemibold];
-    hostViewTitleLabel.text = [LocalizationHelper localizedStringForKey:@"Hosts"];
-    // CGFloat labelHeight = 60;
-
-
-    hostViewTitleLabel.textColor = [ThemeManager textColor];
-    hostViewTitleLabel.textAlignment = NSTextAlignmentCenter;
-    // hostViewTitleLabel.backgroundColor = [UIColor clearColor];
-    hostViewTitleLabel.userInteractionEnabled = NO; // Enable user interaction for tap gesture
-    // Add tap gesture recognizer to handle hyperlink action
-    [self.view addSubview:hostViewTitleLabel];
-    // Set up constraints
-    [NSLayoutConstraint activateConstraints:@[
-        [hostViewTitleLabel.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:0], // Aligns the horizontal center of label to the horizontal center of view
-        [hostViewTitleLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:25],
-        [hostViewTitleLabel.heightAnchor constraintEqualToConstant:30],
-        [hostViewTitleLabel.widthAnchor constraintEqualToConstant:100],
-    ]];
-}
-
 - (void)applyNavBarAppearance{
     if (@available(iOS 13.0, *)) {
         self.navigationController.navigationBar.standardAppearance.backgroundColor = [UIColor clearColor]; // old ios depend on this, do not remove
@@ -1571,11 +1539,6 @@ static NSMutableSet* hostList;
     TemporarySettings* tempSettings = [dataMan getSettings];
     [ThemeManager setUserInterfaceStyle:tempSettings.appTheme.intValue];
     
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(deviceOrientationDidChange) // handle orientation change since i made portrait mode available
-                                                 name:UIDeviceOrientationDidChangeNotification
-                                               object:nil];
-
 #if !TARGET_OS_TV
     self.settingsExpandedInStreamView = false; // init this flag
     self.revealViewController.isStreaming = false; //init this flag for rvlVC
@@ -1667,6 +1630,25 @@ static NSMutableSet* hostList;
     __unused UIView *view = viewController.view;
     
     snapshot = nil;
+    
+    _controllerConnectObserver = [[NSNotificationCenter defaultCenter] addObserverForName:GCControllerDidConnectNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
+        Log(LOG_I, @"Controller connected!");
+        GCController* controller = note.object;
+        if(controller){
+            if (@available(iOS 14.0, tvOS 14.0, *)) {
+                for (GCControllerElement* element in controller.physicalInputProfile.allElements) {
+                    element.preferredSystemGestureState = GCSystemGestureStateDisabled;
+                }
+            }
+        }
+    }];
+    
+    _controllerDisconnectObserver = [[NSNotificationCenter defaultCenter] addObserverForName:GCControllerDidDisconnectNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
+        Log(LOG_I, @"Controller disconnected!");
+        
+        GCController* controller = note.object;
+        [self unregisterControllerCallbacks:controller];
+    }];
 }
 
 -(void)viewDidLayoutSubviews{
@@ -1846,10 +1828,6 @@ static NSMutableSet* hostList;
     [self attachWaterMark];
     
 #if !TARGET_OS_TV
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(handleOrientationChange) // //force expand settings view to update resolution table, and all setting includes current fullscreen resolution will be updated.
-                                                 name:UIDeviceOrientationDidChangeNotification
-                                               object:nil];
     
     [[self revealViewController] setPrimaryViewController:self];
     self.revealViewController.isStreaming = false; // tell the revealViewController streaming is finished
@@ -1881,7 +1859,6 @@ static NSMutableSet* hostList;
     [self updateResolutionAccordingly];
     if([self isFirstLaunch])[self helpButtonTapped];
 }
-
 
 - (void)viewWillDisappear:(BOOL)animated{
     NSLog(@"willDisappear");
@@ -1938,6 +1915,8 @@ static NSMutableSet* hostList;
     
     // Remove our lifetime observers to avoid triggering them
     // while streaming
+    [[NSNotificationCenter defaultCenter] removeObserver:_controllerConnectObserver];
+    [[NSNotificationCenter defaultCenter] removeObserver:_controllerDisconnectObserver];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
@@ -2034,20 +2013,6 @@ static NSMutableSet* hostList;
     // Reset state first so we can rediscover hosts that were deleted before
     [_discMan resetDiscoveryState];
 }
-
-// This function forces immediate decoding of the UIImage, rather
-// than the default lazy decoding that results in janky scrolling.
--(void)deviceOrientationDidChange{
-    if(self.revealViewController.isStreaming || self.collectionView.superview == nil) return;
-    [NSLayoutConstraint activateConstraints:@[
-        [self.collectionView.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
-        [self.collectionView.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor],
-        [self.collectionView.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor],
-        [self.collectionView.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor],
-        //[self.collectionView.heightAnchor constraintEqualToConstant:_headerViewHeight]
-    ]];
-}
-
 
 + (UIImage*) loadBoxArtForCaching:(TemporaryApp*)app {
     UIImage* boxArt;
@@ -2338,22 +2303,31 @@ static NSMutableSet* hostList;
     self.hostCollectionVC.minimumLineSpacing = 25;
     // 添加为子控制器
     [self addChildViewController:self.hostCollectionVC];
-    [self.view addSubview:self.hostCollectionVC.view];
-
-    // 设置其布局（Auto Layout 示例）
-    // CGFloat hostCollectionViewPadding = 75;
-    CGFloat leftPadding = [self isIPhone] ? 30 : 0;
-    self.hostCollectionVC.view.translatesAutoresizingMaskIntoConstraints = NO;
-    [NSLayoutConstraint activateConstraints:@[
-        [self.hostCollectionVC.view.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:0],
-        [self.hostCollectionVC.view.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor constant:leftPadding],
-        [self.hostCollectionVC.view.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor constant:0],
-        // [self.hostCollectionVC.view.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:0] //?
-    ]];
-
+    
+    if(self.hostCollectionVC.view.superview == nil){
+        [self.view addSubview:self.hostCollectionVC.view];
+        CGFloat leftPadding = [self isIPhone] ? 30 : 0;
+        self.hostCollectionVC.view.translatesAutoresizingMaskIntoConstraints = NO;
+        [NSLayoutConstraint activateConstraints:@[
+            [self.hostCollectionVC.view.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:0],
+            [self.hostCollectionVC.view.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor constant:leftPadding],
+            [self.hostCollectionVC.view.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor constant:0],
+        ]];
+    }
+    
     // 通知子控制器已添加完成
     [self.hostCollectionVC didMoveToParentViewController:self];
 
+}
+
+-(void) unregisterControllerCallbacks:(GCController*) controller
+{
+    if (controller != NULL) {
+        controller.controllerPausedHandler = NULL;
+        if (controller.extendedGamepad != NULL) {
+            controller.extendedGamepad.valueChangedHandler = NULL;
+        }
+    }
 }
 
 @end

@@ -109,7 +109,21 @@
                     hapticEngine:(NSInteger)hapticEngine
           edgeSlidingSensitivity:(CGFloat)edgeSlidingSensitivity
                      audioEngine:(NSInteger)audioEngine
-                 appendLeftClick:(BOOL)appendLeftClick
+                 delayLeftClick:(BOOL)delayLeftClick
+                   duckOtherApps:(BOOL)duckOtherApps
+                muteInBackground:(BOOL)muteInBackground
+     relativeTouchSlideThreshold:(CGFloat)relativeTouchSlideThreshold
+                     enablePinch:(BOOL)enablePinch
+               scrollSensitivity:(CGFloat)scrollSensitivity
+                pinchSensitivity:(CGFloat)pinchSensitivity
+                ctrlDownForPinch:(BOOL)ctrlDownForPinch
+                leftClickDelayMs:(CGFloat)leftClickDelayMs
+              settingsMenuOffset:(CGFloat)settingsMenuOffset
+             passthroughGestures:(BOOL)passthroughGestures
+            mapControllerToMouse:(BOOL)mapControllerToMouse
+  controllerMousePointerVelocity:(CGFloat)controllerMousePointerVelocity
+             controllerMouseExpo:(CGFloat)controllerMouseExpo
+        controllerGyroSwitchMode:(NSInteger)controllerGyroSwitchMode
           backgroundSessionTimer:(NSInteger)backgroundSessionTimer{
 
     [_managedObjectContext performBlockAndWait:^{
@@ -169,7 +183,20 @@
         settingsToSave.hapticEngine = [NSNumber numberWithInteger:hapticEngine];
         settingsToSave.edgeSlidingSensitivity = [NSNumber numberWithFloat:edgeSlidingSensitivity];
         settingsToSave.audioEngine = [NSNumber numberWithInteger:audioEngine];
-        settingsToSave.appendLeftClick = appendLeftClick;
+        settingsToSave.delayLeftClick = delayLeftClick;
+        settingsToSave.duckOtherApps = duckOtherApps;
+        settingsToSave.muteInBackground = muteInBackground;
+        settingsToSave.relativeTouchSlideThreshold = [NSNumber numberWithFloat:relativeTouchSlideThreshold];
+        settingsToSave.enablePinch = enablePinch;
+        settingsToSave.scrollSensitivity = [NSNumber numberWithFloat:scrollSensitivity];
+        settingsToSave.pinchSensitivity = [NSNumber numberWithFloat:pinchSensitivity];
+        settingsToSave.ctrlDownForPinch = ctrlDownForPinch;
+        settingsToSave.leftClickDelayMs = [NSNumber numberWithFloat:leftClickDelayMs];
+        settingsToSave.settingsMenuOffset = [NSNumber numberWithFloat:settingsMenuOffset];
+        settingsToSave.passthroughGestures = passthroughGestures;
+        settingsToSave.mapControllerToMouse = mapControllerToMouse;
+        settingsToSave.controllerMousePointerVelocity = [NSNumber numberWithFloat:controllerMousePointerVelocity];
+        settingsToSave.controllerMouseExpo = [NSNumber numberWithFloat:controllerMouseExpo];
         settingsToSave.rememberFoldState = rememberFoldState;
         [self saveData];
     }];

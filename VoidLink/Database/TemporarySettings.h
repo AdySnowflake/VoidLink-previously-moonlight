@@ -83,8 +83,25 @@
 @property (nonatomic, retain) NSNumber * appTheme;
 @property (nonatomic, retain) NSNumber * edgeSlidingSensitivity;
 @property (nonatomic, retain) NSNumber * audioEngine;
-@property (nonatomic) BOOL appendLeftClick;
+@property (nonatomic) BOOL delayLeftClick;
+@property (nonatomic) BOOL duckOtherApps;
+@property (nonatomic) BOOL muteInBackground;
+@property (nonatomic) BOOL enablePinch;
+@property (nonatomic) BOOL ctrlDownForPinch;
+@property (nonatomic) BOOL passthroughGestures;
 @property (nonatomic, retain) NSNumber * framePacingMode;
+@property (nonatomic, retain) NSNumber * scrollSensitivity;
+@property (nonatomic, retain) NSNumber * pinchSensitivity;
+@property (nonatomic, retain) NSNumber * relativeTouchSlideThreshold;
+@property (nonatomic, retain) NSNumber * leftClickDelayMs;
+@property (nonatomic, retain) NSNumber * settingsMenuOffset;
+@property (nonatomic, retain) NSNumber * controllerMouseLeftButton;
+@property (nonatomic, retain) NSNumber * controllerMouseRightButton;
+@property (nonatomic, retain) NSNumber * controllerMouseStick;
+@property (nonatomic, retain) NSNumber * controllerMouseSwitch;
+@property (nonatomic) BOOL mapControllerToMouse;
+@property (nonatomic, retain) NSNumber * controllerMousePointerVelocity;
+@property (nonatomic, retain) NSNumber * controllerMouseExpo;
 
 - (id) initFromSettings:(Settings*)settings;
 

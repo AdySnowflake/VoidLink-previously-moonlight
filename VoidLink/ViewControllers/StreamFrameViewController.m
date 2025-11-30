@@ -19,7 +19,6 @@
 #import "DataManager.h"
 #import "PaddedLabel.h"
 #import "ImGuiRenderer.h"
-#import "RelativeTouchHandler.h"
 #import "MetalVideoRenderer.h"
 #import "CustomEdgeSlideGestureRecognizer.h"
 #import "CustomTapGestureRecognizer.h"
@@ -305,13 +304,14 @@
         _oscLayoutTapRecoginizer.delaysTouchesBegan = NO;
         _oscLayoutTapRecoginizer.delaysTouchesEnded = NO;
         if(_settings.touchMode.intValue == AbsoluteTouch) _oscLayoutTapRecoginizer.immediateTriggering = true; // make immediate triggering on for absolute touch mode
-        [self.view addGestureRecognizer:_oscLayoutTapRecoginizer]; //
+        [self.view addGestureRecognizer:_oscLayoutTapRecoginizer];
+        _oscLayoutTapRecoginizer.touchCapturingView = _streamView;
     }
     
 }
 
 - (void)configZoomGestureAndAddStreamView{
-    if (_settings.touchMode.intValue == AbsoluteTouch) {
+    if (_settings.touchMode.intValue == AbsoluteTouch && !_settings.passthroughGestures) {
         if(!_scrollView) _scrollView = [[UIScrollView alloc] initWithFrame:self.view.frame];
 #if !TARGET_OS_TV
         [_scrollView.panGestureRecognizer setMinimumNumberOfTouches:2];
@@ -320,13 +320,14 @@
         [_scrollView setShowsHorizontalScrollIndicator:NO];
         [_scrollView setShowsVerticalScrollIndicator:NO];
         [_scrollView setDelegate:self];
-        [_scrollView setMaximumZoomScale:10.0f];
+        [_scrollView setMaximumZoomScale:_settings.passthroughGestures ? 1.0 : 10.0f];
         if(!_mainFrameViewcontroller.settingsExpandedInStreamView){
             // Add StreamView inside a UIScrollView for absolute mode
             [_scrollView addSubview:_streamView];
             // Insert at index 0 to ensure it doesn't cover OSC controls (CALayers)
             [self.view insertSubview:_scrollView atIndex:0];
         }
+        _scrollView.panGestureRecognizer.enabled = !_settings.passthroughGestures;
     }
     else{
         // Add streamView directly to self.view in other touch modes
@@ -374,7 +375,8 @@
     }
     else [micHandler stopTappingWithStopEngine:false];
     
-    [Connection setUseSystemAudioEngine:_settings.audioEngine.intValue == SystemAudioEngine];
+    Connection.useSystemAudioEngine = _settings.audioEngine.intValue == SystemAudioEngine;
+    Connection.muteInBackground = _settings.muteInBackground;
     
     if(!viewJustLoaded) [_controllerSupport updateControllerSupport:self.streamConfig delegate:self];
     // reload controllerSupport obj, this is mandatory for OSC reload,especially when the stream view is launched without OSC
@@ -445,6 +447,11 @@
     _streamView.onScreenControls.instanceReceiverDelegate = _motionHandler;
     [_streamView.onScreenControls sendInstance];
     
+    TouchPadGestureHandler.enablePinch = _settings.enablePinch;
+    TouchPadGestureHandler.ctrlDownForPinch = _settings.ctrlDownForPinch;
+    TouchPadGestureHandler.scrollSensitivity = _settings.scrollSensitivity.floatValue;
+    TouchPadGestureHandler.pinchSensitivity = _settings.pinchSensitivity.floatValue;
+
     NSLog(@"frameview gestures: %d", (uint32_t)[self.view.gestureRecognizers count]);
     NSLog(@"streamview gestures: %d", (uint32_t)[_streamView.gestureRecognizers count]);
 }
@@ -549,12 +556,13 @@
     // 创建弹窗
     NSString* tipText = [LocalizationHelper localizedStringForKey:@"firstLaunchTip", settingsEdgeSide, slideDist, cmdToolEdgeSide, slideDist];
     
-    [CountdownAlertController showAlertIn:self
+    [AlertControllerUtil showAlertIn:self
                                     title:[LocalizationHelper localizedStringForKey:@"First Launch Tips"]
                                   message:tipText
                                withCancel:NO
                               buttonTitle:[LocalizationHelper localizedStringForKey:@"Got it!"]
                                 countdown:16
+                                   action:^{}
                                completion:^{}];
     
     return;
@@ -772,6 +780,10 @@
 
 - (void)enterPip{
     [self.pipController startPictureInPicture];
+}
+
+- (void)alterAbsTouchDragWithMouseButton:(int32_t)mouseButton{
+    [_streamView alterAbsTouchDragWith:mouseButton];
 }
 
 - (void)oscLayoutClosed{
@@ -1033,7 +1045,7 @@
 - (void)applicationWillResignActive:(NSNotification *)notification {
     //[self.pipController startPictureInPicture];
     //sleep(1);
-    _streamMan.videoRenderer.appDidEnterBackgroundWithoutPiP = true;
+    appDidEnterBackgroundWithoutPip = true;
 
     [_streamView saveRelocatedWidgetViews];
 
@@ -1050,7 +1062,7 @@
 }
 
 - (void)applicationDidBecomeActive:(NSNotification *)notification {
-    _streamMan.videoRenderer.appDidEnterBackgroundWithoutPiP = false;
+    appDidEnterBackgroundWithoutPip = false;
     // Stop the background timer, since we're foregrounded again
     if (_inactivityTimer != nil) {
         Log(LOG_I, @"Stopping inactivity timer after becoming active again");
@@ -1083,9 +1095,9 @@
     NSLog(@"did enter background, %d, %@, %d", _settings.enablePIP, self.pipController, self.pipController.isPictureInPictureActive);
     if (_settings.enablePIP && self.pipController && self.pipController.isPictureInPictureActive) {
         //Log(LOG_I, @"PIP is active, not terminating stream");
-        _streamMan.videoRenderer.appDidEnterBackgroundWithoutPiP = false;
+        appDidEnterBackgroundWithoutPip = false;
     } else {
-        _streamMan.videoRenderer.appDidEnterBackgroundWithoutPiP = true;
+        appDidEnterBackgroundWithoutPip = true;
 
         if ([_settings.renderingBackend intValue] == RENDER_METAL && self.metalViewController) {
             Log(LOG_I, @"Pausing Metal renderer on background");
@@ -1570,8 +1582,8 @@
     [_motionHandler startAccelUpdate];
 }
 
-- (void)stopGyroUpdateWithInterruptTouchInput:(BOOL)interruption{
-    [_motionHandler stopGyroUpdateWithInterruptTouchInput:interruption];
+- (void)stopGyroUpdateWithInterruptNoneGyroInput:(BOOL)interruption{
+    [_motionHandler stopGyroUpdateWithInterruptNoneGyroInput:interruption resetLeftStick:false];
 }
 
 - (void)stopAccelUpdate{
@@ -1641,6 +1653,13 @@
 
 - (void)setupDisplayLink {
     if (_displayLink != nil) return;
+    TemporarySettings* tempSettings = [[[DataManager alloc] init] getSettings];  //StreamFrameViewController retrieve the settings here.
+    if (@available(iOS 15.0, tvOS 15.0, *)) {
+        [_displayLink setPreferredFrameRateRange:CAFrameRateRangeMake(tempSettings.framerate.intValue,tempSettings.framerate.intValue, tempSettings.framerate.intValue)];
+    }
+    else {
+        _displayLink.preferredFramesPerSecond = tempSettings.framerate.intValue;
+    }
     _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(displayLinkTick:)];
     [_displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
 }

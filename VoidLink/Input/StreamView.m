@@ -170,7 +170,7 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
         [_onScreenControls setLevel:OnScreenControlsLevelOff];
         
         //pass touchesCaptureByOnScreenButtons Set to the native touchhandler, this NSSet is init witihin onscreencontrols class, don't do it again in native touch handler class
-        [OnScreenControls.touchAddrsCapturedByOnScreenControls removeAllObjects]; // reset the attribute to nil
+        [OnScreenControls.touchesCapturedByOnScreenControls removeAllObjects]; // reset the attribute to nil
         
         /*
         if(settings.touchMode.intValue == NativeTouch){
@@ -237,6 +237,7 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     keyboardToggleRecognizer.delaysTouchesBegan = NO;
     keyboardToggleRecognizer.delaysTouchesEnded = NO;
     [self->_streamFrameTopLayerView addGestureRecognizer:keyboardToggleRecognizer];
+    keyboardToggleRecognizer.touchCapturingView = self;
 }
 
 - (void)keyboardWillShow:(NSNotification *)notification{
@@ -563,8 +564,10 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
                 widgetView.mouseButtonAction = buttonState.mouseButtonAction;
                 widgetView.sensitivityFactorX = buttonState.sensitivityFactorX;
                 widgetView.sensitivityFactorY = buttonState.sensitivityFactorY;
+                widgetView.slideThreshold = buttonState.slideThreshold;
                 widgetView.yawFactor = buttonState.yawFactor;
                 widgetView.pitchFactor = buttonState.pitchFactor;
+                widgetView.rollFactor = buttonState.rollFactor;
                 widgetView.trackballDecelerationRate = buttonState.decelerationRate;
                 widgetView.stickIndicatorOffset = buttonState.stickIndicatorOffset;
                 widgetView.minStickOffset = buttonState.minStickOffset;
@@ -1378,6 +1381,15 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 
 - (void)wheelDidScrollWithIdentifier:(NSUUID * _Nonnull)identifier deltaZ:(int8_t)deltaZ {
     LiSendScrollEvent(deltaZ);
+}
+
+- (void)alterAbsTouchDragWith:(int32_t)mouseButton{
+    if([touchHandler isKindOfClass:[AbsoluteTouchHandler class]]){
+        AbsoluteTouchHandler* handler = (AbsoluteTouchHandler* )touchHandler;
+        handler.mouseButtonForCursorMove = mouseButton;
+        [handler pauseLeftButtonDrag];
+    }
+    else return;
 }
 
 
