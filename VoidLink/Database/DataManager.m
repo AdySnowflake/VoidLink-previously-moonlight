@@ -88,6 +88,7 @@
                   preferredCodec:(uint32_t)preferredCodec
                     enableYUV444:(BOOL)enableYUV444
                        enablePIP:(BOOL)enablePIP
+                       fullColorRange:(BOOL)fullColorRange
                        enableHdr:(BOOL)enableHdr
                   btMouseSupport:(BOOL)btMouseSupport
                // absoluteTouchMode:(BOOL)absoluteTouchMode
@@ -161,6 +162,7 @@
         settingsToSave.preferredCodec = preferredCodec;
         settingsToSave.enableYUV444 = enableYUV444;
         settingsToSave.enablePIP = enablePIP;
+        settingsToSave.fullColorRange = fullColorRange;
         settingsToSave.enableHdr = enableHdr;
         settingsToSave.btMouseSupport = btMouseSupport;
         // settingsToSave.absoluteTouchMode = absoluteTouchMode;
