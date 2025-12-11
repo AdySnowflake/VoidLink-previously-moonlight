@@ -451,6 +451,7 @@
     TouchPadGestureHandler.ctrlDownForPinch = _settings.ctrlDownForPinch;
     TouchPadGestureHandler.scrollSensitivity = _settings.scrollSensitivity.floatValue;
     TouchPadGestureHandler.pinchSensitivity = _settings.pinchSensitivity.floatValue;
+    TouchPadGestureHandler.displayLinkRate = _settings.framerate.intValue;
 
     NSLog(@"frameview gestures: %d", (uint32_t)[self.view.gestureRecognizers count]);
     NSLog(@"streamview gestures: %d", (uint32_t)[_streamView.gestureRecognizers count]);
@@ -927,6 +928,9 @@
 }
 
 - (void) returnToMainFrame {
+    [_streamView clearOnScreenWidgets];
+    if(micHandler) [micHandler clean];
+    
     // Reset display mode back to default
     [self updatePreferredDisplayMode:NO];
     if (@available(iOS 13.0, *)) {
