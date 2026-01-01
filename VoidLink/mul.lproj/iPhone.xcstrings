@@ -1219,6 +1219,18 @@
         }
       }
     },
+    "Afv-Tt-8Fo.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Walkmode threshold\"; ObjectID = \"Afv-Tt-8Fo\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Walkmode threshold"
+          }
+        }
+      }
+    },
     "AN9-U4-nUG.text" : {
       "comment" : "Class = \"UILabel\"; text = \"Yaw&Pitch → Right Stick\"; ObjectID = \"AN9-U4-nUG\";",
       "extractionState" : "extracted_with_value",
@@ -2408,7 +2420,37 @@
       }
     },
     "hfR-K8-Ti4.segmentTitles[1]" : {
-      "comment" : "Class = \"UISegmentedControl\"; hfR-K8-Ti4.segmentTitles[1] = \"5.1-channel\"; ObjectID = \"hfR-K8-Ti4\";",
+      "comment" : "Class = \"UISegmentedControl\"; hfR-K8-Ti4.segmentTitles[1] = \"Stereo(SDL)\"; ObjectID = \"hfR-K8-Ti4\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Stereo(SDL)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "双声道(SDL)"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "雙聲道(SDL)"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "雙聲道(SDL)"
+          }
+        }
+      }
+    },
+    "hfR-K8-Ti4.segmentTitles[2]" : {
+      "comment" : "Class = \"UISegmentedControl\"; hfR-K8-Ti4.segmentTitles[2] = \"5.1-channel\"; ObjectID = \"hfR-K8-Ti4\";",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
@@ -2425,20 +2467,20 @@
         },
         "zh-Hant" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "5.1聲道"
           }
         },
         "zh-HK" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "5.1聲道"
           }
         }
       }
     },
-    "hfR-K8-Ti4.segmentTitles[2]" : {
-      "comment" : "Class = \"UISegmentedControl\"; hfR-K8-Ti4.segmentTitles[2] = \"7.1-channel\"; ObjectID = \"hfR-K8-Ti4\";",
+    "hfR-K8-Ti4.segmentTitles[3]" : {
+      "comment" : "Class = \"UISegmentedControl\"; hfR-K8-Ti4.segmentTitles[3] = \"7.1-channel\"; ObjectID = \"hfR-K8-Ti4\";",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
@@ -2455,13 +2497,13 @@
         },
         "zh-Hant" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "7.1聲道"
           }
         },
         "zh-HK" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "7.1聲道"
           }
         }
@@ -2757,6 +2799,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "陀螺儀"
+          }
+        }
+      }
+    },
+    "kcX-kR-3gl.text" : {
+      "comment" : "Class = \"UILabel\"; text = \"Component size\"; ObjectID = \"kcX-kR-3gl\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Component size"
           }
         }
       }

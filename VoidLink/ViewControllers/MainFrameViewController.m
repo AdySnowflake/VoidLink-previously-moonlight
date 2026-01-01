@@ -765,6 +765,10 @@ static NSMutableSet* hostList;
                         [hostNotFoundAlert addAction:[UIAlertAction actionWithTitle:[LocalizationHelper localizedStringForKey:@"Ok"] style:UIAlertActionStyleDefault handler:nil]];
                         dispatch_async(dispatch_get_main_queue(), ^{
                             [self hideLoadingFrame:^{
+                                if([error isEqualToString:[LocalizationHelper localizedStringForKey:@"Host information updated"]]){
+                                    DataManager* dataMan = [[DataManager alloc] init];
+                                    [dataMan updateHost:host];
+                                }
                                 [[self activeViewController] presentViewController:hostNotFoundAlert animated:YES completion:nil];
                             }];
                         });
@@ -850,6 +854,7 @@ static NSMutableSet* hostList;
     }
 
     int numberOfChannels = MIN([streamSettings.audioConfig intValue], physicalOutputChannels);
+    
     Log(LOG_I, @"Selected number of audio channels %d", numberOfChannels);
     if (numberOfChannels >= 8) {
         _streamConfig.audioConfiguration = AUDIO_CONFIGURATION_71_SURROUND;
@@ -861,6 +866,7 @@ static NSMutableSet* hostList;
         _streamConfig.audioConfiguration = AUDIO_CONFIGURATION_STEREO;
     }
     
+    Connection.useSystemAudioEngine = streamSettings.audioConfig.intValue == 2;
     
     switch (streamSettings.preferredCodec) {
         case CODEC_PREF_AV1:
@@ -1191,7 +1197,24 @@ static NSMutableSet* hostList;
     [settingsViewController.emulatedControllerTypeSelector setEnabled:!_settingsExpandedInStreamView];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.citrixX1MouseStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.externalDisplayModeStack];
-    [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.audioConfigStack];
+    
+    if(settingsViewController.audioConfigSelector.numberOfSegments>2){
+        if(_settingsExpandedInStreamView){
+            if(settingsViewController.audioConfigSelector.selectedSegmentIndex>=2){
+                [settingsViewController.audioConfigSelector setEnabled:false];
+            }
+            else {
+                [settingsViewController.audioConfigSelector setEnabled:false forSegmentAtIndex:2];
+                [settingsViewController.audioConfigSelector setEnabled:false forSegmentAtIndex:3];
+            }
+        }
+        else{
+            [settingsViewController.audioConfigSelector setEnabled:true];
+            [settingsViewController.audioConfigSelector setEnabled:true forSegmentAtIndex:2];
+            [settingsViewController.audioConfigSelector setEnabled:true forSegmentAtIndex:3];
+        }
+    }
+    
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.duckOtherAppStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.pipStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.appThemeStack];
@@ -1658,6 +1681,19 @@ static NSMutableSet* hostList;
         GCController* controller = note.object;
         [self unregisterControllerCallbacks:controller];
     }];
+    
+    [self prewarmSoftKeyboard];
+}
+
+- (void)prewarmSoftKeyboard {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UITextField *tf = [[UITextField alloc] initWithFrame:CGRectZero];
+        tf.hidden = YES;
+        [[UIApplication sharedApplication].windows.firstObject addSubview:tf];
+        [tf becomeFirstResponder];
+        [tf resignFirstResponder];
+        [tf removeFromSuperview];
+    });
 }
 
 -(void)viewDidLayoutSubviews{

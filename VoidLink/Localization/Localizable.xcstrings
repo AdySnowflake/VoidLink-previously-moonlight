@@ -801,13 +801,13 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "透明度：%.2f"
+            "value" : "透明度: %.2f"
           }
         },
         "zh-HK" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "透明度：%.2f"
+            "value" : "透明度: %.2f"
           }
         }
       }
@@ -854,6 +854,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音訊"
+          }
+        }
+      }
+    },
+    "audioConfigStackTip" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "- Stereo: Stereo mode driven by the system audio engine. Offers better audio quality and continues playback when the screen is off.\n\n- Stereo (SDL): Stereo mode driven by the SDL engine. This mode is essentially equivalent to Moonlight-iOS audio. Playback cannot be maintained after the screen is turned off.\n\n- 5.1 / 7.1 Channels: both are driven by the SDL engine. Playback cannot be maintained after the screen is turned off. Available for iOS 18+."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "- 双声道：由系统音频引擎驱动的双声道模式。音质更好、熄屏可维持播放。\n\n- 双声道(SDL)：由SDL引擎驱动的双声道模式。此模式基本上等价于moonlight-iOS音频。熄屏后无法维持播放。\n\n- 5.1 / 7.1 声道：均为SDL引擎驱动。熄屏后无法维持播放。需 iOS 18 以上支持。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "- 雙聲道：由系統音訊引擎驅動的雙聲道模式。音質較佳，且在熄屏後仍可維持播放。\n\n- 雙聲道（SDL）：由 SDL 引擎驅動的雙聲道模式。此模式基本等同於 Moonlight-iOS 的音訊。熄屏後無法維持播放。\n\n5.1／7.1 聲道：皆由 SDL 引擎驅動。熄屏後無法維持播放，需 iOS 18 以上支援。"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "- 雙聲道：由系統音訊引擎驅動的雙聲道模式。音質較佳，且在熄屏後仍可維持播放。\n\n- 雙聲道（SDL）：由 SDL 引擎驅動的雙聲道模式。此模式基本等同於 Moonlight-iOS 的音訊。熄屏後無法維持播放。\n\n5.1／7.1 聲道：皆由 SDL 引擎驅動。熄屏後無法維持播放，需 iOS 18 以上支援。"
           }
         }
       }
@@ -1129,13 +1158,13 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "邊框寬度：%.2f"
+            "value" : "邊框寬度: %.2f"
           }
         },
         "zh-HK" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "邊框寬度：%.2f"
+            "value" : "邊框寬度: %.2f"
           }
         }
       }
@@ -1251,6 +1280,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "指令"
+          }
+        }
+      }
+    },
+    "Component size: %.2f   " : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "组件大小: %.2f"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "組件大小: %.2f"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "組件大小: %.2f"
           }
         }
       }
@@ -1699,25 +1751,48 @@
         }
       }
     },
-    "Deceleration Rate: %.3f  " : {
+    "DecelerationRateX: %.3f  " : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "减速率: %.3f  "
+            "value" : "减速率X: %.3f  "
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "減速率：%.3f  "
+            "value" : "減速率X: %.3f  "
           }
         },
         "zh-HK" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "減速率：%.3f  "
+            "value" : "減速率X: %.3f  "
+          }
+        }
+      }
+    },
+    "DecelerationRateY: %.3f  " : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "减速率Y: %.3f  "
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "減速率Y: %.3f  "
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "減速率Y: %.3f  "
           }
         }
       }
@@ -2915,6 +2990,29 @@
         }
       }
     },
+    "Highlight alpha: %.2f" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高亮透明度: %.2f"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高亮透明度: %.2f"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高亮透明度: %.2f"
+          }
+        }
+      }
+    },
     "Highlight size: %.2f" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3042,13 +3140,13 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "指示器偏移：%.0f"
+            "value" : "指示器偏移: %.0f"
           }
         },
         "zh-HK" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "指示器偏移：%.0f"
+            "value" : "指示器偏移: %.0f"
           }
         }
       }
@@ -5935,6 +6033,29 @@
         }
       }
     },
+    "Sensitivity: %.2f" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "灵敏度: %.2f"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "靈敏度: %.2f"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "靈敏度: %.2f"
+          }
+        }
+      }
+    },
     "SensitivityX: %.2f" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5947,13 +6068,13 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "靈敏度X：%.2f"
+            "value" : "靈敏度X: %.2f"
           }
         },
         "zh-HK" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "靈敏度X：%.2f"
+            "value" : "靈敏度X: %.2f"
           }
         }
       }
@@ -5970,13 +6091,13 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "靈敏度Y：%.2f"
+            "value" : "靈敏度Y: %.2f"
           }
         },
         "zh-HK" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "靈敏度Y：%.2f"
+            "value" : "靈敏度Y: %.2f"
           }
         }
       }
@@ -7165,6 +7286,29 @@
         }
       }
     },
+    "Walkmode threshold: %.0f   " : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行走模式阈值: %.0f   "
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行走模式閾值: %.0f   "
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行走模式閾值: %.0f   "
+          }
+        }
+      }
+    },
     "waterMarkText" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7188,7 +7332,7 @@
         },
         "zh-HK" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "聯絡開發者 True砖家"
           }
         }

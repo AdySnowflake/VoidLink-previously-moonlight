@@ -2,20 +2,20 @@
 //  InertialScroller.swift
 //  VoidLink
 //
-//  Created by True砖家 on 2025/11/5.
+//  Created by True砖家 on 2025/12/5.
 //  Copyright © 2025 True砖家 on Bilibili. All rights reserved.
 //
 
 class InertialScroller {
-    public var decelerationRate: CGFloat
-    
+    public var decelerationRateX: CGFloat
+    public var decelerationRateY: CGFloat
+
     public lazy var timer: SafeTimer? = {
         SafeTimer(interval: 1/displayLinkRate) { [weak self] in
             guard let self = self, handler != nil else {return}
-            let deceratedDeltaX = self.vector.dx * decelerationRate
-            let deceratedDeltaY = self.vector.dy * decelerationRate
-            self.vector = CGVector(dx: deceratedDeltaX, dy: deceratedDeltaY)
-            if abs(deceratedDeltaX) < self.timerSuspendThreshold && abs(deceratedDeltaY) < self.timerSuspendThreshold {
+            self.vector.dx = self.vector.dx * decelerationRateX
+            self.vector.dy = self.vector.dy * decelerationRateY
+            if abs(self.vector.dx) < self.timerSuspendThreshold && abs(self.vector.dy) < self.timerSuspendThreshold {
                 self.timer?.pause()
             }
             (self.handler ?? {})()
@@ -28,7 +28,8 @@ class InertialScroller {
     public var handler: (() -> Void)?
     
     init(decelerationRate: CGFloat = 0.93, displayLinkRate: CGFloat = 60, handler: (() -> Void)? = nil) {
-        self.decelerationRate = decelerationRate
+        self.decelerationRateX = decelerationRate
+        self.decelerationRateY = decelerationRate
         self.displayLinkRate = displayLinkRate
         self.handler = handler
     }
