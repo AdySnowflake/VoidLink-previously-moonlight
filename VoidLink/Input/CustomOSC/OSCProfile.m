@@ -31,12 +31,13 @@
 - (void) encodeWithCoder:(NSCoder*)encoder {
     [encoder encodeObject:self.name forKey:@"name"];
     [encoder encodeObject:self.buttonStatesEncoded forKey:@"buttonStates"];
+    [encoder encodeInt32:self.unfoldedExclusiveFolderSequence forKey:@"unfoldedExclusiveFolderSequence"];
+    [encoder encodeObject:self.postExclusiveUnfoldedSequences forKey:@"postExclusiveUnfoldedSequences"];
     [encoder encodeBool:self.isSelected forKey:@"isSelected"];
     [encoder encodeInt64:self.mapGyroTo forKey:@"mapGyroTo"];
     [encoder encodeBool:self.yawPitchToRightStick forKey:@"yawPitchToRightStick"];
     [encoder encodeBool:self.rollToLeftStick forKey:@"rollToLeftStick"];
     [encoder encodeBool:self.synthesizePhysicalStick forKey:@"synthesizePhysicalStick"];
-    [encoder encodeInt64:self.mapGyroTo forKey:@"mapGyroTo"];
     [encoder encodeFloat:self.gyroSensitivityYaw forKey:@"gyroSensitivityYaw"];
     [encoder encodeFloat:self.gyroSensitivityPitch forKey:@"gyroSensitivityPitch"];
     [encoder encodeFloat:self.gyroSensitivityRoll forKey:@"gyroSensitivityRoll"];
@@ -50,12 +51,44 @@
     [encoder encodeBool:self.reverseGyroHoldButton forKey:@"reverseGyroHoldButton"];
     [encoder encodeInt:self.controllerGyroSwitchHold forKey:@"controllerGyroSwitchHold"];
     [encoder encodeInt:self.controllerGyroSwitchToggle forKey:@"controllerGyroSwitchToggle"];
+    [encoder encodeObject:self.pressureCurvePoints forKey:@"pressureCurvePoints"];
+    [encoder encodeBool:self.pressureCurveEnabled forKey:@"pressureCurveEnabled"];
+    [encoder encodeBool:self.doubleTapShorcutEnabled forKey:@"doubleTapShorcutEnabled"];
+    [encoder encodeObject:self.brushShortcut forKey:@"brushShortcut"];
+    [encoder encodeObject:self.eraserShortcut forKey:@"eraserShortcut"];
+    [encoder encodeBool:self.squeezeShorcutEnabled forKey:@"squeezeShorcutEnabled"];
+    [encoder encodeObject:self.squeezeStartShortcut forKey:@"squeezeStartShortcut"];
+    [encoder encodeObject:self.squeezeEndShortcut forKey:@"squeezeEndShortcut"];
+    [encoder encodeBool:self.pencilPausesNativeTouch forKey:@"pencilPausesNativeTouch"];
+    [encoder encodeBool:self.disablePencilSlideGestures forKey:@"disablePencilSlideGestures"];
 }
 
 - (id) initWithCoder:(NSCoder*)decoder {
     if (self = [super init]) {
-        self.name = [decoder decodeObjectForKey:@"name"];
-        self.buttonStatesEncoded = [decoder decodeObjectForKey:@"buttonStates"];
+        self.name =
+            [decoder decodeObjectOfClasses:
+                [NSSet setWithObjects:
+                    [NSString class],
+                    nil]
+                                       forKey:@"name"];
+        self.buttonStatesEncoded =
+            [decoder decodeObjectOfClasses:
+                [NSSet setWithObjects:
+                    [NSMutableArray class],
+                    [NSArray class],
+                    [NSData class],
+                    nil]
+                                       forKey:@"buttonStates"];
+        self.unfoldedExclusiveFolderSequence = [decoder containsValueForKey:@"unfoldedExclusiveFolderSequence"] ? [decoder decodeInt32ForKey:@"unfoldedExclusiveFolderSequence"] : -1;
+        self.postExclusiveUnfoldedSequences = [decoder containsValueForKey:@"postExclusiveUnfoldedSequences"] ?
+            [decoder decodeObjectOfClasses:
+                [NSSet setWithObjects:
+                 [NSMutableSet class],
+                 [NSSet class],
+                 [NSNumber class],
+                    nil]
+                                    forKey:@"postExclusiveUnfoldedSequences"] :
+            [NSSet set];
         self.isSelected = [decoder decodeBoolForKey:@"isSelected"];
         self.mapGyroTo = [decoder containsValueForKey:@"mapGyroTo"] ? [decoder decodeInt64ForKey:@"mapGyroTo"] : mapGyroToMouse;
         self.yawPitchToRightStick = [decoder containsValueForKey:@"yawPitchToRightStick"] ? [decoder decodeBoolForKey:@"yawPitchToRightStick"] : true;
@@ -74,6 +107,57 @@
         self.reverseGyroHoldButton = [decoder containsValueForKey:@"reverseGyroHoldButton"] ? [decoder decodeBoolForKey:@"reverseGyroHoldButton"] : false;
         self.controllerGyroSwitchHold = [decoder containsValueForKey:@"controllerGyroSwitchHold"] ? [decoder decodeIntForKey:@"controllerGyroSwitchHold"] : ControllerButtonNull;
         self.controllerGyroSwitchToggle = [decoder containsValueForKey:@"controllerGyroSwitchToggle"] ? [decoder decodeIntForKey:@"controllerGyroSwitchToggle"] : ControllerButtonNull;
+        self.pressureCurvePoints =
+            [decoder containsValueForKey:@"pressureCurvePoints"]
+            ? [decoder decodeObjectOfClasses:
+                    [NSSet setWithObjects:
+                    [NSArray class],
+                    [NSNumber class],
+                                    nil]
+                                            forKey:@"pressureCurvePoints"]
+            : @[@0.0, @0.0, @1.0, @1.0];
+        self.pressureCurveEnabled = [decoder containsValueForKey:@"pressureCurveEnabled"] ? [decoder decodeBoolForKey:@"pressureCurveEnabled"] : false;
+        
+        self.doubleTapShorcutEnabled = [decoder containsValueForKey:@"doubleTapShorcutEnabled"] ? [decoder decodeBoolForKey:@"doubleTapShorcutEnabled"] : false;
+        self.brushShortcut =
+        [decoder containsValueForKey:@"brushShortcut"]
+        ? [decoder decodeObjectOfClasses:
+                [NSSet setWithObjects:
+                    [NSString class],
+                    nil]
+                                       forKey:@"brushShortcut"]
+        : @"";
+        
+        self.eraserShortcut =
+        [decoder containsValueForKey:@"eraserShortcut"]
+        ? [decoder decodeObjectOfClasses:
+            [NSSet setWithObjects:
+                [NSString class],
+                nil]
+                                   forKey:@"eraserShortcut"]
+        : @"";
+        
+        self.squeezeShorcutEnabled = [decoder containsValueForKey:@"squeezeShorcutEnabled"] ? [decoder decodeBoolForKey:@"squeezeShorcutEnabled"] : false;
+        self.squeezeStartShortcut =
+        [decoder containsValueForKey:@"squeezeStartShortcut"]
+        ? [decoder decodeObjectOfClasses:
+                [NSSet setWithObjects:
+                    [NSString class],
+                    nil]
+                                       forKey:@"squeezeStartShortcut"]
+        : @"";
+        
+        self.squeezeEndShortcut =
+        [decoder containsValueForKey:@"squeezeEndShortcut"]
+        ? [decoder decodeObjectOfClasses:
+                [NSSet setWithObjects:
+                    [NSString class],
+                    nil]
+                                       forKey:@"squeezeEndShortcut"]
+        : @"";
+
+        self.pencilPausesNativeTouch = [decoder containsValueForKey:@"pencilPausesNativeTouch"] ? [decoder decodeBoolForKey:@"pencilPausesNativeTouch"] : false;
+        self.disablePencilSlideGestures = [decoder containsValueForKey:@"disablePencilSlideGestures"] ? [decoder decodeBoolForKey:@"disablePencilSlideGestures"] : false;
     }
     
     return self;
@@ -83,6 +167,8 @@
     OSCProfile *copy = [[[self class] allocWithZone:zone] init];
     copy.name = [self.name mutableCopy]; // NSString → NSMutableString
     copy.buttonStatesEncoded = [[NSMutableArray alloc] initWithArray:self.buttonStatesEncoded copyItems:YES];
+    copy.unfoldedExclusiveFolderSequence = self.unfoldedExclusiveFolderSequence;
+    copy.postExclusiveUnfoldedSequences = [self.postExclusiveUnfoldedSequences copy];
     copy.isSelected = self.isSelected;
     copy.mapGyroTo = self.mapGyroTo;
     copy.yawPitchToRightStick = self.yawPitchToRightStick;
@@ -101,6 +187,16 @@
     copy.reverseGyroHoldButton = self.reverseGyroHoldButton;
     copy.controllerGyroSwitchHold = self.controllerGyroSwitchHold;
     copy.controllerGyroSwitchToggle = self.controllerGyroSwitchToggle;
+    copy.pressureCurvePoints = [[NSMutableArray alloc] initWithArray:self.pressureCurvePoints copyItems:YES];
+    copy.pressureCurveEnabled = self.pressureCurveEnabled;
+    copy.doubleTapShorcutEnabled = self.doubleTapShorcutEnabled;
+    copy.brushShortcut = [self.brushShortcut mutableCopy]; // NSString → NSMutableString
+    copy.eraserShortcut = [self.eraserShortcut mutableCopy]; // NSString → NSMutableString
+    copy.squeezeShorcutEnabled = self.squeezeShorcutEnabled;
+    copy.squeezeStartShortcut = [self.squeezeStartShortcut mutableCopy]; // NSString → NSMutableString
+    copy.squeezeEndShortcut = [self.squeezeEndShortcut mutableCopy]; // NSString → NSMutableString
+    copy.pencilPausesNativeTouch = self.pencilPausesNativeTouch;
+    copy.disablePencilSlideGestures = self.disablePencilSlideGestures;
     return copy;
 }
 

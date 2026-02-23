@@ -18,6 +18,8 @@
 		18416EA42EBB3DCE00AE0124 /* UITouchUtil.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18416EA32EBB3DCE00AE0124 /* UITouchUtil.swift */; };
 		1850C82A2E667E4000845308 /* MicHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1850C8292E667E4000845308 /* MicHandler.swift */; };
 		18729EDE2E8BD68800101194 /* UUIDHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18729EDD2E8BD68800101194 /* UUIDHelper.swift */; };
+		18780CC72F10D66000B90483 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 18780CC62F10D66000B90483 /* StoreKit.framework */; };
+		18780CCA2F10D6CC00B90483 /* IAPManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18780CC92F10D6CC00B90483 /* IAPManager.swift */; };
 		187F4B282E04658A00EECC59 /* WidgetPanelStackView.m in Sources */ = {isa = PBXBuildFile; fileRef = 187F4B272E04658A00EECC59 /* WidgetPanelStackView.m */; };
 		1888C1922E24C33100108730 /* AboutViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1888C1912E24C33100108730 /* AboutViewController.swift */; };
 		1888C1932E24C41000108730 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1888C1902E24C2C800108730 /* AboutView.swift */; };
@@ -29,7 +31,9 @@
 		18A0EE2C2EFBCCFD00BA853A /* GraphicUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18A0EE2B2EFBCCFD00BA853A /* GraphicUtils.swift */; };
 		18A765BD2ECD51FB004784AA /* ControllerUtil.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18A765BC2ECD51FB004784AA /* ControllerUtil.swift */; };
 		18B317032EE67A3A009B62C2 /* InertialScroller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B317022EE67A39009B62C2 /* InertialScroller.swift */; };
+		18D43D7F2F050240008C326F /* PressureCurve.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18D43D7E2F050240008C326F /* PressureCurve.swift */; };
 		18E4BCEA2E891895000A8657 /* MotionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18E4BCE92E891895000A8657 /* MotionHandler.swift */; };
+		18FCADAF2ECAC23200787A96 /* PencilHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18FCADAE2ECAC23200787A96 /* PencilHandler.swift */; };
 		840751B32BF49C050096B657 /* CustomTapGestureRecognizer.m in Sources */ = {isa = PBXBuildFile; fileRef = 840751B22BF49C050096B657 /* CustomTapGestureRecognizer.m */; };
 		841BAC922DE35D6B00DA639E /* ThemeManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 841BAC912DE35D6B00DA639E /* ThemeManager.m */; };
 		84203F232C5F24C00032EEED /* OnScreenWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84203F222C5F24C00032EEED /* OnScreenWidgetView.swift */; };
@@ -170,7 +174,6 @@
 		180345E02E819877004AF36F /* libopus-sim.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = "libopus-sim.a"; sourceTree = "<group>"; };
 		180E6E362E93BFDB0067C73A /* AlertControllerUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertControllerUtil.swift; sourceTree = "<group>"; };
 		1817B61D2E6FD04D000D938D /* SafeTimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeTimer.swift; sourceTree = "<group>"; };
-		182042252EFEE46700309FF6 /* touchCentered.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = touchCentered.swift; sourceTree = "<group>"; };
 		1829CE3D2E2154DF0074A99A /* SceneDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SceneDelegate.h; sourceTree = "<group>"; };
 		1829CE3E2E2154DF0074A99A /* SceneDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SceneDelegate.m; sourceTree = "<group>"; };
 		18341A022DEB65AB0094E5F2 /* FixedTintImageView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FixedTintImageView.h; sourceTree = "<group>"; };
@@ -178,6 +181,8 @@
 		18416EA32EBB3DCE00AE0124 /* UITouchUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITouchUtil.swift; sourceTree = "<group>"; };
 		1850C8292E667E4000845308 /* MicHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicHandler.swift; sourceTree = "<group>"; };
 		18729EDD2E8BD68800101194 /* UUIDHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UUIDHelper.swift; sourceTree = "<group>"; };
+		18780CC62F10D66000B90483 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
+		18780CC92F10D6CC00B90483 /* IAPManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IAPManager.swift; sourceTree = "<group>"; };
 		187F4B232E04633100EECC59 /* WidgetPanelStackView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WidgetPanelStackView.h; sourceTree = "<group>"; };
 		187F4B272E04658A00EECC59 /* WidgetPanelStackView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = WidgetPanelStackView.m; sourceTree = "<group>"; };
 		1888C1902E24C2C800108730 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
@@ -190,7 +195,9 @@
 		18A765BC2ECD51FB004784AA /* ControllerUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControllerUtil.swift; sourceTree = "<group>"; };
 		18B317022EE67A39009B62C2 /* InertialScroller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InertialScroller.swift; sourceTree = "<group>"; };
 		18BF141D2E0D7A00009DEE4F /* VoidLink v1.0.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "VoidLink v1.0.xcdatamodel"; sourceTree = "<group>"; };
+		18D43D7E2F050240008C326F /* PressureCurve.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PressureCurve.swift; sourceTree = "<group>"; };
 		18E4BCE92E891895000A8657 /* MotionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionHandler.swift; sourceTree = "<group>"; };
+		18FCADAE2ECAC23200787A96 /* PencilHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PencilHandler.swift; sourceTree = "<group>"; };
 		693B3A9A218638CD00982F7B /* Settings.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = Settings.bundle; sourceTree = "<group>"; };
 		840751B12BF49B5A0096B657 /* CustomTapGestureRecognizer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CustomTapGestureRecognizer.h; sourceTree = "<group>"; };
 		840751B22BF49C050096B657 /* CustomTapGestureRecognizer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CustomTapGestureRecognizer.m; sourceTree = "<group>"; };
@@ -430,6 +437,7 @@
 				F74BEF9C2C1A705600224667 /* OpenSSL in Frameworks */,
 				98882A072AF60F7200C5A11C /* libavformat.a in Frameworks */,
 				FB290CF619B2C406004C83CF /* UIKit.framework in Frameworks */,
+				18780CC72F10D66000B90483 /* StoreKit.framework in Frameworks */,
 				FB290CF219B2C406004C83CF /* Foundation.framework in Frameworks */,
 				FB4679011A57048000377732 /* CoreFoundation.framework in Frameworks */,
 				182760FA2E83E57D00EC1C5C /* DequeModule in Frameworks */,
@@ -583,7 +591,6 @@
 				FB1A67542132419700507771 /* Moonlight TV */,
 				FB290CF019B2C406004C83CF /* Frameworks */,
 				FB290CEF19B2C406004C83CF /* Products */,
-				182042252EFEE46700309FF6 /* touchCentered.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -598,6 +605,7 @@
 		FB290CF019B2C406004C83CF /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				18780CC62F10D66000B90483 /* StoreKit.framework */,
 				98882A032AF60F5300C5A11C /* libavcodec.a */,
 				98882A052AF60F5300C5A11C /* libavformat.a */,
 				98882A0A2AF60F9000C5A11C /* libavcodec.a */,
@@ -718,16 +726,18 @@
 				9827E7A7251436EA00F25707 /* HapticContext.h */,
 				840751B12BF49B5A0096B657 /* CustomTapGestureRecognizer.h */,
 				840751B22BF49C050096B657 /* CustomTapGestureRecognizer.m */,
-				9819CC12254F107A008A7C8E /* RelativeTouchHandler.h */,
-				843CC7F42C1E778000BBC475 /* NativeTouchHandler.h */,
 				844CD0E82C7F847E004861A7 /* PureNativeTouchHandler.h */,
 				844CD0EA2C7F8500004861A7 /* PureNativeTouchHandler.m */,
+				843CC7F42C1E778000BBC475 /* NativeTouchHandler.h */,
 				843CC7F52C1E7A1700BBC475 /* NativeTouchHandler.m */,
+				9819CC12254F107A008A7C8E /* RelativeTouchHandler.h */,
 				9819CC13254F107A008A7C8E /* RelativeTouchHandler.m */,
 				9819CC20254F180F008A7C8E /* AbsoluteTouchHandler.h */,
 				9819CC21254F180F008A7C8E /* AbsoluteTouchHandler.m */,
 				988FCD3F293B091B003050E2 /* KeyboardInputField.h */,
 				988FCD40293B091B003050E2 /* KeyboardInputField.m */,
+				18D43D7E2F050240008C326F /* PressureCurve.swift */,
+				18FCADAE2ECAC23200787A96 /* PencilHandler.swift */,
 				18416EA32EBB3DCE00AE0124 /* UITouchUtil.swift */,
 				18B317022EE67A39009B62C2 /* InertialScroller.swift */,
 				18951D1C2EBB6D2300A86E12 /* TouchPadGestureHandler.swift */,
@@ -778,6 +788,7 @@
 			children = (
 				18729EDD2E8BD68800101194 /* UUIDHelper.swift */,
 				18A0EE2B2EFBCCFD00BA853A /* GraphicUtils.swift */,
+				18780CC92F10D6CC00B90483 /* IAPManager.swift */,
 				97E20DD42E2164A9000D5DCA /* BandwidthTracker.h */,
 				97E20DD52E2164A9000D5DCA /* BandwidthTracker.m */,
 				97E20DD62E2164A9000D5DCA /* FloatBuffer.h */,
@@ -1043,6 +1054,7 @@
 				97E20DE02E2164A9000D5DCA /* FrameQueue.m in Sources */,
 				18951D1D2EBB6D2300A86E12 /* TouchPadGestureHandler.swift in Sources */,
 				97E20DE12E2164A9000D5DCA /* FloatBuffer.m in Sources */,
+				18FCADAF2ECAC23200787A96 /* PencilHandler.swift in Sources */,
 				97E20DE22E2164A9000D5DCA /* PaddedLabel.m in Sources */,
 				97E20DE32E2164A9000D5DCA /* BandwidthTracker.m in Sources */,
 				84591A512BE1625E006AAB10 /* CustomEdgeSlideGestureRecognizer.m in Sources */,
@@ -1090,6 +1102,7 @@
 				840751B32BF49C050096B657 /* CustomTapGestureRecognizer.m in Sources */,
 				187F4B282E04658A00EECC59 /* WidgetPanelStackView.m in Sources */,
 				FB4678FA1A55FFAD00377732 /* DiscoveryManager.m in Sources */,
+				18D43D7F2F050240008C326F /* PressureCurve.swift in Sources */,
 				180E6E372E93BFDB0067C73A /* AlertControllerUtil.swift in Sources */,
 				841BAC922DE35D6B00DA639E /* ThemeManager.m in Sources */,
 				98D5856D1C0EA79600F6CC00 /* TemporaryHost.m in Sources */,
@@ -1136,6 +1149,7 @@
 				18341A042DEB662C0094E5F2 /* FixedTintImageView.m in Sources */,
 				18416EA42EBB3DCE00AE0124 /* UITouchUtil.swift in Sources */,
 				FB89463119F646E200339C8A /* StreamManager.m in Sources */,
+				18780CCA2F10D6CC00B90483 /* IAPManager.swift in Sources */,
 				84351B2D2C29AD6100A77989 /* ToolBarContainerView.m in Sources */,
 				18E4BCEA2E891895000A8657 /* MotionHandler.swift in Sources */,
 				988FCD41293B091B003050E2 /* KeyboardInputField.m in Sources */,
@@ -1326,7 +1340,7 @@
 					"$(PROJECT_DIR)/Limelight/Database",
 				);
 				INFOPLIST_FILE = "VoidLink/Limelight-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "VoidLink - beta";
+				INFOPLIST_KEY_CFBundleDisplayName = VoidLink;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1392,7 +1406,7 @@
 					"$(PROJECT_DIR)/Limelight/Database",
 				);
 				INFOPLIST_FILE = "VoidLink/Limelight-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "VoidLink - beta";
+				INFOPLIST_KEY_CFBundleDisplayName = VoidLink;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (

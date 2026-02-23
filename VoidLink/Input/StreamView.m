@@ -26,6 +26,7 @@
 #import "KeyboardInputField.h"
 #import "CustomTapGestureRecognizer.h"
 #import "LocalizationHelper.h"
+#import "StreamFrameViewController.h"
 
 
 static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
@@ -34,8 +35,6 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
  Stream Video has been moved out of this class to _renderView in StreamFrameViewController.
  */
 @implementation StreamView {
-    UIView* streamFrameTopLayerView;
-    UIViewController* streamFrameVC;
     
     TemporarySettings* settings;
         
@@ -58,8 +57,7 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     int localMousePointerMode;
     
     UIResponder* touchHandler;
-    
-    id<UserInteractionDelegate> interactionDelegate;
+
     NSTimer* interactionTimer;
     BOOL hasUserInteracted;
     
@@ -85,9 +83,8 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
  streamFrameTopLayerView:(UIView* )topLayerView{
     self->comboKeyModifierFlags = (UIKeyModifierControl|UIKeyModifierAlternate|UIKeyModifierShift);
 
-    self->streamFrameTopLayerView = topLayerView;
-    self.streamFrameTopLayerView = topLayerView; // this will be used as a read-only pointer for other class
-    self->interactionDelegate = interactionDelegate;
+    self->_streamFrameTopLayerView = topLayerView;
+    self->_interactionDelegate = interactionDelegate;
     self->streamAspectRatio = (float)streamConfig.width / (float)streamConfig.height;
     self.streamAspectRatio = self->streamAspectRatio;
     _widgetSizeTransition = keepWidgetSize;
@@ -127,6 +124,10 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     // tvOS requires RelativeTouchHandler to manage Apple Remote input
     self->touchHandler = [[RelativeTouchHandler alloc] initWithView:self];
 #else
+    
+    PencilHandler.shared = [[PencilHandler alloc] initWithStreamView:self settings:settings];
+    _pencilHandler = PencilHandler.shared;
+
     // iOS uses touch Mode depending on user preference
         
     switch (settings.touchMode.intValue) {
@@ -156,8 +157,8 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     }
     
     // we'll render on-screen controls on the toplayer too:
-    _onScreenControls = [[OnScreenControls alloc] initWithView:self->streamFrameTopLayerView controllerSup:controllerSupport streamConfig:streamConfig];  // don't delete, this is mandatory
-    OnScreenControls.shared = _onScreenControls;
+    _onScreenControls = [[OnScreenControls alloc] initWithView:self->_streamFrameTopLayerView controllerSup:controllerSupport streamConfig:streamConfig];  // don't delete, this is mandatory
+    // OnScreenControls.shared = _onScreenControls;
     /*
     // here we pass the tap recognizer to the onscreencontrols obj
     if (settings.touchMode.intValue == RelativeTouch){
@@ -396,7 +397,7 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     
     // Notify the delegate if this was a new user interaction
     if (!timerAlreadyRunning) {
-        [interactionDelegate userInteractionBegan];
+        [_interactionDelegate userInteractionBegan];
     }
 }
 
@@ -404,7 +405,7 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     if (!hasUserInteracted) {
         // User has finished touching the screen
         interactionTimer = nil;
-        [interactionDelegate userInteractionEnded];
+        [_interactionDelegate userInteractionEnded];
     }
     else {
         // User is still touching the screen. Restart the timer.
@@ -412,9 +413,9 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     }
 }
 
-- (void) showOnScreenControls {
+- (void) reloadLegacyWidgets:(OSCProfile* )profile {
 #if !TARGET_OS_TV
-    if(!_widgetToolOpened) [_onScreenControls show];
+    if(!_widgetToolOpened) [_onScreenControls showLegacyWidgetsWith:profile];
 #endif
 }
 
@@ -442,16 +443,17 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 - (void) reloadOnScreenControlsRealtimeWith:(ControllerSupport*)controllerSupport
                          andConfig:(StreamConfiguration*)streamConfig {
     [self reloadOnScreenControlsWith:controllerSupport andConfig:streamConfig];
-    if([self isOscEnabled]) [self showOnScreenControls];
-    else [self disableOnScreenControls];
+    /*
+    StreamFrameViewController* vc = (StreamFrameViewController* )_streamFrameVC;
+    if([self isOscEnabled]) [self reloadLegacyWidgets:nil];
+    else [self disableOnScreenControls];*/
 }
-
 
 - (void) reloadOnScreenControlsWith:(ControllerSupport*)controllerSupport
                          andConfig:(StreamConfiguration*)streamConfig {
     
     // we'll render on-screen controllers on the toplayer too.
-    _onScreenControls = [[OnScreenControls alloc] initWithView:self->streamFrameTopLayerView controllerSup:controllerSupport streamConfig:streamConfig];
+    _onScreenControls = [[OnScreenControls alloc] initWithView:self->_streamFrameTopLayerView controllerSup:controllerSupport streamConfig:streamConfig];
     /*
     // pass mouseRightClickTapRecognizer to onScreenControls obj here:
     if([self isOscEnabled]){
@@ -465,7 +467,8 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 
 - (void) clearOnScreenWidgets{
     OnScreenWidgetView.isTweakingHighlight = false;
-    for (UIView *subview in self->streamFrameTopLayerView.subviews) {
+    [OnScreenWidgetView clearMappings];
+    for (UIView *subview in self->_streamFrameTopLayerView.subviews) {
         // 检查子视图是否是特定类型的实例
         if ([subview isKindOfClass:[OnScreenWidgetView class]]) {
             // 如果是，就添加到将要被移除的数组中
@@ -476,8 +479,8 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 
 - (CGPoint)denormalizeWidgetPosition:(CGPoint)position {
     if(position.x < 1.0 && position.y < 1.0){
-        position.x = position.x * streamFrameTopLayerView.bounds.size.width;
-        position.y = position.y * streamFrameTopLayerView.bounds.size.height;
+        position.x = position.x * _streamFrameTopLayerView.bounds.size.width;
+        position.y = position.y * _streamFrameTopLayerView.bounds.size.height;
     }
     else{
         NSLog(@"invalid coords");
@@ -491,134 +494,185 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     else return longSide;
 }
 
-- (void)saveRelocatedWidgetViews{
+- (void)saveStreamViewWidgetChanges{
+    /*
     NSMutableDictionary* relocatedWidgetDict = [NSMutableDictionary dictionary];
     
-    for(UIView* subview in self->streamFrameTopLayerView.subviews){
+    for(UIView* subview in self->_streamFrameTopLayerView.subviews){
         if([subview isKindOfClass:[OnScreenWidgetView class]]){
             OnScreenWidgetView* widget = (OnScreenWidgetView* )subview;
-            if(widget.relocatedDuringStreaming) [relocatedWidgetDict setObject:widget forKey:widget.identifier];
+            if(widget.relocatedDuringStreaming) [relocatedWidgetDict setObject:widget forKey:@(widget.sequence)];
+            OnScreenWidgetView* widget = [OnScreenWidgetView widgetForKey:newButtonState.sequence];
+            if(widget.isFolder)
         }
     }
+    */
     
-    if(relocatedWidgetDict.allKeys.count == 0) return;
+    NSMutableSet* relocatedWidgetSequences = [NSMutableSet set];
+    bool hasFolderStateChanged = false;
+    for(OnScreenWidgetView* widget in [OnScreenWidgetView.mapping allValues]){
+        if(widget.relocatedDuringStreaming) [relocatedWidgetSequences addObject:@(widget.sequence)];
+        if(!hasFolderStateChanged) hasFolderStateChanged = widget.folded != widget.persistedFolded;
+    }
+        
+    if(relocatedWidgetSequences.count == 0 && !hasFolderStateChanged) return;
+    NSLog(@"relocatedWidgetSequences.count %lu, hasFolderStateChanged %d    %F", relocatedWidgetSequences.count, hasFolderStateChanged, CACurrentMediaTime());
     
-    oscProfileMan = [OSCProfilesManager sharedManager:self->streamFrameTopLayerView.bounds];
+    oscProfileMan = [OSCProfilesManager sharedManager:self->_streamFrameTopLayerView.bounds];
     OSCProfile *newProfile = [oscProfileMan getSelectedProfile];
     
     for (NSInteger i = 0; i < newProfile.buttonStatesEncoded.count; i++) {
         NSData* buttonStateEncoded = newProfile.buttonStatesEncoded[i];
         OnScreenButtonState *newButtonState = [oscProfileMan unarchiveButtonStateEncoded:buttonStateEncoded];
-        if([relocatedWidgetDict.allKeys containsObject:newButtonState.identifier]){
-            OnScreenWidgetView* widget = [relocatedWidgetDict objectForKey:newButtonState.identifier];
-            newButtonState.position = [oscProfileMan normalizeWidgetPosition:widget.center];
-            NSData *newButtonStateEncoded = [NSKeyedArchiver archivedDataWithRootObject:newButtonState requiringSecureCoding:YES error:nil];
+        OnScreenWidgetView* widget = [OnScreenWidgetView.mapping objectForKey:@(newButtonState.sequence)];
+        NSData *newButtonStateEncoded;
+        if([relocatedWidgetSequences containsObject:@(widget.sequence)]
+           || widget.isFolder){
+            newButtonState.position = [oscProfileMan normalizeWidgetPosition:widget.storedCenter];
+            newButtonState.folded = widget.folded;
+            newButtonStateEncoded = [NSKeyedArchiver archivedDataWithRootObject:newButtonState requiringSecureCoding:YES error:nil];
             newProfile.buttonStatesEncoded[i] = newButtonStateEncoded;
         }
     }
     
-    [oscProfileMan replaceSelectedProfileWith:newProfile overwriteDefault:NO];
+    newProfile.unfoldedExclusiveFolderSequence = OnScreenWidgetView.unfoldedExclusiveFolderSequence;
+    newProfile.postExclusiveUnfoldedSequences = OnScreenWidgetView.postExclusiveUnfoldedSequences;
+    
+    [oscProfileMan replaceSelectedProfileWith:newProfile overwriteDefault:YES];
 }
 
-- (void) reloadOnScreenWidgetViews{
+- (void) reloadOnScreenWidgetViews:(bool)reload{
+    NSLog(@"reloadOnScreenWidgets in streamview %f", CACurrentMediaTime());
     
-    // NSLog(@"reload on screen keyboard buttons here");
-
-    // remove all keyboard widget views first
-    [self clearOnScreenWidgets];
-    
-    // get streamFrameVC
-    if(!streamFrameVC) streamFrameVC = [self parentViewController];
-    
-    // bool customOscEnabled = [self isOscEnabled] && settings.onscreenControls.intValue == OnScreenControlsLevelCustom;
-    
-    if(![self isOnScreenWidgetEnabled]) return;
-    
-    OnScreenWidgetView.buttonVisualFeedbackEnabled = settings.buttonVisualFeedback;
-    
-    if(!oscProfileMan) oscProfileMan = [OSCProfilesManager sharedManager:self->streamFrameTopLayerView.bounds];
-    OSCProfile *oscProfile = [oscProfileMan getSelectedProfile]; //returns the currently selected OSCProfile
-    MotionHandler* motionHandler = [MotionHandler sharedInstance];
-    
-    if(!OnScreenWidgetView.editMode){ // in edit mode, keyboard widget view will be updated within layoutool view controller.
-                
-        for (NSData *buttonStateEncoded in oscProfile.buttonStatesEncoded) {
-            OnScreenButtonState* buttonState = [oscProfileMan unarchiveButtonStateEncoded:buttonStateEncoded];
-            if(buttonState.widgetType == CustomOnScreenWidget){
-                OnScreenWidgetView* widgetView = [[OnScreenWidgetView alloc] initWithCmdString:buttonState.name buttonLabel:buttonState.alias shape:buttonState.widgetShape]; //reconstruct widgetView
-                //--------------------------------------------------
-                _onScreenControls.instanceReceiverDelegate = widgetView; // connecting onScreenControls to OnScreenWidgetView, sending the active instance for touchPad stick control
-                [_onScreenControls sendInstance];
-                //--------------------------------------------------
-                
-                widgetView.functionalButtonDelegate = (id<OnScreenFunctionalButtonDelegate>)streamFrameVC;
-                widgetView.motionHandler = motionHandler;
-                
-                widgetView.identifier = buttonState.identifier;
-                widgetView.translatesAutoresizingMaskIntoConstraints = NO; // weird but this is mandatory, or you will find no key views added to the right place
-                widgetView.widthFactor = buttonState.widthFactor;
-                widgetView.heightFactor = buttonState.heightFactor;
-                widgetView.componentSizeFactor = buttonState.componentSizeFactor;
-                widgetView.borderWidth = buttonState.borderWidth;
-                widgetView.highlightSizeFactor = buttonState.highlightSizeFactor;
-                widgetView.autoTapInterval = buttonState.autoTapInterval;
-                [widgetView setVibrationWithStyle:buttonState.vibrationStyle];
-                widgetView.mouseButtonAction = buttonState.mouseButtonAction;
-                widgetView.sensitivityFactorX = buttonState.sensitivityFactorX;
-                widgetView.sensitivityFactorY = buttonState.sensitivityFactorY;
-                widgetView.slideThreshold = buttonState.slideThreshold;
-                widgetView.yawFactor = buttonState.yawFactor;
-                widgetView.pitchFactor = buttonState.pitchFactor;
-                widgetView.rollFactor = buttonState.rollFactor;
-                widgetView.decelerationRateX = buttonState.decelerationRateX;
-                widgetView.decelerationRateY = buttonState.decelerationRateY;
-                widgetView.stickIndicatorOffset = buttonState.stickIndicatorOffset;
-                widgetView.minStickOffset = buttonState.minStickOffset;
-                widgetView.dWheelWalkModeThreshold = buttonState.walkModeThreshold;
-                widgetView.buttonMode = buttonState.buttonMode;
-                // Add the widgetView to the view controller's view
-                [self->streamFrameTopLayerView addSubview:widgetView]; // add keyboard button to the stream frame view. must add it to the target view before setting location.
-                buttonState.position = [self denormalizeWidgetPosition:buttonState.position];
-                [widgetView setLocationWithPosition:buttonState.position];
-                widgetView.sizeReference = [self getCurrentWidgetSizeReference];
-                // widgetView.sizeReference = buttonState.sizeReference;
-                //portrait markmarkmark
-                [widgetView resizeWidgetView]; // resize must be called after relocation
-                [widgetView adjustTransparencyWithAlpha:buttonState.backgroundAlpha tweakBorderAlpha:NO];
-                [widgetView adjustBorderWithWidth:buttonState.borderWidth];
-                [widgetView tweakLabelAlphaWithAlpha:buttonState.labelAlpha];
-                [widgetView tweakBorderAlphaWithAlpha:buttonState.borderAlpha];
-                [widgetView tweakHighlightAlphaWithAlpha:buttonState.highlightAlpha];
-                [widgetView setupAutoTapTimer];
-                [widgetView setupInertialScroller];
-            }
-        }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if(!self->oscProfileMan) self->oscProfileMan = [OSCProfilesManager sharedManager:self->_streamFrameTopLayerView.bounds];
+        OSCProfile *oscProfile = [self->oscProfileMan getSelectedProfile]; //returns the currently selected OSCProfile
+        MotionHandler* motionHandler = [MotionHandler sharedWithProfile:oscProfile];
         
-        uint64_t buttonIndex = 9999999;
-        UIView* deepestButton;
-        for (UIView *subview in self->streamFrameTopLayerView.subviews) {
-            if ([subview isKindOfClass:[OnScreenWidgetView class]]) {
-                OnScreenWidgetView* widget = (OnScreenWidgetView* ) subview;
-                if(widget.widgetType == WidgetTypeEnumButton){
-                    uint64_t index = [self->streamFrameTopLayerView.subviews indexOfObject:subview];
-                    if (index<buttonIndex){
-                        buttonIndex = index;
-                        deepestButton = subview;
+        // get streamFrameVC
+        if(!self->_streamFrameVC) self->_streamFrameVC = [self parentViewController];
+        
+        // bool customOscEnabled = [self isOscEnabled] && settings.onscreenControls.intValue == OnScreenControlsLevelCustom;
+        
+        if(![self isOnScreenWidgetEnabled]) return;
+        
+        OnScreenWidgetView.buttonVisualFeedbackEnabled = self->settings.buttonVisualFeedback;
+        
+        bool hasLegacyWidget = false;
+        if(reload && !OnScreenWidgetView.editMode){
+            // remove all keyboard widget views first
+            [self clearOnScreenWidgets];
+            
+            bool sequenceGenerated = false;
+            bool hasMovableWidget = false;
+            for (NSInteger i = 0; i < oscProfile.buttonStatesEncoded.count; i++) {
+                NSData* buttonStateEncoded = oscProfile.buttonStatesEncoded[i];
+                OnScreenButtonState* buttonState = [self->oscProfileMan unarchiveButtonStateEncoded:buttonStateEncoded];
+                if(buttonState.widgetType == CustomOnScreenWidget){
+                    OnScreenWidgetView* widgetView = [[OnScreenWidgetView alloc] initWithCmdString:buttonState.name buttonLabel:buttonState.alias shape:buttonState.widgetShape profile:oscProfile]; //reconstruct widgetView
+                    
+                    widgetView.functionalButtonDelegate = (id<OnScreenFunctionalButtonDelegate>)self->_streamFrameVC;
+                    widgetView.motionHandler = motionHandler;
+                    
+                    widgetView.sequence = buttonState.sequence == -1 ? i : buttonState.sequence;
+                    if(!sequenceGenerated) sequenceGenerated = buttonState.sequence == -1;
+                    if(!hasMovableWidget) hasMovableWidget = buttonState.buttonMode == movable;
+                    [OnScreenWidgetView setWithWidget:widgetView for:widgetView.sequence];
+                    widgetView.sequenceSet = buttonState.sequenceSet;
+                    widgetView.parentSequence = buttonState.parentSequence;
+                    widgetView.folded = buttonState.folded;
+                    widgetView.persistedFolded = buttonState.folded;
+                    widgetView.revealMode = buttonState.revealMode;
+                    
+                    widgetView.translatesAutoresizingMaskIntoConstraints = NO; // weird but this is mandatory, or you will find no key views added to the right place
+                    widgetView.widthFactor = buttonState.widthFactor;
+                    widgetView.heightFactor = buttonState.heightFactor;
+                    widgetView.componentSizeFactor = buttonState.componentSizeFactor;
+                    widgetView.borderWidth = buttonState.borderWidth;
+                    widgetView.highlightSizeFactor = buttonState.highlightSizeFactor;
+                    widgetView.autoTapInterval = buttonState.autoTapInterval;
+                    [widgetView setVibrationWithStyle:buttonState.vibrationStyle];
+                    widgetView.mouseButtonAction = buttonState.mouseButtonAction;
+                    widgetView.sensitivityFactorX = buttonState.sensitivityFactorX;
+                    widgetView.sensitivityFactorY = buttonState.sensitivityFactorY;
+                    widgetView.slideThreshold = buttonState.slideThreshold;
+                    widgetView.yawFactor = buttonState.yawFactor;
+                    widgetView.pitchFactor = buttonState.pitchFactor;
+                    widgetView.rollFactor = buttonState.rollFactor;
+                    widgetView.decelerationRateX = buttonState.decelerationRateX;
+                    widgetView.decelerationRateY = buttonState.decelerationRateY;
+                    widgetView.stickIndicatorOffset = buttonState.stickIndicatorOffset;
+                    widgetView.minStickOffset = buttonState.minStickOffset;
+                    widgetView.dWheelWalkModeThreshold = buttonState.walkModeThreshold;
+                    widgetView.buttonMode = buttonState.buttonMode;
+                    // Add the widgetView to the view controller's view
+                    [self->_streamFrameTopLayerView addSubview:widgetView]; // add keyboard button to the stream frame view. must add it to the target view before setting location.
+                    buttonState.position = [self denormalizeWidgetPosition:buttonState.position];
+                    [widgetView setLocationWithPosition:buttonState.position];
+                    widgetView.sizeReference = [self getCurrentWidgetSizeReference];
+                    // widgetView.sizeReference = buttonState.sizeReference;
+                    //portrait markmarkmark
+                    [widgetView resizeWidgetView]; // resize must be called after relocation
+                    [widgetView adjustTransparencyWithAlpha:buttonState.backgroundAlpha tweakBorderAlpha:NO];
+                    [widgetView adjustBorderWithWidth:buttonState.borderWidth];
+                    [widgetView tweakLabelAlphaWithAlpha:buttonState.labelAlpha];
+                    [widgetView tweakBorderAlphaWithAlpha:buttonState.borderAlpha];
+                    [widgetView tweakHighlightAlphaWithAlpha:buttonState.highlightAlpha];
+                    [widgetView setupAutoTapTimer];
+                    [widgetView setupInertialScrollerWithFps:self->settings.framerate.intValue];
+                    
+                    if(sequenceGenerated){
+                        // NSLog(@"widgetView.sequence %d %f", widgetView.sequence, CACurrentMediaTime());
+                        buttonState.sequence = widgetView.sequence;
+                        oscProfile.buttonStatesEncoded[i] = [NSKeyedArchiver archivedDataWithRootObject:buttonState requiringSecureCoding:YES error:nil];
+                    }
+                    
+                    [widgetView accessWidgetAttributes];
+                }
+                else if(buttonState.widgetType == LegacyOnScreenControls) hasLegacyWidget = true;
+            }
+            
+            if(sequenceGenerated && hasMovableWidget){
+                [self->oscProfileMan replaceSelectedProfileWith:oscProfile overwriteDefault:YES];
+            }
+            
+            uint64_t buttonIndex = 9999999;
+            UIView* deepestButton;
+            for (UIView *subview in self->_streamFrameTopLayerView.subviews) {
+                if ([subview isKindOfClass:[OnScreenWidgetView class]]) {
+                    OnScreenWidgetView* widget = (OnScreenWidgetView* ) subview;
+                    if(widget.widgetType == WidgetTypeEnumButton){
+                        uint64_t index = [self->_streamFrameTopLayerView.subviews indexOfObject:subview];
+                        if (index<buttonIndex){
+                            buttonIndex = index;
+                            deepestButton = subview;
+                        }
+                    }
+                }
+            }
+            if(deepestButton){
+                for (UIView *subview in self->_streamFrameTopLayerView.subviews) {
+                    if ([subview isKindOfClass:[OnScreenWidgetView class]]) {
+                        OnScreenWidgetView* widget = (OnScreenWidgetView* ) subview;
+                        if(widget.widgetType == WidgetTypeEnumTouchPad){
+                            [self->_streamFrameTopLayerView insertSubview:subview belowSubview:deepestButton];
+                        }
                     }
                 }
             }
         }
-        if(!deepestButton) return;
         
-        for (UIView *subview in self->streamFrameTopLayerView.subviews) {
-            if ([subview isKindOfClass:[OnScreenWidgetView class]]) {
-                OnScreenWidgetView* widget = (OnScreenWidgetView* ) subview;
-                if(widget.widgetType == WidgetTypeEnumTouchPad){
-                    [self->streamFrameTopLayerView insertSubview:subview belowSubview:deepestButton];
-                }
-            }
+        OnScreenWidgetView.unfoldedExclusiveFolderSequence = oscProfile.unfoldedExclusiveFolderSequence;
+        [OnScreenWidgetView setPostExclusiveUnfoldeds:oscProfile.postExclusiveUnfoldedSequences];
+        [OnScreenWidgetView restoreFoldedStates];
+        
+        NSLog(@"hasLegacyWidget %d %f", hasLegacyWidget, CACurrentMediaTime());
+        // legacy widgets
+        if(!OnScreenWidgetView.editMode && (hasLegacyWidget || !reload)){
+            if([self isOscEnabled]) [self reloadLegacyWidgets:oscProfile];
+            else [self disableOnScreenControls];
         }
-    }
+    });
 }
 
 - (OnScreenControlsLevel) getCurrentOscState {
@@ -724,6 +778,8 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     CGPoint location = [self adjustCoordinatesForVideoArea:[event locationInView:self]];
     CGSize videoSize = [self getVideoAreaSize];
     
+    CGFloat pressure = (event.force / event.maximumPossibleForce) / sin(event.altitudeAngle);
+    
     return LiSendPenEvent(type, LI_TOOL_TYPE_PEN, 0, location.x / videoSize.width, location.y / videoSize.height,
                           (event.force / event.maximumPossibleForce) / sin(event.altitudeAngle),
                           0.0f, 0.0f,
@@ -781,12 +837,17 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
         [touchHandler touchesBegan:touches withEvent:event];
         return; //This is a native touch oriented fork, in pure native touch mode, this call back method deals with native touch only.
     }
-    if (@available(iOS 13.4, *)) { // now only pencil events are restricted
-        for (UITouch* touch in touches) {
-            if (touch.type == UITouchTypePencil) {
-                if ([self sendStylusEvent:touch]) return;
-            }
+    NSMutableSet* pencilTouches = [NSMutableSet set];
+    for (UITouch* touch in touches) {
+        if (touch.type == UITouchTypePencil) {
+            [pencilTouches addObject:touch];
         }
+    }
+    NSMutableSet* nonPencilTouches;
+    if(pencilTouches.count>0){
+        [_pencilHandler touchesBegan:pencilTouches withEvent:event];
+        nonPencilTouches = [touches mutableCopy];
+        [nonPencilTouches minusSet:pencilTouches];
     }
     
 #endif
@@ -802,11 +863,12 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     // Notify of user interaction and start expiration timer
     [self startInteractionTimer];
     
+    NSSet* targetTouches = nonPencilTouches ? nonPencilTouches : touches;
     if(settings.touchMode.intValue == NativeTouch || settings.touchMode.intValue == RelativeTouch){
-        [self->_onScreenControls handleTouchDownEvent:touches];
-        [self->touchHandler touchesBegan:touches withEvent:event];
+        [self->_onScreenControls handleTouchDownEvent:targetTouches];
+        [self->touchHandler touchesBegan:targetTouches withEvent:event];
     }
-    else if(![_onScreenControls handleTouchDownEvent:touches]) [touchHandler touchesBegan:touches withEvent:event];
+    else if(![_onScreenControls handleTouchDownEvent:targetTouches]) [touchHandler touchesBegan:targetTouches withEvent:event];
 }
 
 - (UIBarButtonItem *)createButtonWithImageNamed:(NSString *)imageName backgroundColor:(UIColor *)backgroundColor target:(id)target action:(SEL)action keyCode:(NSInteger)keyCode isToggleable:(BOOL)isToggleable {
@@ -937,9 +999,10 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
         return; //This is a native touch oriented fork, in pure native touch mode, this call back method deals with native touch only.
     }
     
+    NSMutableSet* pencilTouches = [NSMutableSet set];
     for (UITouch* touch in touches) {
         if (touch.type == UITouchTypePencil) {
-            if ([self sendStylusEvent:touch]) return;
+            [pencilTouches addObject:touch];
         }
         if (@available(iOS 13.4, *)) {
             UITouch *touch = [touches anyObject];
@@ -962,14 +1025,21 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
         }
 #endif
     }
-    
+    NSMutableSet* nonPencilTouches;
+    if(pencilTouches.count>0){
+        [_pencilHandler touchesMoved:pencilTouches withEvent:event];
+        nonPencilTouches = [touches mutableCopy];
+        [nonPencilTouches minusSet:pencilTouches];
+    }
+
     hasUserInteracted = YES;
     
+    NSSet* targetTouches = nonPencilTouches ? nonPencilTouches : touches;
     if(self->settings.touchMode.intValue == NativeTouch || self->settings.touchMode.intValue == RelativeTouch){
-        [self->touchHandler touchesMoved:touches withEvent:event];
-        [self->_onScreenControls handleTouchMovedEvent:touches];
+        [self->touchHandler touchesMoved:targetTouches withEvent:event];
+        [self->_onScreenControls handleTouchMovedEvent:targetTouches];
     }
-    else if(![self->_onScreenControls handleTouchMovedEvent:touches]) [self->touchHandler touchesMoved:touches withEvent:event];
+    else if(![self->_onScreenControls handleTouchMovedEvent:targetTouches]) [self->touchHandler touchesMoved:targetTouches withEvent:event];
 }
 
 - (void) handleKeyCombos:(UIPress*) press{
@@ -978,19 +1048,19 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     }
     switch (press.key.keyCode) {
         case UIKeyboardHIDUsageKeyboardQ:
-            [interactionDelegate streamExitRequested];
+            [_interactionDelegate streamExitRequested];
             break;
         case UIKeyboardHIDUsageKeyboardS:
-            [interactionDelegate toggleStatsOverlay];
+            [_interactionDelegate toggleStatsOverlay];
             break;
         case UIKeyboardHIDUsageKeyboardM:
-            [interactionDelegate toggleMouseCapture];
+            [_interactionDelegate toggleMouseCapture];
             break;
         case UIKeyboardHIDUsageKeyboardC:
-            [interactionDelegate toggleMouseVisible];
+            [_interactionDelegate toggleMouseVisible];
             break;
         case UIKeyboardHIDUsageKeyboardD:
-            [interactionDelegate disconnectAndQuitApp];
+            [_interactionDelegate disconnectAndQuitApp];
             break;
         default:
             break;
@@ -1044,17 +1114,22 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
         return; //This is a native touch oriented fork, in pure native touch mode, this call back method deals with native touch only.
     }
     
-    if (@available(iOS 13.4, *)){ //now only pencil events are restricted
-        for (UITouch* touch in touches) {
-            if (touch.type == UITouchTypePencil) {
-                if ([self sendStylusEvent:touch]) return;
-            }
+    NSMutableSet* pencilTouches = [NSMutableSet set];
+    for (UITouch* touch in touches) {
+        if (touch.type == UITouchTypePencil) {
+            [pencilTouches addObject:touch];
         }
+    }
+    NSMutableSet* nonPencilTouches;
+    if(pencilTouches.count>0){
+        [_pencilHandler touchesEnded:pencilTouches withEvent:event];
+        nonPencilTouches = [touches mutableCopy];
+        [nonPencilTouches minusSet:pencilTouches];
     }
 
 #endif
     if ([self handleMouseButtonEvent:BUTTON_ACTION_RELEASE
-                          forTouches:touches
+                          forTouches:nonPencilTouches ? nonPencilTouches : touches
                            withEvent:event]) {
         // If it's a mouse event, we're done
         return;
@@ -1064,22 +1139,21 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     
     hasUserInteracted = YES;
     
+    NSSet* targetTouches = nonPencilTouches ? nonPencilTouches : touches;
     if(settings.touchMode.intValue == NativeTouch || settings.touchMode.intValue == RelativeTouch){
-        [self->touchHandler touchesEnded:touches withEvent:event]; // when touches ended, must call the native touchhandler before onScreenControls, since the NSSet of touches captured by on screen button shall be updated later
-        [self->_onScreenControls handleTouchUpEvent:touches];
+        [self->touchHandler touchesEnded:targetTouches withEvent:event]; // when touches ended, must call the native touchhandler before onScreenControls, since the NSSet of touches captured by on screen button shall be updated later
+        [self->_onScreenControls handleTouchUpEvent:targetTouches];
     }
-    else if(![_onScreenControls handleTouchUpEvent:touches]) [touchHandler touchesEnded:touches withEvent:event];
+    else if(![_onScreenControls handleTouchUpEvent:targetTouches]) [touchHandler touchesEnded:targetTouches withEvent:event];
 }
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
     [touchHandler touchesCancelled:touches withEvent:event];
 #if !TARGET_OS_TV
     if (settings.touchMode.intValue == NativeTouchOnly) return; //This is a native touch oriented fork, in pure native touch mode, this call back method deals with native touch only.
-    if (@available(iOS 13.4, *)){ //now only pencil events are restricted
-        for (UITouch* touch in touches) {
-            if (touch.type == UITouchTypePencil) {
-                if ([self sendStylusEvent:touch]) return;
-            }
+    for (UITouch* touch in touches) {
+        if (touch.type == UITouchTypePencil) {
+            [self touchesEnded:touches withEvent:event];
         }
     }
 #endif
@@ -1424,6 +1498,33 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     else return;
 }
 
+- (void)switchPencilHover{
+    [_pencilHandler switchPencilHover];
+}
+
+- (void)enablePencilHover{
+    [_pencilHandler enablePencilHover];
+}
+
+- (void)disablePencilHover{
+    [_pencilHandler disablePencilHover];
+}
+
+- (void)setAllowSingleTouchEnabled:(BOOL)enabled{
+    if([touchHandler isKindOfClass:[NativeTouchHandler class]]){
+        NativeTouchHandler* handler = (NativeTouchHandler* )touchHandler;
+        [handler setAllowSingleTouchEnabled:enabled];
+    }
+}
+
+- (void)cleanUp{
+    [keyInputField resignFirstResponder];
+    keyInputField.delegate = nil;
+}
+
+- (void)dealloc{
+    NSLog(@"dealloc streamView %f", CACurrentMediaTime());
+}
 
 #if !TARGET_OS_TV
 - (BOOL)isMultipleTouchEnabled {

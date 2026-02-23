@@ -78,7 +78,13 @@ typedef NS_ENUM(NSInteger, WidgetSizeTransition) {
     transitionWithOrientation,
 };
 
-- (void) saveSettingsWithBitrate:(NSInteger)bitrate
+typedef NS_ENUM(NSInteger, PencilTickMode) {
+    PencilTickDisabled,
+    ManualTick
+};
+
+- (void) saveSettings:(Settings*)settings
+                     withBitrate:(NSInteger)bitrate
                        framerate:(NSInteger)framerate
                           height:(NSInteger)height
                            width:(NSInteger)width
@@ -104,6 +110,7 @@ typedef NS_ENUM(NSInteger, WidgetSizeTransition) {
                    optimizeGames:(BOOL)optimizeGames
                  multiController:(BOOL)multiController
             buttonVisualFeedback:(BOOL)buttonVisualFeedback
+              touchPointTracking:(BOOL)touchPointTracking
                  swapABXYButtons:(BOOL)swapABXYButtons
                        audioOnPC:(BOOL)audioOnPC
                      redirectMic:(BOOL)redirectMic
@@ -148,6 +155,9 @@ typedef NS_ENUM(NSInteger, WidgetSizeTransition) {
   controllerMousePointerVelocity:(CGFloat)controllerMousePointerVelocity
              controllerMouseExpo:(CGFloat)controllerMouseExpo
         controllerGyroSwitchMode:(NSInteger)controllerGyroSwitchMode
+             enableFrameTimebase:(BOOL)enableFrameTimebase
+               asyncFrameDequeue:(BOOL)asyncFrameDequeue
+        sdrPerformanceWorkaround:(BOOL)sdrPerformanceWorkaround
           backgroundSessionTimer:(NSInteger)backgroundSessionTimer;
 
 - (NSArray*) getHosts;

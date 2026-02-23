@@ -30,6 +30,8 @@ typedef NS_ENUM(NSInteger, MapGyroTo) {
 
 @property NSString *name;
 @property NSMutableArray <NSData *> *buttonStatesEncoded;
+@property (nonatomic, assign) int16_t unfoldedExclusiveFolderSequence;
+@property NSSet<NSNumber *> *postExclusiveUnfoldedSequences;
 @property BOOL isSelected;
 @property (nonatomic, assign) MapGyroTo mapGyroTo;
 @property (nonatomic, assign) bool yawPitchToRightStick;
@@ -48,6 +50,16 @@ typedef NS_ENUM(NSInteger, MapGyroTo) {
 @property (nonatomic, assign) bool reverseGyroHoldButton;
 @property (nonatomic, assign) int controllerGyroSwitchHold;
 @property (nonatomic, assign) int controllerGyroSwitchToggle;
+@property NSArray<NSNumber *> *pressureCurvePoints;
+@property (nonatomic, assign) bool pressureCurveEnabled;
+@property (nonatomic, assign) bool doubleTapShorcutEnabled;
+@property NSString *brushShortcut;
+@property NSString *eraserShortcut;
+@property (nonatomic, assign) bool squeezeShorcutEnabled;
+@property NSString *squeezeStartShortcut;
+@property NSString *squeezeEndShortcut;
+@property (nonatomic, assign) bool pencilPausesNativeTouch;
+@property (nonatomic, assign) bool disablePencilSlideGestures;
 
 
 - (id) initWithName:(NSString*)name buttonStates:(NSMutableArray*)buttonStates isSelected:(BOOL)isSelected;

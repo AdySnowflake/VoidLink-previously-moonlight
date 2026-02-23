@@ -33,7 +33,7 @@
 #import "DataManager.h"
 #import "ThemeManager.h"
 #import "FixedTintImageView.h"
-#import "VoidLink-Swift.h" // not used yet.
+#import "VoidLink-Swift.h"
 
 #if !TARGET_OS_TV
 #import "SettingsViewController.h"
@@ -72,7 +72,7 @@
     UIView* menuSeparator;
     UIView* snapshot;
     SettingsViewController* settingsViewController;
-    StreamFrameViewController* streamFrameViewController;
+    __weak StreamFrameViewController* streamFrameViewController;
     id navBarAppearanceStandard;
     bool _viewJustAppeared;
     TemporaryApp * launchedApp;
@@ -876,7 +876,8 @@ static NSMutableSet* hostList;
                     _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_AV1_HIGH8_444;
                 }
                 else {
-                    _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_AV1_MAIN8;
+                    if(streamSettings.sdrPerformanceWorkaround && [Utils hdrSupported]) _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_AV1_MAIN10; // 8bit performance degradation workaround for av1
+                    else _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_AV1_MAIN8;
                 }
             }
 #endif
@@ -886,10 +887,13 @@ static NSMutableSet* hostList;
         case CODEC_PREF_HEVC:
             if (VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC)) {
                 if (streamSettings.enableYUV444) {
-                    _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_H265_REXT8_444;
+                    if(streamSettings.sdrPerformanceWorkaround && [Utils hdrSupported]) _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_H265_REXT10_444; // 8bit performance degradation workaround
+                    else _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_H265_REXT8_444;
                 }
                 else {
-                    _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_H265;
+                    // _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_H265;
+                    if(streamSettings.sdrPerformanceWorkaround && [Utils hdrSupported]) _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_H265_MAIN10; // 8bit performance degradation workaround
+                    else _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_H265;
                 }
             }
             // Fall-through
@@ -905,8 +909,10 @@ static NSMutableSet* hostList;
     
     // HEVC is supported if the user wants it (or it's required by the chosen resolution) and the SoC supports it
     if ((_streamConfig.width > 4096 || _streamConfig.height > 4096 || streamSettings.enableHdr) && VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC)) {
-        _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_H265;
         
+        if(streamSettings.sdrPerformanceWorkaround && [Utils hdrSupported]) _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_H265_MAIN10; // 8bit performance degradation workaround
+        else _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_H265;
+
         // HEVC Main10 is supported if the user wants it and the display supports it
         if (streamSettings.enableHdr && (AVPlayer.availableHDRModes & AVPlayerHDRModeHDR10) != 0) {
             if (streamSettings.enableYUV444) {
@@ -1162,6 +1168,15 @@ static NSMutableSet* hostList;
     _settingsViewExpanded = position != FrontViewPositionLeft;
     if (position == FrontViewPositionLeft) {
         self.navigationItem.leftBarButtonItems = @[_settingsButton];
+        
+        if(streamFrameViewController.streamMan){
+            // NSLog(@"setNeedRequeuing %f", CACurrentMediaTime());
+            double delayInSeconds = 0.1;
+            dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+            dispatch_after(popTime, dispatch_get_main_queue(), ^{
+                [self->streamFrameViewController.streamMan setNeedRequeuing:true];
+            });
+        }
     }
     else {
         self.navigationItem.leftBarButtonItems = @[];
@@ -1182,6 +1197,7 @@ static NSMutableSet* hostList;
     // [settingsViewController widget:settingsViewController.bitrateSlider setEnabled:!self.settingsExpandedInStreamView];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.optimizeGamesStack];
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.audioOnPcStack];
+    [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.sdrPerformanceWorkaroundStack];
     [settingsViewController.touchModeSelector1 setEnabled:!_settingsExpandedInStreamView || !(settingsViewController.touchModeSelector1.selectedSegmentIndex == AbsoluteTouch && !settingsViewController.passthroughGesturesSwitch.isOn)];
     [settingsViewController.touchModeSelector2 setEnabled:settingsViewController.touchModeSelector1.enabled];
     
@@ -1220,8 +1236,12 @@ static NSMutableSet* hostList;
     [settingsViewController setHidden:_settingsExpandedInStreamView forStack:settingsViewController.appThemeStack];
     [settingsViewController.renderingBackendSelector setEnabled:!_settingsExpandedInStreamView];
     // Enable frame pacing mode selector only if not in stream view AND not in performance mode
-    BOOL shouldEnableFramePacing = !_settingsExpandedInStreamView && (settingsViewController.renderingBackendSelector.selectedSegmentIndex != RENDER_METAL);
-    [settingsViewController.framePacingModeSelector setEnabled:shouldEnableFramePacing];
+    BOOL shouldEnableFramePacingSelector = !_settingsExpandedInStreamView && (settingsViewController.renderingBackendSelector.selectedSegmentIndex != RENDER_METAL);
+    [settingsViewController.framePacingModeSelector setEnabled:shouldEnableFramePacingSelector];
+    // [settingsViewController.frameTimebaseSwitch setEnabled:shouldEnableFramePacing];
+    [settingsViewController.asyncFrameDequeueSwitch setEnabled:shouldEnableFramePacingSelector && settingsViewController.framePacingModeSelector.selectedSegmentIndex == FramePacingModeQueue];
+    [settingsViewController setHidden:_settingsExpandedInStreamView || !(shouldEnableFramePacingSelector && settingsViewController.framePacingModeSelector.selectedSegmentIndex == FramePacingModeQueue) forStack:settingsViewController.frameQueueSizeStack];
+
     // Disable mic switch if sunshine does not support mic redirection
     [settingsViewController.redirectMicSwitch setEnabled:!_settingsExpandedInStreamView||streamFrameViewController.micStreamInitialized];
     if(_settingsExpandedInStreamView && !streamFrameViewController.micStreamInitialized) [settingsViewController.redirectMicSwitch setOn:false];
@@ -1257,6 +1277,7 @@ static NSMutableSet* hostList;
         streamFrameViewController.mainFrameViewcontroller = self;
         streamFrameViewController.streamConfig = _streamConfig;
     }
+    NSLog(@"streamVC seque... %lu %f",(uintptr_t)streamFrameViewController , CACurrentMediaTime());
 }
 
 - (void) showLoadingFrame:(void (^)(void))completion {
@@ -1335,11 +1356,12 @@ static NSMutableSet* hostList;
     }
 }
 
-- (BOOL)isFirstLaunch {
-    NSString *key = @"appHasLaunchedBefore";
-    BOOL launchedBefore = [[NSUserDefaults standardUserDefaults] boolForKey:key];
+- (BOOL)needPopupAboutView {
+    // NSString *key = @"appHasLaunchedBefore";
+    NSString *key = @"needPopupAboutView20260215";
+    BOOL keyExists = [[NSUserDefaults standardUserDefaults] boolForKey:key];
 
-    if (!launchedBefore) {
+    if (!keyExists) {
         [[NSUserDefaults standardUserDefaults] setBool:YES forKey:key];
         [[NSUserDefaults standardUserDefaults] synchronize]; // iOS 12+ 可省略
         return YES;
@@ -1564,6 +1586,36 @@ static NSMutableSet* hostList;
     }
 }
 
+- (void)changeDefaultSettings{
+    if(![Utils needUpdateDefaultSettings]) return;
+    DataManager* dataMan = [[DataManager alloc] init];
+    Settings* settings = [dataMan retrieveSettings];
+    switch ([UIDevice currentDevice].userInterfaceIdiom) {
+        case UIUserInterfaceIdiomPad:
+            settings.sdrPerformanceWorkaround = true;
+            settings.framePacingMode = @(FramePacingModeQueue);
+            break;
+        case UIUserInterfaceIdiomPhone:
+            settings.sdrPerformanceWorkaround = true;
+            settings.framePacingMode = @(FramePacingModeQueue);
+            break;
+        default:
+            settings.sdrPerformanceWorkaround = true;
+            settings.framePacingMode = @(FramePacingModeQueue);
+            break;
+    }
+    
+    if([UIScreen mainScreen].maximumFramesPerSecond > 110) settings.asyncFrameDequeue = true;
+    if([UIScreen mainScreen].maximumFramesPerSecond < 65) settings.asyncFrameDequeue = true;
+    
+    settings.touchMoveEventInterval = [Utils isIPhone] ? @(45) : @(0);
+    if([UIScreen mainScreen].maximumFramesPerSecond < 65) settings.touchMoveEventInterval = @(60);
+    
+    settings.pencilTickIntervalUs = @(1750);
+    
+    [dataMan saveData];
+}
+
 - (void)viewDidLoad{
     [super viewDidLoad];
     
@@ -1683,6 +1735,32 @@ static NSMutableSet* hostList;
     }];
     
     [self prewarmSoftKeyboard];
+        
+    [IAPManager.shared fetchProducts];
+    
+    [self changeDefaultSettings];
+
+    /*
+    if (@available(iOS 15.0, *)) {
+        [IAPManager checkPurchaseInfo:AddOnProductPencilProPack completion:^(PurchaseInfo* info) {
+            switch (info.status) {
+                case PurchaseStatusPurchased:
+                    NSLog(@"PurchaseStatus Purchased");
+                    break;
+                case PurchaseStatusNotPurchased:
+                    NSLog(@"PurchaseStatus NotPurchased");
+                    break;
+                case PurchaseStatusRevoked:
+                    NSLog(@"PurchaseStatus Revoked");
+                    break;
+                default:
+                    break;
+            }
+            NSLog(@"PurchaseStatus Valid: %d", info.valid);
+            NSLog(@"PurchaseStatus Expiration: %@", info.expirationDate);
+        }];
+    }
+    */
 }
 
 - (void)prewarmSoftKeyboard {
@@ -1902,7 +1980,7 @@ static NSMutableSet* hostList;
     //[self simulateSettingsButtonPress]; //force reload resolution table in the setting
     //[self simulateSettingsButtonPress];
     [self updateResolutionAccordingly];
-    if([self isFirstLaunch])[self helpButtonTapped];
+    if([self needPopupAboutView])[self helpButtonTapped];
 }
 
 - (void)viewWillDisappear:(BOOL)animated{

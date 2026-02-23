@@ -9,32 +9,51 @@
 import UIKit
 import SVGKit
 
-@objc class OnScreenWidgetView: UIView, OscInstanceReceiverDelegate {
-    // receiving the OnScreenControls instance from delegate
-    @objc func getOnScreenControlsInstance(_ sender: Any) {
-        if let controls = sender as? OnScreenControls {
-            self.onScreenControls = controls
-            print("ClassA received OnScreenControls instance: \(controls)")
-        } else {
-            print("ClassA received an unknown sender")
-        }
+@objc class OnScreenWidgetView: UIView {
+    @objc public static var mapping: [Int16:OnScreenWidgetView] = [:]
+    @objc public static var isRestoring: Bool = false
+    @objc public static func set(widget:OnScreenWidgetView, for key:Int16) {
+        mapping[key] = widget
     }
-    
+    @objc public static func widgetFor(key:Int16) -> OnScreenWidgetView? {
+        return mapping[key]
+    }
+    @objc public static func removeWidgetFromMappings(key:Int16) {
+        mapping.removeValue(forKey: key)
+    }
+    @objc public static func clearMappings() {
+        mapping.removeAll()
+    }
+    @objc public static var unfoldedExclusiveFolderSequence:Int16 = -1
+    @objc public static var postExclusiveUnfoldedSequences:Set<Int16> = Set()
+    @objc public static func setPostExclusiveUnfoldeds(_ sequences:NSSet){
+        let sequenceSet:Set<Int16> = sequences as? Set<Int16> ?? Set()
+        postExclusiveUnfoldedSequences = Set(sequenceSet)
+        // print("postExclusiveUnfoldedSequences \(postExclusiveUnfoldedSequences) \(CACurrentMediaTime())")
+    }
+
     @objc public weak var guidelineDelegate: OnScreenWidgetGuidelineUpdateDelegate?
     @objc protocol OnScreenWidgetGuidelineUpdateDelegate: AnyObject {
         func updateGuidelinesForOnScreenWidget(_ sender: Any)
     }
     
-    @objc public var motionHandler: MotionHandler = MotionHandler.shared
+    @objc public var motionHandler: MotionHandler?
     
     @objc public weak var functionalButtonDelegate: OnScreenFunctionalButtonDelegate?
     @objc protocol OnScreenFunctionalButtonDelegate: AnyObject {
         func expandSettingsView()
         func bringUpToolboxMenu()
         func openWidgetLayoutTool()
-        func switchWidgetProfile()
+        func openWidgetProfileTable(pickProfile: Bool)
         func bringUpSoftKeyboard()
         func alterAbsTouchDragWith(mouseButton:Int32)
+        func switchPencilHover()
+        func enablePencilHover()
+        func disablePencilHover()
+        func setAllowSingleTouchEnabled(_ enabled:Bool)
+        func replaceBrush(shortcut:String)
+        func replaceEraser(shortcut:String)
+        func presentPressureCurveVC()
     }
     
     @objc enum WidgetTypeEnum: UInt8 {
@@ -45,11 +64,8 @@ import SVGKit
     
     private static let MinAutotapInterval:Int = 50
     
-    private let oscProfileMan: OSCProfilesManager = OSCProfilesManager.sharedManager(CGRectZero)
-    private var oscProfile: OSCProfile
-    
-    private let dataMan: DataManager = DataManager()
-    private let tempSettings: TemporarySettings
+    // private let oscProfileMan: OSCProfilesManager = OSCProfilesManager.sharedManager(CGRectZero)
+    @objc public var oscProfile: OSCProfile
     
     @objc public var widgetType: WidgetTypeEnum = WidgetTypeEnum.uninitialized
     
@@ -57,9 +73,9 @@ import SVGKit
     @objc static public var buttonVisualFeedbackEnabled: Bool = true
     @objc public var widgetLabel: String
     @objc public var cmdString: String
-    @objc public var identifier: String = ""
+    @objc public var sequence: Int16 = -1
     private var buttonString: String = ""
-    private var functionalButtonString: String = ""
+    @objc private(set) var functionalButtonString: String = ""
     public var motionControlButtonString: String = ""
     @objc public var touchPadString: String = ""
     // super combo key string set
@@ -71,7 +87,7 @@ import SVGKit
     @objc public var heightFactor: CGFloat = 1.0
     @objc public var componentSizeFactor: CGFloat = 2.88
 
-    @objc public var buttonMode: Int = 0
+    @objc public var buttonMode: ButtonMode = .slideToToggle
     @objc private var tapToToggleFlag: Bool = true
     
     @objc public var sizeReference: Int = WidgetSizeReference.longSide.rawValue
@@ -141,12 +157,14 @@ import SVGKit
     @objc public var hasAutoTap: Bool = false
     @objc public var isMousePadWithButtonActions: Bool = false
     @objc public var hasInertia: Bool = false
-    @objc public var isFuncationalButton: Bool = false
+    @objc public var isFunctionalButton: Bool = false
+    @objc public var isTapToToggleException: Bool = false
     @objc public var hasHapticFeedback: Bool = false
     @objc public var isDirectionPad: Bool = false
     @objc public var hasL3R3Indicator: Bool = false
     
     @objc public var isStickWheel: Bool = false
+    @objc public var isFolder: Bool = false
 
     // for all stick pads
     @objc public var minStickOffset: CGFloat = 0
@@ -193,9 +211,10 @@ import SVGKit
 
     // check quick double tap:
     private var quickDoubleTapDetected: Bool
+    private var temporarilyMovable: Bool = false
     private var touchTapTimeInterval: TimeInterval
     private var touchTapTimeStamp: TimeInterval
-    private let QUICK_TAP_TIME_INTERVAL = 0.2
+    private var QUICK_TAP_TIME_INTERVAL = 0.2
     @objc public var stickIndicatorOffset: CGFloat = 120
     
     // for all LRUD pads
@@ -217,7 +236,7 @@ import SVGKit
     private var previousButtonMask = Direction.initialStatus.rawValue
     
     // OnScreenControls instance
-    @objc public var onScreenControls: OnScreenControls
+    @objc public var onScreenControls: OnScreenControls?
     
     // key / button label
     private let label: UILabel
@@ -226,7 +245,6 @@ import SVGKit
     @objc public var touchBeganLocation: CGPoint = .zero
     
     // for mousePad
-    private var touchLockedForMoveEvent: UITouch
     private var touchBegan: Bool = false
     private var directionPadTouchBegan: Bool = false
     private var firstTouchMoved: Bool = false
@@ -250,7 +268,6 @@ import SVGKit
     
     //slide buttons
     private var capturedTouches: NSMutableSet
-    private let noTouch: UITouch = UITouch()
     let setLock = NSLock()
      
     //controller touch pad
@@ -268,15 +285,21 @@ import SVGKit
     private var tickCycle: UInt8 = UIScreen.main.maximumFramesPerSecond > 110 ? 20 : 10
     private var tickFlag: UInt8 = 0
 
+    @objc public var folded: Bool = false
+    @objc public var persistedFolded: Bool = false
+    @objc public var revealMode: RevealMode = .coexist
+    @objc public var sequenceSet: Set<Int16> = Set()
+    @objc public var parentSequence: Int16 = -1
+    private weak var capturer: OnScreenWidgetView?
     
-    @objc init(cmdString: String, buttonLabel: String, shape:String) {
+    @objc init(cmdString: String, buttonLabel: String, shape:String, profile:OSCProfile) {
 
         self.cmdString = cmdString
         self.touchPadString = ""
         
         if !self.cmdString.contains("+"){
             // 安全解包并处理 `comboKeyStrings`
-            if var comboStrings = CommandManager.shared.extractSinglCmdStringsFromComboKeys(from: self.cmdString) {
+            if var comboStrings = CommandManager.shared.extractCmdStrings(from: self.cmdString) {
                 
                 // extract timeInterval
                 if let lastString = comboStrings.last, lastString.contains("MS") {
@@ -343,7 +366,6 @@ import SVGKit
         self.touchTapTimeStamp = 100
         self.buttonDownVisualEffectStandardWidth = 0
         self.mousePointerMoved = false
-        self.touchLockedForMoveEvent = UITouch()
         self.twoTouchesDetected = false
         self.stickIndicatorOffset = 95
         self.sensitivityFactorX = 1.0
@@ -355,10 +377,10 @@ import SVGKit
             self.pointerIdPool.insert(UInt32(i))
         }
         self.activePointerIds = []
-        self.oscProfile = oscProfileMan.getSelectedProfile()
-        self.tempSettings = dataMan.getSettings()
+        self.oscProfile = profile
         self.inertialScroller = InertialScroller()
         dWheelWalkModeThreshold = stickMaxOffset*0.5
+        // self.motionHandler = MotionHandler.shared(profile: profile)
         super.init(frame: .zero)
         
         // helps widget panel to hide/show stacks
@@ -367,13 +389,20 @@ import SVGKit
         if self.widgetType == WidgetTypeEnum.button {
             if !self.touchPadString.isEmpty {
                 self.mouseButtonAction = MouseButtonAction.noClick
-                self.buttonMode = ButtonMode.regular.rawValue
+                self.buttonMode = .regular
             }
             if !self.motionControlButtonString.isEmpty {
-                self.buttonMode = ButtonMode.tapToToggle.rawValue
+                self.buttonMode = .tapToToggle
             }
-            if !self.functionalButtonString.isEmpty {
-                self.buttonMode = ButtonMode.movable.rawValue
+            if self.cmdString.contains("BRUSH"){
+                self.functionalButtonString = "BRUSH"
+            }
+            if self.cmdString.contains("ERASER"){
+                self.functionalButtonString = "ERASER"
+            }
+            if self.isFunctionalButton {
+                self.buttonMode = .movable
+                if self.functionalButtonString == "PENCILHOVER" {self.buttonMode = .regular}
             }
         }
         
@@ -397,6 +426,8 @@ import SVGKit
         }
                 
         self.tweakBorderAlpha(alpha: self.borderAlpha) // fix default borderAlpha offset
+        
+        self.onScreenControls = OnScreenControls.shared()
 
         setupView()
         
@@ -431,13 +462,25 @@ import SVGKit
         self.hasAutoTap = self.widgetType == WidgetTypeEnum.button && self.functionalButtonString == "" && self.motionControlButtonString == ""
         self.isMousePadWithButtonActions = CommandManager.mousePadWithButtonActions.contains(self.touchPadString) && widgetType == WidgetTypeEnum.touchPad
         self.hasInertia = CommandManager.inertialTouchPads.contains(self.touchPadString)
-        self.isFuncationalButton = self.functionalButtonString != ""
+        self.isFunctionalButton = self.functionalButtonString != "" || self.cmdString.contains("+")
+        self.isTapToToggleException = (self.functionalButtonString == "NOSINGLETOUCH"
+                                       || self.functionalButtonString == "PENCILHOVER"
+                                       || self.functionalButtonString == "ABSTCHDRAG"
+                                    )
         self.hasHapticFeedback = !self.comboButtonStrings.isEmpty || CommandManager.directionPads.contains(self.touchPadString)
         self.isDirectionPad = self.widgetType == WidgetTypeEnum.touchPad && CommandManager.directionPads.contains(self.touchPadString)
         self.isStickWheel = self.widgetType == WidgetTypeEnum.touchPad && CommandManager.stickWheels.contains(self.touchPadString)
+        self.isFolder = self.cmdString == "FOLDER"
         
         self.hasComponent = self.isStickWheel
         self.hasL3R3Indicator = !self.isStickWheel && !self.isDirectionPad && self.widgetType == WidgetTypeEnum.touchPad
+        
+        /*
+        self.hasTrackPoint = (CommandManager.vectorTouchPads.contains(self.touchPadString)
+                              || self.isStickWheel
+                              || (self.widgetType == WidgetTypeEnum.button
+                                  && (buttonMode == .slideAndHold || buttonMode == .slideToToggle)))*/
+        self.hasTrackPoint = true
     }
     
     // ======================================================================================================
@@ -453,9 +496,9 @@ import SVGKit
         }
     }
     
-    @objc public func setupInertialScroller() {
+    @objc public func setupInertialScroller(fps: Int) {
         if self.hasInertia {
-            self.inertialScroller = InertialScroller(decelerationRate: self.decelerationRateX, displayLinkRate: CGFloat(self.tempSettings.framerate.intValue))
+            self.inertialScroller = InertialScroller(decelerationRate: self.decelerationRateX, displayLinkRate: CGFloat(fps))
             self.inertialScroller.decelerationRateY = self.decelerationRateY
         }
     }
@@ -732,11 +775,11 @@ import SVGKit
         }
         return false
     }
-
+    
     private func setupAtrributedText(){
-        let text = self.widgetLabel
+        let text = self.widgetLabel.contains("#") ? "\(self.widgetLabel.split(separator: "#").first ?? "")" : SwiftLocalizationHelper.localizedString(forKey: self.widgetLabel)
         let attr = NSAttributedString(
-            string: text,
+            string: self.folded ? "[\(text)]" : text,
             attributes: [
                 .foregroundColor: UIColor(white:labelAlpha>0 ? 1.0 : 0, alpha: abs(labelAlpha)),     // 填充色
                 .strokeColor: (labelAlpha>0 ? UIColor.black : UIColor.white).withAlphaComponent(abs(labelAlpha)*0.43),          // 描边色
@@ -836,12 +879,16 @@ import SVGKit
         if CommandManager.stickTouchPads.contains(touchPadString) {setupL3R3Indicator()}
         if CommandManager.verticalTouchPads.contains(touchPadString) {setupL3R3Indicator()}
         if CommandManager.mousePadWithButtonActions.contains(self.touchPadString) {setupL3R3Indicator()}
+        if self.hasTrackPoint {setupTrackPoint()}
         if self.hasStickIndicator {
             if self.crossMarkLayer.superlayer == nil {self.crossMarkLayer = createCrossMark()}
             if self.lrudIndicatorBall.superlayer == nil {self.lrudIndicatorBall = createStickBall()}
         }
         if self.isStickWheel {
             self.setupStickWheelLayers()
+        }
+        if self.isFolder {
+            QUICK_TAP_TIME_INTERVAL = 0.15
         }
     }
     
@@ -875,6 +922,21 @@ import SVGKit
         CATransaction.commit()
     }
     
+    @objc var hasTrackPoint: Bool = false
+    @objc static var trackPointEnabled: Bool = false
+    private var trackPoint:CAShapeLayer = CAShapeLayer()
+    @objc public func setupTrackPoint() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        // 1. 创建圆形路径
+        
+        
+        trackPoint.removeFromSuperlayer()
+        trackPoint = GraphicUtils.makeTouchTrackpoint(in: self)
+        
+        CATransaction.commit()
+    }
+
     private func showl3r3Indicator(){
         if OnScreenWidgetView.buttonVisualFeedbackEnabled {
             CATransaction.begin()
@@ -1077,15 +1139,14 @@ import SVGKit
 
         let axisdiameter = self.getDiameter(lengthFactor: UIDevice.current.userInterfaceIdiom == .phone ? 0.35 : 0.5)
         let axisSize = CGSize(width: axisdiameter, height: axisdiameter)
-        self.stickWheelAxis = GraphicUtils.makeCenteredSVGLayer(from: "StickWheelAxis.svg", in: self.layer, targetSize: axisSize)
         self.stickWheelAxis.removeFromSuperlayer()
+        self.stickWheelAxis = GraphicUtils.makeSVGLayer(from: "StickWheelAxis", in: self.layer, targetSize: axisSize)
         self.layer.insertSublayer(self.stickWheelAxis, at: 0)
         // GraphicUtils.changeColor(layer: self.stickWheelAxis, color: .white.withAlphaComponent(1))
         self.stickWheelAxis.isHidden = false
 
-        
-        self.stickWheelLayer = GraphicUtils.makeCenteredSVGLayer(from: "StickWheel.svg", in: self.layer, targetSize: CGSize(width: diameter, height: diameter))
         self.stickWheelLayer.removeFromSuperlayer()
+        self.stickWheelLayer = GraphicUtils.makeSVGLayer(from: "StickWheel", in: self.layer, targetSize: CGSize(width: diameter, height: diameter))
         self.layer.insertSublayer(self.stickWheelLayer, at: 0)
         GraphicUtils.changeColor(layer: self.stickWheelLayer, color: tintColor)
         self.stickWheelLayer.setAffineTransform(.identity)
@@ -1093,8 +1154,8 @@ import SVGKit
         
         
         let smallWheelSize = CGSize(width: diameter*0.56766, height: diameter*0.56766)
-        self.stickWheelLayerSmall = GraphicUtils.makeCenteredSVGLayer(from: "StickWheelSmall.svg", in: self.layer, targetSize: smallWheelSize)
         self.stickWheelLayerSmall.removeFromSuperlayer()
+        self.stickWheelLayerSmall = GraphicUtils.makeSVGLayer(from: "StickWheelSmall", in: self.layer, targetSize: smallWheelSize)
         self.layer.insertSublayer(self.stickWheelLayerSmall, below: stickWheelLayer)
         GraphicUtils.changeColor(layer: self.stickWheelLayerSmall, color: tintColor)
         self.stickWheelLayerSmall.setAffineTransform(.identity)
@@ -1262,7 +1323,7 @@ import SVGKit
                 switch touchPadString {
                 case "WASDPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["W"]!,Int8(KEY_ACTION_DOWN), 0)
                 case "ARROWPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["UP_ARROW"]!,Int8(KEY_ACTION_DOWN), 0)
-                case "DPAD": self.onScreenControls.pressDownControllerButton(UP_FLAG)
+                case "DPAD": self.onScreenControls?.pressDownControllerButton(UP_FLAG)
                 default: break
                 }
             }
@@ -1271,7 +1332,7 @@ import SVGKit
                 switch touchPadString {
                 case "WASDPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["W"]!,Int8(KEY_ACTION_UP), 0)
                 case "ARROWPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["UP_ARROW"]!,Int8(KEY_ACTION_UP), 0)
-                case "DPAD": self.onScreenControls.releaseControllerButton(UP_FLAG)
+                case "DPAD": self.onScreenControls?.releaseControllerButton(UP_FLAG)
                 default: break
                 }
             }
@@ -1280,7 +1341,7 @@ import SVGKit
                 switch touchPadString {
                 case "WASDPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["S"]!,Int8(KEY_ACTION_DOWN), 0)
                 case "ARROWPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["DOWN_ARROW"]!,Int8(KEY_ACTION_DOWN), 0)
-                case "DPAD": self.onScreenControls.pressDownControllerButton(DOWN_FLAG)
+                case "DPAD": self.onScreenControls?.pressDownControllerButton(DOWN_FLAG)
                 default: break
                 }
             }
@@ -1289,7 +1350,7 @@ import SVGKit
                 switch touchPadString {
                 case "WASDPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["S"]!,Int8(KEY_ACTION_UP), 0)
                 case "ARROWPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["DOWN_ARROW"]!,Int8(KEY_ACTION_UP), 0)
-                case "DPAD": self.onScreenControls.releaseControllerButton(DOWN_FLAG)
+                case "DPAD": self.onScreenControls?.releaseControllerButton(DOWN_FLAG)
                 default: break
                 }
             }
@@ -1298,7 +1359,7 @@ import SVGKit
                 switch touchPadString {
                 case "WASDPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["A"]!,Int8(KEY_ACTION_DOWN), 0)
                 case "ARROWPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["LEFT_ARROW"]!,Int8(KEY_ACTION_DOWN), 0)
-                case "DPAD": self.onScreenControls.pressDownControllerButton(LEFT_FLAG)
+                case "DPAD": self.onScreenControls?.pressDownControllerButton(LEFT_FLAG)
                 default: break
                 }
             }
@@ -1307,7 +1368,7 @@ import SVGKit
                 switch touchPadString {
                 case "WASDPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["A"]!,Int8(KEY_ACTION_UP), 0)
                 case "ARROWPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["LEFT_ARROW"]!,Int8(KEY_ACTION_UP), 0)
-                case "DPAD": self.onScreenControls.releaseControllerButton(LEFT_FLAG)
+                case "DPAD": self.onScreenControls?.releaseControllerButton(LEFT_FLAG)
                 default: break
                 }
             }
@@ -1316,7 +1377,7 @@ import SVGKit
                 switch touchPadString {
                 case "WASDPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["D"]!,Int8(KEY_ACTION_DOWN), 0)
                 case "ARROWPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["RIGHT_ARROW"]!,Int8(KEY_ACTION_DOWN), 0)
-                case "DPAD": self.onScreenControls.pressDownControllerButton(RIGHT_FLAG)
+                case "DPAD": self.onScreenControls?.pressDownControllerButton(RIGHT_FLAG)
                 default: break
                 }
             }
@@ -1325,7 +1386,7 @@ import SVGKit
                 switch touchPadString {
                 case "WASDPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["D"]!,Int8(KEY_ACTION_UP), 0)
                 case "ARROWPAD": LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["RIGHT_ARROW"]!,Int8(KEY_ACTION_UP), 0)
-                case "DPAD": self.onScreenControls.releaseControllerButton(RIGHT_FLAG)
+                case "DPAD": self.onScreenControls?.releaseControllerButton(RIGHT_FLAG)
                 default: break
                 }
             }
@@ -1409,18 +1470,20 @@ import SVGKit
         }
     }
     
-    private func handleFingerUpOrSlideout() {
+    
+    private func handleFingerUpOrSlideout(leaveFunctionalButtonAlone: Bool = false, event: UIEvent? = nil) {
         if autoTapInterval < OnScreenWidgetView.MinAutotapInterval {
-            handleButtonUp()
+            handleButtonUp(leaveFunctionalButtonAlone:leaveFunctionalButtonAlone, event:event)
         }
         else{
             self.autoTapTimer?.pause()
-            self.handleButtonUp()
+            self.handleButtonUp(leaveFunctionalButtonAlone: leaveFunctionalButtonAlone)
         }
     }
     
     private func handleButtonDown() {
-        
+        if !self.isUserInteractionEnabled {return}
+
         if !OnScreenWidgetView.editMode, !self.functionalButtonString.isEmpty {self.handleFunctionalButtonDown()}
                         
         if !OnScreenWidgetView.editMode {self.sendComboButtonsDownEvent(comboStrings: self.comboButtonStrings)}
@@ -1455,7 +1518,8 @@ import SVGKit
         }
     }
     
-    private func handleButtonUp() {
+    private func handleButtonUp(leaveFunctionalButtonAlone:Bool = false, event: UIEvent? = nil) {
+        if !self.isUserInteractionEnabled {return}
         if !OnScreenWidgetView.editMode {self.sendComboButtonsUpEvent(comboStrings: self.comboButtonStrings)}
         
         if !OnScreenWidgetView.editMode && !self.motionControlButtonString.isEmpty{
@@ -1465,7 +1529,22 @@ import SVGKit
         self.buttonUpVisualEffect()
 
         if !OnScreenWidgetView.editMode && !self.functionalButtonString.isEmpty{
-            self.handleFunctionalButtonUp()
+            // print("handleFingerUpOrSlideout leaveFunctionalButtonAlone, \(leaveFunctionalButtonAlone) \(CACurrentMediaTime())")
+            if !leaveFunctionalButtonAlone {self.handleFunctionalButtonUp(event:event)}
+        }
+        
+        // legacy keyboard button combo connected by "+"
+        if !OnScreenWidgetView.editMode && self.cmdString.contains("+") && !self.cmdString.contains("-"){
+            if buttonMode == .movable, moveableButtonLongPressed() {return}
+            self.buttonDownVisualEffect()
+            var autoReleaseComboButtons = CommandManager.shared.extractAutoReleaseButtonStrings(from: self.cmdString)!
+            autoReleaseComboButtons.removeAll{
+                Set(CommandManager.pencilProButtonCmds).contains($0)
+            }
+            CommandManager.shared.sendAutoReleaseComboCommand(cmdStrings: autoReleaseComboButtons) // send multi-key command
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.buttonUpVisualEffect()
+            }
         }
     }
     
@@ -1495,16 +1574,16 @@ import SVGKit
         if !touchCenteredOffset {
             let axisdiameter = self.getDiameter(lengthFactor: UIDevice.current.userInterfaceIdiom == .phone ? 0.27 : 0.35)
             let axisSize = CGSize(width: axisdiameter, height: axisdiameter)
-            self.stickWheelAxis = GraphicUtils.makeCenteredSVGLayer(from: "StickWheelAxis-0.75.svg", in: self.layer, targetSize: axisSize)
-            GraphicUtils.changeColor(layer: self.stickWheelAxis, color: UIColor(white: 1, alpha: 0.5))
             self.stickWheelAxis.removeFromSuperlayer()
+            self.stickWheelAxis = GraphicUtils.makeSVGLayer(from: "StickWheelAxis-0.75", in: self.layer, targetSize: axisSize)
+            GraphicUtils.changeColor(layer: self.stickWheelAxis, color: UIColor(white: 1, alpha: 0.5))
             self.layer.addSublayer(self.stickWheelAxis)
             self.stickWheelAxis.isHidden = false
         }
         
         CATransaction.commit()
     }
-    
+        
     @objc public func hideAllHighlightLayersOfAllWidgets(selfIncluded:Bool) {
         self.forEachWidget(){ widget in
             if !selfIncluded && widget == self {return}
@@ -1530,7 +1609,7 @@ import SVGKit
         if self.motionControlButtonString != "" {self.buttonDownVisualEffectStandardWidth = 3}
         
         // Set the frame to be larger than the view to expand outward
-        buttonDownVisualEffectLayer.borderWidth = self.buttonDownVisualEffectStandardWidth * self.highlightSizeFactor // set this 0 to hide the visual effect first
+        buttonDownVisualEffectLayer.borderWidth = CGFloat(Int(self.buttonDownVisualEffectStandardWidth * self.highlightSizeFactor / 2) * 2) // set this 0 to hide the visual effect first
         buttonDownVisualEffectLayer.borderColor = voidlinkPurple
         buttonDownVisualEffectLayer.frame = self.bounds.insetBy(dx: -buttonDownVisualEffectLayer.borderWidth, dy: -buttonDownVisualEffectLayer.borderWidth) // Adjust the inset as needed
         buttonDownVisualEffectLayer.cornerRadius = self.layer.cornerRadius + buttonDownVisualEffectLayer.borderWidth
@@ -1580,12 +1659,12 @@ import SVGKit
         
         let mixRightStickInputToGyro = (oscProfile.mapGyroTo == MapGyroTo.mapGyroToControllerStick
                                        && oscProfile.yawPitchToRightStick)
-        if !mixRightStickInputToGyro || (self.motionHandler.gyroMixInputStarted() != true) {
+        if !mixRightStickInputToGyro || (self.motionHandler?.gyroMixInputStarted() != true) {
             
             stickOffsetVector = ControllerUtil.compensated(offsetVector: CGVector(dx: targetX, dy: targetY), minOffset: minStickOffset, circulate: circulate)
-            self.onScreenControls.sendRightStickTouchPadEvent(stickOffsetVector.dx, stickOffsetVector.dy)
+            self.onScreenControls?.sendRightStickTouchPadEvent(stickOffsetVector.dx, stickOffsetVector.dy)
         }
-        self.motionHandler.mixOnScreenRightStickAndGyroInput(x: targetX, y: targetY)
+        self.motionHandler?.mixOnScreenRightStickAndGyroInput(x: targetX, y: targetY)
     }
     
     private func sendLeftStickTouchPadEvent(weightedTouchX:CGFloat, weightedTouchY:CGFloat, circulate:Bool=false){
@@ -1594,44 +1673,44 @@ import SVGKit
         
         let mixLeftStickInputToGyro = (oscProfile.mapGyroTo == MapGyroTo.mapGyroToControllerStick
                                        && oscProfile.rollToLeftStick)
-        if !mixLeftStickInputToGyro || (self.motionHandler.gyroMixInputStarted() != true) {
+        if !mixLeftStickInputToGyro || (self.motionHandler?.gyroMixInputStarted() != true) {
             
             stickOffsetVector = ControllerUtil.compensated(offsetVector: CGVector(dx: targetX, dy: targetY), minOffset: minStickOffset, circulate: circulate)
-            self.onScreenControls.sendLeftStickTouchPadEvent(stickOffsetVector.dx, stickOffsetVector.dy)
+            self.onScreenControls?.sendLeftStickTouchPadEvent(stickOffsetVector.dx, stickOffsetVector.dy)
         }
-        self.motionHandler.mixOnScreenLeftStickAndGyroInput(x: targetX, y: targetY)
+        self.motionHandler?.mixOnScreenLeftStickAndGyroInput(x: targetX, y: targetY)
     }
      
     private func sendLeftTriggerTouchPadEvent(inputY: CGFloat){
-        self.onScreenControls.updateLeftTrigger(UInt8(max(min(inputY,255),0)))
+        self.onScreenControls?.updateLeftTrigger(UInt8(max(min(inputY,255),0)))
     }
     
     private func sendRightTriggerTouchPadEvent(inputY: CGFloat){
-        self.onScreenControls.updateRightTrigger(UInt8(max(min(inputY,255),0)))
+        self.onScreenControls?.updateRightTrigger(UInt8(max(min(inputY,255),0)))
     }
 
     //==========================================================================================================
     
     private func sendOscButtonDownEvent(oscString: String){
         let buttonFlag = CommandManager.oscButtonMappings[oscString]
-        if buttonFlag != 0 {self.onScreenControls.pressDownControllerButton(buttonFlag!)}
+        if buttonFlag != 0 {self.onScreenControls?.pressDownControllerButton(buttonFlag!)}
         else {switch oscString {
         case "OSCL2", "L2", "LT":
-            self.onScreenControls.updateLeftTrigger(0xFF)
+            self.onScreenControls?.updateLeftTrigger(0xFF)
         case "OSCR2", "R2", "RT":
-            self.onScreenControls.updateRightTrigger(0xFF)
+            self.onScreenControls?.updateRightTrigger(0xFF)
         default:break
         }}
     }
     
     private func sendOscButtonUpEvent(oscString: String){
         let buttonFlag = CommandManager.oscButtonMappings[oscString]
-        if buttonFlag != 0 {self.onScreenControls.releaseControllerButton(buttonFlag!)}
+        if buttonFlag != 0 {self.onScreenControls?.releaseControllerButton(buttonFlag!)}
         else {switch oscString {
         case "OSCL2", "L2", "LT":
-            self.onScreenControls.updateLeftTrigger(0x00)
+            self.onScreenControls?.updateLeftTrigger(0x00)
         case "OSCR2", "R2", "RT":
-            self.onScreenControls.updateRightTrigger(0x00)
+            self.onScreenControls?.updateRightTrigger(0x00)
         default:break
         }}
     }
@@ -1693,28 +1772,32 @@ import SVGKit
         self.firstTouchMoved = false
         self.tickFlag = 0
         super.touchesBegan(touches, with: event)
+        
         self.isMultipleTouchEnabled = self.widgetType == WidgetTypeEnum.button || CommandManager.mousePadWithButtonActions.contains(self.touchPadString);
 
         if !OnScreenWidgetView.editMode && self.touchPadString == "TRACKBALL" {
             stopTrackballMomentum()
         }
         
+        guard let touch = touches.first else {return}
+        // get touchBeganLocation
+        
         if touches.count == 1 { // to make sure touchBegan location captured properly, don't use event.alltouches.count here
             let currentTime = CACurrentMediaTime()
             touchTapTimeInterval = currentTime - touchTapTimeStamp
             touchTapTimeStamp = currentTime
             quickDoubleTapDetected = touchTapTimeInterval < QUICK_TAP_TIME_INTERVAL
-            
-            let touch = touches.first
-            // get touchBeganLocation
+            if quickDoubleTapDetected, self.isFolder, self.buttonMode == .slideAndHold {
+                self.temporarilyMovable = true
+            }
             
             if OnScreenWidgetView.editMode {
-                self.touchBeganLocation = touch!.location(in: superview)
+                self.touchBeganLocation = touch.location(in: superview)
                 self.highlightBorder(highlighted: true)
             }
             else {
-                if widgetType == WidgetTypeEnum.button, self.buttonMode == ButtonMode.movable.rawValue {self.touchBeganLocation = touch!.location(in: superview)}
-                else {self.touchBeganLocation = touch!.location(in: self)}
+                if widgetType == WidgetTypeEnum.button, self.buttonMode == .movable {self.touchBeganLocation = touch.location(in: superview)}
+                else {self.touchBeganLocation = touch.location(in: self)}
             }
             self.latestTouchLocation = touchBeganLocation
         }
@@ -1728,8 +1811,8 @@ import SVGKit
             if self.widgetType == WidgetTypeEnum.touchPad && touches.count == 1{ // don't use event?.allTouches?.count here, it will counts all touches including the ones captured by other UIViews
                 switch self.touchPadString {
                 case "LSWHEEL","RSWHEEL":
-                    self.getVector(touch: touches.first!)
-                    self.handleStickWheelMove(touch: touches.first!)
+                    self.getVector(touch: touch)
+                    self.handleStickWheelMove(touch: touch)
                     if quickDoubleTapDetected {
                         self.showl3r3Indicator()
                         self.sendComboButtonsDownEvent(comboStrings: self.comboButtonStrings)}
@@ -1762,7 +1845,7 @@ import SVGKit
                         self.stickWheelAxis.position = touchCenteredOffset ? touchBeganLocation : CGPoint(x: self.bounds.midX, y: self.bounds.midY)
                         self.stickWheelAxis.isHidden = false
                         CATransaction.commit()
-                        self.getVector(touch: touches.first!)
+                        self.getVector(touch: touch)
                         self.handleLrudTouchMove()
                     }
                     if quickDoubleTapDetected {
@@ -1792,26 +1875,38 @@ import SVGKit
                         
             // this will also deal with button events
             if self.widgetType == WidgetTypeEnum.button && !self.comboButtonStrings.isEmpty {
-                if self.buttonMode != ButtonMode.tapToToggle.rawValue {
+                switch self.buttonMode {
+                case .tapToToggle:
+                    if(self.tapToToggleFlag) {self.handleTapDownOrSlidein()}
+                    else {self.handleFingerUpOrSlideout()}
+                    self.tapToToggleFlag = !self.tapToToggleFlag
+                case .slideToToggle where !self.isFolder:
+                    self.handleButtonSliding(touches: touches)
+                case .slideAndHold where !self.isFolder:
+                    self.handleButtonSliding(touches: touches)
+                default:
                     self.handleTapDownOrSlidein()
                     setLock.lock()
                     self.capturedTouches.union(touches)
                     setLock.unlock()
                 }
-                else{
-                    if(self.tapToToggleFlag) {self.handleTapDownOrSlidein()}
-                    else {self.handleFingerUpOrSlideout()}
-                    self.tapToToggleFlag = !self.tapToToggleFlag
+            }
+            
+            if self.widgetType == WidgetTypeEnum.button && (self.buttonMode == .movable || self.temporarilyMovable) {
+                movableButtonReleased = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    OnScreenWidgetView.updateStreamViewGuidelines(for: self)
                 }
             }
             
-            // legacy keyboard button combo connected by "+"
-            if self.cmdString.contains("+") && !self.cmdString.contains("-"){
-                let keyboardCmdStrings = CommandManager.shared.extractKeyStringsFromComboCommand(from: self.cmdString)!
-                CommandManager.shared.sendKeyComboCommand(keyboardCmdStrings: keyboardCmdStrings) // send multi-key command
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { // reset shadow color immediately 50ms later
-                    self.handleButtonUp()
+            if self.hasTrackPoint, OnScreenWidgetView.trackPointEnabled {
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                if let touch = touches.first {
+                    trackPoint.isHidden = false
+                    trackPoint.position = touch.location(in: self)
                 }
+                CATransaction.commit()
             }
         }
         // here is in edit mode:
@@ -1823,10 +1918,25 @@ import SVGKit
     
     private func moveByTouch(touch: UITouch){
         let currentLocation: CGPoint
-        if OnScreenWidgetView.editMode {currentLocation = touch.location(in: superview)}
+        if OnScreenWidgetView.editMode {
+            // self.layer.borderColor = voidlinkPurple
+            capturer = nil
+            currentLocation = touch.location(in: superview)
+                forEachWidget { (widget) in
+                    guard widget != self else {return}
+                    if widget.isFolder {
+                        if isLocation(currentLocation, in: widget), !self.sequenceSet.contains(widget.sequence) {
+                            // self.layer.borderColor = UIColor.systemYellow.cgColor
+                            widget.highlightBorder(highlighted: true)
+                            capturer = widget
+                            return
+                        }
+                        else {widget.highlightBorder(highlighted: false)}
+                    }
+                }
+        }
         else {
-            if self.buttonMode == ButtonMode.movable.rawValue {currentLocation = touch.location(in: superview)}
-            else {return}
+            currentLocation = touch.location(in: superview)
         }
         
         if !firstTouchMoved, !self.isAdjacentPoints(currentLocation, from: latestTouchLocation, tolerance: 1) {
@@ -1841,7 +1951,10 @@ import SVGKit
         let outOfBoundsX = center.x+offsetX >= (self.superview?.bounds.width)! || center.x+offsetX < 0
         let outOfBoundsY = center.y+offsetY >= (self.superview?.bounds.height)! || center.y+offsetY < 0
 
-        if firstTouchMoved {center = CGPoint(x: outOfBoundsX ? center.x : center.x+offsetX, y: outOfBoundsY ? center.y : center.y+offsetY)}
+        if firstTouchMoved {
+            center = CGPoint(x: outOfBoundsX ? center.x : center.x+offsetX, y: outOfBoundsY ? center.y : center.y+offsetY)
+            storedCenter = center
+        }
         
         latestTouchLocation = currentLocation
         
@@ -1850,6 +1963,10 @@ import SVGKit
         //NSLog("x coord: %f, y coord: %f", self.frame.origin.x, self.frame.origin.y)
         if OnScreenWidgetView.editMode {
             guidelineDelegate?.updateGuidelinesForOnScreenWidget(self)
+        }
+        else {
+            if self.widgetType == .button {superview?.bringSubviewToFront(self)}
+            OnScreenWidgetView.updateStreamViewGuidelines(for: self)
         }
     }
     
@@ -1888,17 +2005,32 @@ import SVGKit
         }
     }
 
-    private func handleFingerUpAfterSliding(touches: Set<UITouch>) {
+    private func handleFingerUpAfterSliding(touches: Set<UITouch>, event: UIEvent? = nil) {
+        func processWidget(_ widget: OnScreenWidgetView , with touch: UITouch) {
+            setLock.lock()
+            let captured = widget.capturedTouches.contains(touch)
+            setLock.unlock()
+            if !captured || widget.buttonMode == .regular {return}
+            // let needReleaseButton =  (isLocation(touch.location(in: superview), in: widget) // for slideToToggle & movable+slidable buttons
+            //                           || widget.buttonMode == .slideAndHold) // for slideAndHold buttons
+            widget.handleFingerUpOrSlideout(event: event)
+            setLock.lock()
+            widget.capturedTouches.remove(touch)
+            setLock.unlock()
+        }
+        
+        // only called by self
         for touch in touches {
-            self.forEachWidget(){ widget in
-                setLock.lock()
-                let captured = widget.capturedTouches.contains(touch)
-                setLock.unlock()
-                if !captured || widget.buttonMode == ButtonMode.regular.rawValue {return}
-                widget.handleFingerUpOrSlideout()
-                setLock.lock()
-                widget.capturedTouches.remove(touch)
-                setLock.unlock()
+            var exclusiveFolders: Set<OnScreenWidgetView> = Set()
+            self.forEachWidget(){ widget in // self included here.
+                guard widget.revealMode != .exclusive || !isLocation(touch.location(in: superview), in: widget) else {
+                    exclusiveFolders.insert(widget)
+                    return
+                }
+                processWidget(widget, with: touch)
+            }
+            for folder in exclusiveFolders {
+                processWidget(folder, with: touch)
             }
         }
     }
@@ -1911,15 +2043,22 @@ import SVGKit
             }
         }
     }
+    
+    private func isLocation(_ location:CGPoint, in widget:OnScreenWidgetView) -> Bool{
+        let locationInWidget = widget.convert(location, from: self.superview)
+        return widget.bounds.contains(locationInWidget)
+    }
 
     private func handleButtonSliding(touches: Set<UITouch>) {
         for touch in touches {
             let locationInSuperView = touch.location(in: self.superview)
             self.forEachWidget{ widget in
                 if widget.widgetType != WidgetTypeEnum.button {return}
-                let isSlidableButton = widget.buttonMode == ButtonMode.slideToToggle.rawValue || widget.buttonMode == ButtonMode.slideAndHold.rawValue
-                let pointInSubview = widget.convert(locationInSuperView, from: self.superview)
-                if widget.bounds.contains(pointInSubview){
+                let isSlidableButton = (widget.buttonMode == .slideToToggle
+                                        || widget.buttonMode == .slideAndHold
+                                        || (widget.buttonMode == .movable && widget != self)
+                )
+                if isLocation(locationInSuperView, in: widget){
                     setLock.lock()
                     let captured = widget.capturedTouches.contains(touch)
                     setLock.unlock()
@@ -1937,13 +2076,13 @@ import SVGKit
                     setLock.unlock()
                     if !captured || !isSlidableButton {return}
                     // print("UIButton: \(widget.buttonLabel) out test, \(widget.touchPadString), \(CACurrentMediaTime())")
-                    if(widget.buttonMode == ButtonMode.slideToToggle.rawValue){
-                        widget.handleFingerUpOrSlideout()
+                    if(widget.buttonMode == .slideToToggle || widget.buttonMode == .movable){
+                        widget.handleFingerUpOrSlideout(leaveFunctionalButtonAlone: widget.isFunctionalButton)
                         setLock.lock()
                         widget.capturedTouches.remove(touch)
                         setLock.unlock()
                     }
-                    if(widget.buttonMode == ButtonMode.slideAndHold.rawValue){
+                    if(widget.buttonMode == .slideAndHold){
                         // do nothing here
                     }
                 }
@@ -1961,15 +2100,24 @@ import SVGKit
             }
             
             if self.widgetType == WidgetTypeEnum.button {
-                if self.buttonMode == ButtonMode.slideToToggle.rawValue || self.buttonMode == ButtonMode.slideAndHold.rawValue  {self.handleButtonSliding(touches: touches)}
+                if self.buttonMode == .slideToToggle || self.buttonMode == .slideAndHold  {self.handleButtonSliding(touches: touches)}
+            }
+
+            if (self.buttonMode == .movable || self.temporarilyMovable) && self.moveableButtonLongPressed() {
+                if let touch = touches.first {
+                    self.moveByTouch(touch: touch)
+                }
             }
             
-            if self.buttonMode == ButtonMode.movable.rawValue{
+            if self.hasTrackPoint, OnScreenWidgetView.trackPointEnabled {
                 if let touch = touches.first {
-                    NSLog("touchTapTimeStamp %f", self.touchTapTimeStamp)
-                    if CACurrentMediaTime() - self.touchTapTimeStamp > 0.3 { // temporarily relocate special buttons
-                        self.moveByTouch(touch: touch)
+                    CATransaction.begin()
+                    CATransaction.setDisableActions(true)
+                    if trackPoint.isHidden {
+                        trackPoint.isHidden = false
                     }
+                    trackPoint.position = touch.location(in: self)
+                    CATransaction.commit()
                 }
             }
         }
@@ -2024,15 +2172,16 @@ import SVGKit
     }
     
     private func handleTouchPadMoveEvent (_ touches: Set<UITouch>, with event: UIEvent?){
+        guard let touch = touches.first else { return }
         if touches.count == 1{ // don't use event.alltouches.count here, it will counts all touches
-            self.getVector(touch: touches.first!)
+            self.getVector(touch: touch)
             switch self.touchPadString{
             case "MOUSEPAD":
                 DispatchQueue.global(qos: .userInteractive).async {
                     self.weightedDeltaX = Int(self.deltaX * 1.7 * self.sensitivityFactorX)
                     self.weightedDeltaY = Int(self.deltaY * 1.7 * self.sensitivityFactorY)
                     if self.firstTouchMoved {LiSendMouseMoveEvent(Int16(self.weightedDeltaX), Int16(self.weightedDeltaY))}
-                    self.updateTouchLocation(touch: touches.first!)
+                    self.updateTouchLocation(touch: touch)
                 }
                 break
             case "TRACKBALL":
@@ -2044,7 +2193,7 @@ import SVGKit
                         self.trackballVelocity = CGPoint(x: self.weightedDeltaX, y: self.weightedDeltaY)
                         self.stopTrackballMomentum()
                     }
-                    self.updateTouchLocation(touch: touches.first!)
+                    self.updateTouchLocation(touch: touch)
                 }
                 break
             case "ABSMOUSE":
@@ -2064,24 +2213,24 @@ import SVGKit
                         }
                     }
                 }
-                self.updateTouchLocation(touch: touches.first!)
+                self.updateTouchLocation(touch: touch)
                 break
             case "LSWHEEL", "RSWHEEL":
-                self.handleStickWheelMove(touch: touches.first!)
+                self.handleStickWheelMove(touch: touch)
             case "LSPAD":
                 DispatchQueue.global(qos: .userInteractive).async {
                     self.weightedDeltaX = 1
                     self.sendLeftStickTouchPadEvent(weightedTouchX: self.offSetX * self.sensitivityFactorX, weightedTouchY: self.offSetY * self.sensitivityFactorY)
                 }
                 if widgetType == WidgetTypeEnum.touchPad {updateStickIndicator()}
-                self.updateTouchLocation(touch: touches.first!)
+                self.updateTouchLocation(touch: touch)
             case "RSPAD":
                 DispatchQueue.global(qos: .userInteractive).async {
                     self.weightedDeltaX = 1
                     self.sendRightStickTouchPadEvent(weightedTouchX: self.offSetX * self.sensitivityFactorX, weightedTouchY: self.offSetY * self.sensitivityFactorY)
                 }
                 if widgetType == WidgetTypeEnum.touchPad {updateStickIndicator()}
-                self.updateTouchLocation(touch: touches.first!)
+                self.updateTouchLocation(touch: touch)
             case "LSVPAD":
                 DispatchQueue.global(qos: .userInteractive).async {
                     self.weightedDeltaX = Int(self.deltaX*self.VectorStickFactor*self.sensitivityFactorX)
@@ -2089,7 +2238,7 @@ import SVGKit
                     if self.firstTouchMoved {
                         self.sendLeftStickTouchPadEvent(weightedTouchX: CGFloat(self.weightedDeltaX), weightedTouchY: CGFloat(self.weightedDeltaY))
                     }
-                    self.updateTouchLocation(touch: touches.first!)
+                    self.updateTouchLocation(touch: touch)
                 }
             case "RSVPAD":
                 DispatchQueue.global(qos: .userInteractive).async {
@@ -2098,30 +2247,30 @@ import SVGKit
                     if self.firstTouchMoved {
                         self.sendRightStickTouchPadEvent(weightedTouchX: CGFloat(self.weightedDeltaX), weightedTouchY: CGFloat(self.weightedDeltaY))
                     }
-                    self.updateTouchLocation(touch: touches.first!)
+                    self.updateTouchLocation(touch: touch)
                 }
             case "LTPAD":
                 DispatchQueue.global(qos: .userInteractive).async {
                     self.weightedDeltaY = 1
                     self.sendLeftTriggerTouchPadEvent(inputY: -self.offSetY*4.5*self.sensitivityFactorY)
-                    self.updateTouchLocation(touch: touches.first!)
+                    self.updateTouchLocation(touch: touch)
                 }
             case "RTPAD":
                 DispatchQueue.global(qos: .userInteractive).async {
                     self.weightedDeltaY = 1
                     self.sendRightTriggerTouchPadEvent(inputY: -self.offSetY*4.5*self.sensitivityFactorY)
-                    self.updateTouchLocation(touch: touches.first!)
+                    self.updateTouchLocation(touch: touch)
                 }
             case "DPAD", "WASDPAD", "ARROWPAD":
                 self.weightedDeltaX = 1
                 handleLrudTouchMove()
-                self.updateTouchLocation(touch: touches.first!)
+                self.updateTouchLocation(touch: touch)
             case "MOUSEWHEEL","WHEEL":
                 self.weightedDeltaY = Int(self.deltaY*7.5*self.sensitivityFactorY)
                 if firstTouchMoved {LiSendHighResScrollEvent(Int16(self.weightedDeltaY))}
-                self.updateTouchLocation(touch: touches.first!)
+                self.updateTouchLocation(touch: touch)
             case "DISCRETEWHEEL", "DSWHEEL":
-                let currentLocation = touches.first!.location(in: self)
+                let currentLocation = touch.location(in: self)
                 tickFlag = (tickFlag+1)%UInt8(CGFloat(tickCycle)/abs(sensitivityFactorY))
                 var delta = self.deltaY
                 self.weightedDeltaY = 1
@@ -2130,7 +2279,7 @@ import SVGKit
                 delta = delta * CGFloat(copysign(1.0, sensitivityFactorY))
                 if tickFlag == 1, delta != 0 {LiSendScrollEvent(delta > 0 ? -3 : 3)}
                 // self.latestTouchLocation = currentLocation
-                self.updateTouchLocation(touch: touches.first!)
+                self.updateTouchLocation(touch: touch)
             default:
                 break
             }
@@ -2187,9 +2336,9 @@ import SVGKit
     private func handleMotionControlButtonDown(){
         switch self.motionControlButtonString {
         case "GYRO":
-            self.motionHandler.startGyroByOnScreenButton(self, yawFactor: yawFactor, pitchFactor: pitchFactor, rollFactor: rollFactor)
+            self.motionHandler?.startGyroByOnScreenButton(self, yawFactor: yawFactor, pitchFactor: pitchFactor, rollFactor: rollFactor)
         case "GYROPAUSE":
-            self.motionHandler.stopGyroUpdate(interruptNoneGyroInput:false)
+            self.motionHandler?.stopGyroUpdate(interruptNoneGyroInput:false)
             break
         case "ACCEL":
             break
@@ -2203,27 +2352,27 @@ import SVGKit
     private func handleMotionControlButtonUp(){
         switch self.motionControlButtonString {
         case "GYRO":
-            if let gyroStarter = motionHandler.gyroStarter as? OnScreenWidgetView, self === gyroStarter {
+            if let gyroStarter = motionHandler?.gyroStarter as? OnScreenWidgetView, self === gyroStarter {
                 self.forEachWidget{ widget in
                     if widget.motionControlButtonString != "GYRO" || widget === self {return}
-                    if(widget.buttonMode == ButtonMode.tapToToggle.rawValue && widget.logicallyDown) {
+                    if(widget.buttonMode == .tapToToggle && widget.logicallyDown) {
                         widget.buttonUpVisualEffect()
                         widget.tapToToggleFlag = !widget.tapToToggleFlag
                     }
                 }
-                self.motionHandler.stopGyroUpdate(interruptNoneGyroInput: false, resetLeftStick: true)
-                self.motionHandler.gyroStarter = nil
+                self.motionHandler?.stopGyroUpdate(interruptNoneGyroInput: false, resetLeftStick: true)
+                self.motionHandler?.gyroStarter = nil
             }
             else {
-                if self.motionHandler.gyroStarter != nil {
-                    if let gyroStarter = motionHandler.gyroStarter as? OnScreenWidgetView {
-                        self.motionHandler.startGyroByOnScreenButton(self, yawFactor: gyroStarter.yawFactor, pitchFactor: gyroStarter.pitchFactor, rollFactor: gyroStarter.rollFactor)
+                if self.motionHandler?.gyroStarter != nil {
+                    if let gyroStarter = motionHandler?.gyroStarter as? OnScreenWidgetView {
+                        self.motionHandler?.startGyroByOnScreenButton(self, yawFactor: gyroStarter.yawFactor, pitchFactor: gyroStarter.pitchFactor, rollFactor: gyroStarter.rollFactor)
                     }
                 }
             }
         case "GYROPAUSE":
-            if self.motionHandler.gyroStarter != nil {
-                self.motionHandler.startGyroByOnScreenButton(self, yawFactor: motionHandler.widgetYawFactor, pitchFactor: motionHandler.widgetPitchFactor, rollFactor: motionHandler.widgetRollFactor)
+            if self.motionHandler?.gyroStarter != nil {
+                self.motionHandler?.startGyroByOnScreenButton(self, yawFactor: motionHandler?.widgetYawFactor ?? 0, pitchFactor: motionHandler?.widgetPitchFactor ?? 0, rollFactor: motionHandler?.widgetRollFactor ?? 0)
             }
         case "ACCEL":
             break
@@ -2236,53 +2385,130 @@ import SVGKit
     
     private func handleFunctionalButtonDown(){
         switch self.functionalButtonString {
+        case "FOLDER":
+            if self.buttonMode != .slideAndHold {break}
+            self.folded = false
+            OnScreenWidgetView.set(folded: false, for: self)
         case "ABSTCHDRAG":
             let mouseButton = CommandManager.mouseButtonMappings[Set(self.comboButtonStrings).intersection(CommandManager.mouseButtonMappings.keys).first ?? "MLEFT"] ?? BUTTON_LEFT
             print("mouseButton \(mouseButton)");
             self.functionalButtonDelegate?.alterAbsTouchDragWith(mouseButton:mouseButton)
+        case "PENCILHOVER":
+            if !self.isPencilProEnabled() {break}
+            self.functionalButtonDelegate?.enablePencilHover()
+        case "NOSINGLETOUCH":
+            if !self.isPencilProEnabled() {break}
+            self.functionalButtonDelegate?.setAllowSingleTouchEnabled(false)
         default:
             break
         }
     }
     
-    private func handleFunctionalButtonUp(){
-        let longPressed = CACurrentMediaTime() - self.touchTapTimeStamp > 0.3
-        if longPressed, buttonMode == ButtonMode.movable.rawValue {return}
+    private var movableButtonReleased:Bool = true
+    private func moveableButtonLongPressed() -> Bool{
+        return !movableButtonReleased && CACurrentMediaTime() - self.touchTapTimeStamp > 0.3
+    }
+    
+    private var singleTouchEnabled:Bool = true
+    
+    private func handleFunctionalButtonUp(event: UIEvent? = nil){
+        // print("handleFunctionalButtonUp \(self.widgetLabel), event Empty: \(String(describing: event)), \(CACurrentMediaTime())")
+        if buttonMode == .movable {
+            if moveableButtonLongPressed() && !UITouchUtil.touches(in: self, from: event).isEmpty {return}
+            switch self.functionalButtonString {
+            // case "FOLDER":
+            //    self.folded = !self.folded
+            //    OnScreenWidgetView.set(folded: self.folded, for: self)
+            case "NOSINGLETOUCH":
+                if !self.isPencilProEnabled() {break}
+                singleTouchEnabled = !singleTouchEnabled
+                self.functionalButtonDelegate?.setAllowSingleTouchEnabled(singleTouchEnabled)
+                return
+            default:
+                break
+            }
+        }
         switch self.functionalButtonString {
+        case "FOLDER":
+            self.folded = !self.folded
+            OnScreenWidgetView.set(folded: self.folded, for: self)
         case "SETTINGS":
-            self.functionalButtonDelegate?.expandSettingsView()
+            temporaryDisableFolderButtonAnimation()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                self.functionalButtonDelegate?.expandSettingsView()
+            }
         case "TOOLBOX":
             self.functionalButtonDelegate?.bringUpToolboxMenu()
         case "WIDGETTOOL":
-            self.functionalButtonDelegate?.openWidgetLayoutTool()
+            temporaryDisableFolderButtonAnimation()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                self.functionalButtonDelegate?.openWidgetLayoutTool()
+            }
         case "PROFILES","WIDGETPROFILES":
-            self.functionalButtonDelegate?.switchWidgetProfile()
+            temporaryDisableFolderButtonAnimation()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                self.functionalButtonDelegate?.openWidgetProfileTable(pickProfile: false)
+            }
+        case "PICKPROFILE","PICKPRFL":
+            temporaryDisableFolderButtonAnimation()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                self.functionalButtonDelegate?.openWidgetProfileTable(pickProfile: true)
+            }
         case "SOFTKEYBOARD":
             self.functionalButtonDelegate?.bringUpSoftKeyboard()
         case "ABSTCHDRAG":
             self.functionalButtonDelegate?.alterAbsTouchDragWith(mouseButton:BUTTON_LEFT)
+        case "PENCILHOVER":
+            if !self.isPencilProEnabled() {break}
+            self.functionalButtonDelegate?.disablePencilHover()
+        case "NOSINGLETOUCH":
+            if !self.isPencilProEnabled() {break}
+            self.functionalButtonDelegate?.setAllowSingleTouchEnabled(true)
+        case "BRUSH":
+            if !self.isPencilProEnabled() {break}
+            var brushShortcut = self.cmdString.replacingOccurrences(of: "BRUSH+", with: "")
+            brushShortcut = brushShortcut.replacingOccurrences(of: "BRUSH", with: "")
+            self.functionalButtonDelegate?.replaceBrush(shortcut: brushShortcut)
+        case "ERASER":
+            if !self.isPencilProEnabled() {break}
+            var eraserShortcut = self.cmdString.replacingOccurrences(of: "ERASER+", with: "")
+            eraserShortcut = eraserShortcut.replacingOccurrences(of: "ERASER", with: "")
+            self.functionalButtonDelegate?.replaceEraser(shortcut: eraserShortcut)
+        case "PRESSURECURVE":
+            if ["com.voidlink.iOS"
+                , "com.voidlinkextreme.iOS"
+                , "com.voidlink.tf.debug10.iOS"
+            ].contains(Bundle.main.bundleIdentifier) && Utils.isIPad() {
+                self.functionalButtonDelegate?.presentPressureCurveVC()
+            }
         default:
             break
         }
     }
 
+    private func temporaryDisableFolderButtonAnimation(){
+        OnScreenWidgetView.enableFolderAnimation = false
+        DispatchQueue.global(qos: .default).asyncAfter(deadline: .now() + 0.17) {
+            OnScreenWidgetView.enableFolderAnimation = true
+        }
+    }
     
     private func clearRightStickTouchPadFlag(){
         let mixRightStickInputToGyro = (oscProfile.mapGyroTo == MapGyroTo.mapGyroToControllerStick
                                        && oscProfile.yawPitchToRightStick)
-        if !mixRightStickInputToGyro || self.motionHandler.gyroMixInputStarted() != true {
-            self.onScreenControls.clearRightStickTouchPadFlag()
+        if !mixRightStickInputToGyro || self.motionHandler?.gyroMixInputStarted() != true {
+            self.onScreenControls?.clearRightStickTouchPadFlag()
         }
-        self.motionHandler.mixOnScreenRightStickAndGyroInput(x: 0, y: 0)
+        self.motionHandler?.mixOnScreenRightStickAndGyroInput(x: 0, y: 0)
     }
     
     private func clearLeftStickTouchPadFlag(){
         let mixLeftStickInputToGyro = (oscProfile.mapGyroTo == MapGyroTo.mapGyroToControllerStick
                                        && oscProfile.rollToLeftStick)
-        if !mixLeftStickInputToGyro || self.motionHandler.gyroMixInputStarted() != true {
-            self.onScreenControls.clearLeftStickTouchPadFlag()
+        if !mixLeftStickInputToGyro || self.motionHandler?.gyroMixInputStarted() != true {
+            self.onScreenControls?.clearLeftStickTouchPadFlag()
         }
-        self.motionHandler.mixOnScreenLeftStickAndGyroInput(x: 0, y: 0)
+        self.motionHandler?.mixOnScreenLeftStickAndGyroInput(x: 0, y: 0)
     }
     
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -2355,8 +2581,8 @@ import SVGKit
                         self.inertialScroller.handler = { [self] in
                             let weightedScrollerVector = CGVector(dx: self.inertialScroller.vector.dx*self.VectorStickFactor*self.sensitivityFactorX, dy: self.inertialScroller.vector.dy*self.VectorStickFactor*self.sensitivityFactorY)
 
-                            if self.motionHandler.gyroMixInputStarted() {
-                                let normailizedGyroVector = CGVector(dx: self.stickOffsetToWeightedTouchInput(offset: self.motionHandler.gyroToStickOffset.dx), dy: -self.stickOffsetToWeightedTouchInput(offset: self.motionHandler.gyroToStickOffset.dy))
+                            if ((self.motionHandler?.gyroMixInputStarted()) == true) {
+                                let normailizedGyroVector = CGVector(dx: self.stickOffsetToWeightedTouchInput(offset: self.motionHandler?.gyroToStickOffset.dx ?? 0), dy: -self.stickOffsetToWeightedTouchInput(offset: self.motionHandler?.gyroToStickOffset.dy ?? 0))
                                 
                                 let xConvergent = normailizedGyroVector.dx.sign != weightedScrollerVector.dx.sign && abs(normailizedGyroVector.dx) <= abs(weightedScrollerVector.dx)
                                 let yConvergent = normailizedGyroVector.dy.sign != weightedScrollerVector.dy.sign && abs(normailizedGyroVector.dy) <= abs(weightedScrollerVector.dy)
@@ -2384,9 +2610,9 @@ import SVGKit
                     }
                 }
             case "LTPAD":
-                self.onScreenControls.updateLeftTrigger(0x00)
+                self.onScreenControls?.updateLeftTrigger(0x00)
             case "RTPAD":
-                self.onScreenControls.updateRightTrigger(0x00)
+                self.onScreenControls?.updateRightTrigger(0x00)
             case "WASDPAD":
                 self.stickWheelAxis.isHidden = touchCenteredOffset
                 LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["W"]!,Int8(KEY_ACTION_UP), 0)
@@ -2401,17 +2627,20 @@ import SVGKit
                 LiSendKeyboardEvent(CommandManager.keyboardButtonMappings["DOWN_ARROW"]!,Int8(KEY_ACTION_UP), 0)
             case "DPAD":
                 self.stickWheelAxis.isHidden = touchCenteredOffset
-                self.onScreenControls.releaseControllerButton(LEFT_FLAG)
-                self.onScreenControls.releaseControllerButton(RIGHT_FLAG)
-                self.onScreenControls.releaseControllerButton(UP_FLAG)
-                self.onScreenControls.releaseControllerButton(DOWN_FLAG)
+                self.onScreenControls?.releaseControllerButton(LEFT_FLAG)
+                self.onScreenControls?.releaseControllerButton(RIGHT_FLAG)
+                self.onScreenControls?.releaseControllerButton(UP_FLAG)
+                self.onScreenControls?.releaseControllerButton(DOWN_FLAG)
             case "DS4TOUCH":
                 self.handleControllerTouchesUp(touches: touches)
             default:
                 break
             }
+            if self.widgetType == .touchPad {
+                self.handleButtonUp()
+            }
         }
-        
+                
         if !OnScreenWidgetView.isTweakingHighlight {
             if CommandManager.stickTouchPads.contains(touchPadString){
                 self.l3r3Indicator.isHidden = true
@@ -2435,14 +2664,35 @@ import SVGKit
         }
                                 
         if !OnScreenWidgetView.editMode && !self.cmdString.contains("+") && !self.comboButtonStrings.isEmpty { // if the command(keystring contains "+", it's a legacy multi-key command
-            if self.buttonMode == ButtonMode.slideToToggle.rawValue || self.buttonMode == ButtonMode.slideAndHold.rawValue {
-                self.handleFingerUpAfterSliding(touches: touches)
+            // print("self.comboButtonStrings \(self.comboButtonStrings),\(CACurrentMediaTime())")
+            if self.buttonMode == .slideToToggle || self.buttonMode == .slideAndHold {
+                self.handleFingerUpAfterSliding(touches: touches, event: event)
                 setLock.lock()
                 self.capturedTouches.minus(touches)
                 setLock.unlock()
             }
         }
         
+        if !OnScreenWidgetView.editMode && (self.buttonMode != .tapToToggle
+            && self.buttonMode != .slideToToggle
+            && self.buttonMode != .slideAndHold
+            && self == touches.first?.view) {self.handleFingerUpOrSlideout(event:event)}
+        
+        if !OnScreenWidgetView.editMode && (self.buttonMode == .movable || self.temporarilyMovable) {
+            movableButtonReleased = true
+            OnScreenWidgetView.removeStreamViewGuidelines()
+            for sequence in self.sequenceSet {
+                let widget = OnScreenWidgetView.mapping[sequence]
+                if widget?.isHidden == true {widget?.center = self.center}
+            }
+        }
+        
+        if self.hasTrackPoint, OnScreenWidgetView.trackPointEnabled {
+            trackPoint.isHidden = true
+        }
+        
+        self.temporarilyMovable = false
+
         CATransaction.commit()
         
         if OnScreenWidgetView.editMode {
@@ -2450,6 +2700,15 @@ import SVGKit
             if center != layoutChanges.last {
                 layoutChanges.append(center)
             }
+            
+            if capturer != nil {
+                if firstTouchMoved {undoRelocation()}
+                if let capturer = capturer {
+                    capturer.highlightBorder(highlighted: false)
+                    OnScreenWidgetView.putWidget(self, into: capturer)
+                }
+            }
+            capturer = nil
 
             guard let superview = superview else { return }
             
@@ -2483,7 +2742,6 @@ import SVGKit
             }
         }
         
-        if self.buttonMode != ButtonMode.tapToToggle.rawValue {self.handleFingerUpOrSlideout()}
     }
     
     @objc public func setAutoTapIntervalByText(str: String){
@@ -2557,23 +2815,218 @@ import SVGKit
         }
     }
     
-    private func highlightBorder(highlighted:Bool) {
-        if highlighted {
-            self.layer.borderWidth = 3
-            self.layer.borderColor = voidlinkPurple
+    static private func setBorder(hilighted:Bool, in color:CGColor, for widget:OnScreenWidgetView){
+        if hilighted {
+            widget.layer.borderWidth = 3
+            widget.layer.borderColor = color
         }
         else {
-            self.layer.borderWidth = self.borderWidth
-            self.layer.borderColor = self.defaultBorderColor
+            widget.layer.borderWidth = widget.borderWidth
+            widget.layer.borderColor = widget.defaultBorderColor
         }
+    }
+    
+    private func highlightBorder(highlighted:Bool) {
+        if self.isFolder {
+            OnScreenWidgetView.setBorder(hilighted: highlighted, in: UIColor.systemYellow.cgColor, for: self)
+            self.forEachWidget{ widget in
+                if self.sequenceSet.contains(widget.sequence) {
+                    OnScreenWidgetView.setBorder(hilighted: highlighted, in: UIColor.systemYellow.cgColor, for: widget)
+                }
+            }
+            return
+        }
+        
+        OnScreenWidgetView.setBorder(hilighted: highlighted, in: voidlinkPurple, for: self)
+    }
+    
+    private func isPencilProEnabled() -> Bool {
+        if !(PencilHandler.shared?.pencilProEnabled ?? false) {
+            IAPManager.shared.purchase(AddOnProduct.PencilProPack)
+            return false
+        }
+        return true
+    }
+    
+    @objc func getAvailableSequence() -> Int16 {
+        var sequence:Int16 = 0
+        self.forEachWidget(){ widget in
+            sequence = max(sequence, widget.sequence)
+        }
+        return sequence+1
+    }
+    
+    @objc static var enableFolderAnimation:Bool = true
+    private static func setCollection(hidden:Bool, for folder:OnScreenWidgetView, exception:OnScreenWidgetView? = nil, recursive:Bool = false) {
+        guard folder.isFolder else {return}
+        // guard folder.folded != hidden else { return }
+        folder.folded = hidden
+        folder.setupAtrributedText()
+        if hidden {
+            for sequence in folder.sequenceSet {
+                guard let widget = OnScreenWidgetView.mapping[sequence], widget != exception else {continue}
+                DispatchQueue.main.async {
+                    widget.isUserInteractionEnabled = false
+                    if widget.widgetType == .touchPad {
+                        widget.highlightBorder(highlighted: true)
+                    }
+                    let duration = OnScreenWidgetView.enableFolderAnimation ? (folder.buttonMode == .slideAndHold ? 0.05 : 0.15) : 0
+                    UIView.animate(withDuration: duration, animations: {
+                        widget.center = folder.center
+                    },completion: { finished in
+                        widget.isUserInteractionEnabled = !folder.folded
+                        widget.center = folder.folded ? folder.storedCenter : widget.storedCenter
+                        widget.isHidden = folder.folded
+                        if widget.widgetType == .touchPad {
+                            widget.highlightBorder(highlighted: false)
+                        }
+                    })
+                }
+            }
+        }
+        else{
+            for sequence in folder.sequenceSet {
+                guard let widget = OnScreenWidgetView.mapping[sequence], widget != exception else {continue}
+                DispatchQueue.main.async {
+                    widget.center = folder.storedCenter
+                    widget.isUserInteractionEnabled = false
+                    widget.isHidden = false
+                    if widget.widgetType == .touchPad {
+                        widget.highlightBorder(highlighted: true)
+                    }
+                    UIView.animate(withDuration: OnScreenWidgetView.enableFolderAnimation ? (folder.buttonMode == .slideAndHold ? 0.05 : 0.15) : 0, animations: {
+                        widget.center = widget.storedCenter
+                    },completion: { finished in
+                        widget.isUserInteractionEnabled = !folder.folded
+                        widget.center = folder.folded ? folder.storedCenter : widget.storedCenter
+                        widget.isHidden = folder.folded
+                        if widget.widgetType == .touchPad {
+                            widget.highlightBorder(highlighted: false)
+                        }
+                    })
+                }
+            }
+        }
+        if recursive {
+            for sequence in folder.sequenceSet {
+                guard let widget = OnScreenWidgetView.mapping[sequence] else {continue}
+                guard widget.isFolder, widget != exception else {continue}
+                OnScreenWidgetView.setCollection(hidden: hidden, for: widget, exception: exception, recursive: true)
+            }
+        }
+    }
+    
+    @objc static func set(folded:Bool, for folder:OnScreenWidgetView) { // folder综合逻辑
+        guard folder.isFolder else {return}
+        setCollection(hidden: folded, for: folder)
+        if !folded, folder.revealMode == .exclusive {
+            OnScreenWidgetView.unfoldedExclusiveFolderSequence = folder.sequence
+            if(!isRestoring) {OnScreenWidgetView.postExclusiveUnfoldedSequences.removeAll()}
+            let currentRootFolder = OnScreenWidgetView.getRootFolder(of: folder) ?? folder
+            var offshootRootFolders:Set<OnScreenWidgetView> = Set()
+            folder.forEachWidget{ widget in
+                guard folder != widget else {return}
+                let rootFolder = getRootFolder(of: widget)
+                guard let rootFolder = rootFolder else {return}
+                offshootRootFolders.insert(rootFolder)
+            }
+            offshootRootFolders.remove(currentRootFolder)
+            
+            guard !folder.sequenceSet.isEmpty else {return}
+            for folder in offshootRootFolders {
+                setCollection(hidden: true, for: folder, recursive: true)
+            }
+            
+            guard currentRootFolder != folder else {return}
+            setCollection(hidden: true, for:currentRootFolder, exception: folder, recursive: true)
+        }
+        if folded, folder.revealMode == .exclusive {
+            OnScreenWidgetView.unfoldedExclusiveFolderSequence = -1
+        }
+        if folder.revealMode == .coexist {
+            if folded {
+                OnScreenWidgetView.postExclusiveUnfoldedSequences.remove(folder.sequence)
+            }
+            else {OnScreenWidgetView.postExclusiveUnfoldedSequences.insert(folder.sequence)}
+        }
+    }
+    
+    private static func getRootFolder(of widget:OnScreenWidgetView) -> OnScreenWidgetView?{
+        var widgetRef:OnScreenWidgetView? = widget
+        var parentFolder:OnScreenWidgetView? = OnScreenWidgetView.mapping[widgetRef?.parentSequence ?? -1]
+        repeat {
+            widgetRef = parentFolder
+            parentFolder = OnScreenWidgetView.mapping[widgetRef?.parentSequence ?? -1]
+        } while parentFolder != nil
+        return widgetRef
+    }
+    
+    private static func getParentFolders(of widget: OnScreenWidgetView) -> Set<OnScreenWidgetView> {
+        var parents = Set<OnScreenWidgetView>()
+        var current = widget
+        while let parent = OnScreenWidgetView.mapping[current.parentSequence] {
+            parents.insert(parent)
+            current = parent
+        }
+        return parents
+    }
+
+    private static func putWidget(_ widget:OnScreenWidgetView, into folder:OnScreenWidgetView){
+        guard !OnScreenWidgetView.getParentFolders(of: folder).contains(widget) else { return }
+        let parentFolder = OnScreenWidgetView.mapping[widget.parentSequence]
+        if parentFolder != nil {
+            parentFolder?.sequenceSet.remove(widget.sequence)
+        }
+        widget.parentSequence = folder.sequence
+        folder.sequenceSet.insert(widget.sequence)
+        widget.isHidden = folder.folded
+        /*
+        if folder.buttonMode == .slideAndHold, widget.isFunctionalButton {
+            widget.buttonMode = .slideToToggle
+        } */
+    }
+    
+    @objc static func setFree(widget:OnScreenWidgetView){
+        let parentFolder = OnScreenWidgetView.mapping[widget.parentSequence]
+        if parentFolder != nil {
+            parentFolder?.sequenceSet.remove(widget.sequence)
+        }
+        widget.parentSequence = -1
+    }
+    
+    @objc static func restoreFoldedStates(){
+        isRestoring = true
+        var unfoldedExclusiveFolder: OnScreenWidgetView?
+        if unfoldedExclusiveFolderSequence != -1 {
+            unfoldedExclusiveFolder = OnScreenWidgetView.mapping[unfoldedExclusiveFolderSequence]
+        }
+        
+        for widget in OnScreenWidgetView.mapping.values {
+            OnScreenWidgetView.setCollection(hidden: widget.folded, for: widget, exception: unfoldedExclusiveFolder)
+        }
+        
+        if(unfoldedExclusiveFolder != nil){
+            OnScreenWidgetView.set(folded: false, for: unfoldedExclusiveFolder!)
+            if OnScreenWidgetView.mapping[unfoldedExclusiveFolder!.parentSequence]?.buttonMode == .slideAndHold {
+                unfoldedExclusiveFolder?.isHidden = true
+            }
+        }
+        
+        // print("postExclusiveUnfoldedSequences \(postExclusiveUnfoldedSequences) stamp \(CACurrentMediaTime())")
+        for sequence in postExclusiveUnfoldedSequences {
+            guard let folder = OnScreenWidgetView.mapping[sequence] else { continue }
+            OnScreenWidgetView.set(folded: false, for: folder)
+        }
+        
+        isRestoring = false
     }
     
     override func didMoveToSuperview() {
         super.didMoveToSuperview()
         if superview == nil {
             if self.motionControlButtonString == "GYRO" {
-                self.motionHandler.stopGyroUpdate(interruptNoneGyroInput: true)
-                self.motionHandler.gyroStarter = nil
+                self.motionHandler?.stopGyroUpdate(interruptNoneGyroInput: true)
+                self.motionHandler?.gyroStarter = nil
             }
             if self.motionControlButtonString == "ACCEL" {}
             if self.motionControlButtonString == "MOTION" {}
@@ -2583,6 +3036,7 @@ import SVGKit
                 self.functionalButtonDelegate?.alterAbsTouchDragWith(mouseButton:BUTTON_LEFT)
             }
             buttonDownVisualEffectLayer.removeFromSuperlayer()
+            trackPoint.removeFromSuperlayer()
             crossMarkLayer.removeFromSuperlayer()
             lrudIndicatorBall.removeFromSuperlayer()
             l3r3Indicator.removeFromSuperlayer()
@@ -2598,11 +3052,78 @@ import SVGKit
             self.clearLeftStickTouchPadFlag()
             self.clearRightStickTouchPadFlag()
             self.autoTapTimer?.clean()
+            self.onScreenControls = nil
         }
         else{
             self.superViewWidth = (superview?.bounds.size.width)!
             self.superViewHeight = (superview?.bounds.size.height)!
         }
+    }
+    
+    private static var horizontalGuideline: UIView = {
+        let v = UIView(
+            frame: CGRect(
+                x: 0,
+                y: 0,
+                width: UIScreen.main.bounds.width * 2,
+                height: 2
+            )
+        )
+        v.backgroundColor = .blue
+        v.isHidden = true
+        v.layer.shadowColor = UIColor.black.cgColor
+        v.layer.shadowOffset = .zero
+        v.layer.shadowOpacity = 0.5
+        v.layer.shadowRadius = 2
+        return v
+    }()
+    private static var verticalGuideline: UIView = {
+        let v = UIView(
+            frame: CGRect(
+                x: 0,
+                y: 0,
+                width: 2,
+                height: UIScreen.main.bounds.height * 2
+            )
+        )
+        v.backgroundColor = .blue
+        v.isHidden = true
+        v.layer.shadowColor = UIColor.black.cgColor
+        v.layer.shadowOffset = .zero
+        v.layer.shadowOpacity = 0.5
+        v.layer.shadowRadius = 2
+        return v
+    }()
+    
+    private static func updateStreamViewGuidelines(for widget:OnScreenWidgetView){
+        if !widget.moveableButtonLongPressed() {return}
+        if horizontalGuideline.superview == nil {
+            widget.addSubview(horizontalGuideline)
+            widget.addSubview(verticalGuideline)
+            horizontalGuideline.isHidden = false
+            verticalGuideline.isHidden = false
+        }
+        horizontalGuideline.center = CGPoint(x: widget.bounds.midX, y: widget.bounds.midY)
+        verticalGuideline.center = CGPoint(x: widget.bounds.midX, y: widget.bounds.midY)
+        
+        var horizontallyAligned = false
+        var verticallyAligned = false
+        widget.forEachWidget{ otherWidget in
+            guard otherWidget != widget else {return}
+            verticallyAligned = verticallyAligned ? verticallyAligned : widget.center.x > otherWidget.center.x-1 && widget.center.x < otherWidget.center.x+1
+            horizontallyAligned = horizontallyAligned ? horizontallyAligned : widget.center.y > otherWidget.center.y-1 && widget.center.y < otherWidget.center.y+1
+        }
+        horizontalGuideline.backgroundColor = horizontallyAligned ? .yellow : .blue
+        verticalGuideline.backgroundColor = verticallyAligned ? .yellow : .blue
+    }
+    
+    private static func removeStreamViewGuidelines(){
+        horizontalGuideline.removeFromSuperview()
+        verticalGuideline.removeFromSuperview()
+    }
+    
+    deinit {
+        print("onScreenWidgetView deinit \(CACurrentMediaTime())")
     }
 }
 
