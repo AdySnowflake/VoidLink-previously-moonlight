@@ -31,7 +31,6 @@
 #import "Plot.h"
 #import "CustomEdgeSlideGestureRecognizer.h"
 #import "DataManager.h"
-#import "ThemeManager.h"
 #import "FixedTintImageView.h"
 #import "VoidLink-Swift.h"
 
@@ -149,11 +148,13 @@ static NSMutableSet* hostList;
 - (void)updateTitle {
 
     if (@available(iOS 13.0, *)) {
+        UINavigationBarAppearance* appearance = navBarAppearanceStandard;
         NSDictionary* titleTextAttributes = @{
             NSFontAttributeName: [UIFont systemFontOfSize:20 weight:UIFontWeightMedium],
             NSForegroundColorAttributeName: [ThemeManager textColor] // 可选，设置标题颜色
         };
-        [navBarAppearanceStandard setValue:titleTextAttributes forKey:@"titleTextAttributes"];
+        appearance.titleTextAttributes = titleTextAttributes;
+        navBarAppearanceStandard = appearance;
     }
 
     if (_selectedHost != nil) {
@@ -165,11 +166,14 @@ static NSMutableSet* hostList;
     }
     else {
         if (@available(iOS 13.0, *)) {
+
+            UINavigationBarAppearance* appearance = navBarAppearanceStandard;
             NSDictionary* titleTextAttributes = @{
-                NSFontAttributeName: [UIFont systemFontOfSize:22 weight:UIFontWeightMedium],
+                NSFontAttributeName: [UIFont systemFontOfSize:20 weight:UIFontWeightMedium],
                 NSForegroundColorAttributeName: [ThemeManager textColor] // 可选，设置标题颜色
             };
-            [navBarAppearanceStandard setValue:titleTextAttributes forKey:@"titleTextAttributes"];
+            appearance.titleTextAttributes = titleTextAttributes;
+            navBarAppearanceStandard = appearance;
         }
         /*
         self.navigationController.navigationBar.titleTextAttributes = @{
@@ -376,7 +380,7 @@ static NSMutableSet* hostList;
     // [self.view bringSubviewToFront:self.collectionView];
     self.hostCollectionVC.view.hidden = YES;
     self.collectionView.hidden = NO;
-    self.collectionView.backgroundColor = [ThemeManager appBackgroundColor];
+    self.collectionView.backgroundColor = [ThemeManager hostViewBackgroundColor];
     //self.view.backgroundColor = [ThemeManager appBackgroundColor];
 
     [self.collectionView setContentOffset:CGPointZero animated:NO];
@@ -646,11 +650,10 @@ static NSMutableSet* hostList;
         }]];
     }
     else if (host.pairState == PairStatePaired) {
-        /*
         [longClickAlert addAction:[UIAlertAction actionWithTitle:[LocalizationHelper localizedStringForKey:@"View All Apps"] style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
             self->_showHiddenApps = YES;
-            [self hostClicked:host view:view];
-        }]]; */
+            [self appButtonTappedForHost:host];
+        }]];
         
 #if !TARGET_OS_TV
       
@@ -872,6 +875,7 @@ static NSMutableSet* hostList;
         case CODEC_PREF_AV1:
 #if defined(__IPHONE_16_0) || defined(__TVOS_16_0)
             if (VTIsHardwareDecodeSupported(kCMVideoCodecType_AV1)) {
+                _streamConfig.fullColorRange = false;
                 if (streamSettings.enableYUV444) {
                     _streamConfig.supportedVideoFormats |= VIDEO_FORMAT_AV1_HIGH8_444;
                 }
@@ -1387,26 +1391,35 @@ static NSMutableSet* hostList;
     // 创建按钮
     CGFloat buttonHeight = 30;
     UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
-    button.backgroundColor = [ThemeManager appPrimaryColor]; // #0A85FF
+    button.backgroundColor = GenericUtils.liquidGlassEnabled ? UIColor.whiteColor : [ThemeManager appPrimaryColor]; // #0A85FF
     button.layer.cornerRadius = buttonHeight/2;
-    button.clipsToBounds = YES;
+    button.clipsToBounds = !GenericUtils.liquidGlassEnabled;
 
     // 设置图标（SF Symbol）
 
     if (@available(iOS 13.0, *)) {
-        UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:17 weight:UIImageSymbolWeightMedium];
+        UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration
+                                              configurationWithPointSize:GenericUtils.liquidGlassEnabled ? 18.7 :17
+                                              weight:GenericUtils.liquidGlassEnabled ? UIImageSymbolWeightRegular :UIImageSymbolWeightMedium];
         UIImage *image = [UIImage systemImageNamed:@"plus.circle" withConfiguration:config];
         [button setImage:image forState:UIControlStateNormal];
-        [button setTitle:[LocalizationHelper localizedStringForKey:@" Add Host"] forState:UIControlStateNormal]; // 注意空格用于间隔
+        button.imageEdgeInsets = GenericUtils.liquidGlassEnabled ? UIEdgeInsetsMake(0, 7.6, 0.75, 0) : UIEdgeInsetsZero;;
+        NSString* buttonStringHead = GenericUtils.liquidGlassEnabled ? @"  " : @"";
+        [button setTitle: [buttonStringHead stringByAppendingString:
+                           [LocalizationHelper localizedStringForKey:@" Add Host"]]
+                forState:UIControlStateNormal]; // 注意空格用于间隔
     } else {
         [button setTitle:[LocalizationHelper localizedStringForKey:@"Add Host"] forState:UIControlStateNormal]; // 注意空格用于间隔
     }
     // [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
 
-    button.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
+    button.titleLabel.font = [UIFont systemFontOfSize:GenericUtils.liquidGlassEnabled ? 17 : 16 weight:UIFontWeightMedium];
     // 文字颜色设置为 tintColor 控制
-    button.tintColor = UIColor.whiteColor;
+    if(GenericUtils.liquidGlassEnabled) button.titleEdgeInsets = UIEdgeInsetsMake(0, 0, 0.9, 0);
+    button.tintColor = GenericUtils.liquidGlassEnabled ? [ThemeManager appPrimaryColor] : UIColor.whiteColor;
     [button setTitleColor:button.tintColor forState:UIControlStateNormal];
+    // button.tintColor = UIColor.whiteColor;
+    // [button setTitleColor:button.tintColor forState:UIControlStateNormal];
 
     // 设置按下时的 tintColor（变灰或淡）
     UIColor *highlightColor = [ThemeManager textColorGray];
@@ -1421,6 +1434,7 @@ static NSMutableSet* hostList;
 
     // 创建 UIBarButtonItem
     UIBarButtonItem *barItem = [[UIBarButtonItem alloc] initWithCustomView:button];
+    
     return barItem;
 }
 
@@ -1434,7 +1448,9 @@ static NSMutableSet* hostList;
 
     // 设置图标（SF Symbol）
     if (@available(iOS 13.0, *)) {
-        UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:buttonHeight*0.85 weight:UIImageSymbolWeightRegular];
+        UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:
+                                             GenericUtils.liquidGlassEnabled ? buttonHeight*0.73 : buttonHeight*0.85
+                                            weight:UIImageSymbolWeightRegular];
         UIImage *image = [UIImage systemImageNamed:@"questionmark.circle" withConfiguration:config];
         [button setImage:image forState:UIControlStateNormal];
         [button setTitle:@"" forState:UIControlStateNormal]; // 注意空格用于间隔
@@ -1481,25 +1497,23 @@ static NSMutableSet* hostList;
     else{
         self.navigationController.navigationBar.backgroundColor = [UIColor clearColor]; // old ios depend on this, do not remove
         self.navigationController.navigationBar.barTintColor = [UIColor clearColor]; // ios 14 depend on this, do not remove
-        self.navigationController.navigationBar.barTintColor = [ThemeManager appBackgroundColor]; // ios 14 depend on this, do not remove
+        self.navigationController.navigationBar.barTintColor = [ThemeManager hostViewBackgroundColor]; // ios 14 depend on this, do not remove
     }
 }
 
 - (void)setupNavBar{
     if (@available(iOS 13.0, *)) {
-        Class appearanceClass = NSClassFromString(@"UINavigationBarAppearance");
-        navBarAppearanceStandard = [[appearanceClass alloc] init];
-        [navBarAppearanceStandard performSelector:@selector(configureWithOpaqueBackground)]; // 不透明
-        [navBarAppearanceStandard setValue:[ThemeManager appBackgroundColor] forKey:@"backgroundColor"]; // 设置你需要的背景色
-        [navBarAppearanceStandard setValue:nil forKey:@"shadowColor"]; // 设置你需要的背景色
+        UINavigationBarAppearance* appearance = [[UINavigationBarAppearance alloc] init];
+        [appearance configureWithOpaqueBackground];
+        appearance.backgroundColor = [ThemeManager hostViewBackgroundColor];
+        appearance.shadowColor = nil;
         NSDictionary* titleTextAttributes = @{
             NSForegroundColorAttributeName: [ThemeManager textColor]
         };
-        [navBarAppearanceStandard setValue:titleTextAttributes forKey:@"titleTextAttributes"];
-        [navBarAppearanceStandard setValue:[UIColor clearColor] forKey:@"shadowColor"];
-        [navBarAppearanceStandard setValue:nil forKey:@"backgroundImage"];
-
-        //navBarAppearanceStandard.backgroundImage = nil;
+        appearance.titleTextAttributes = titleTextAttributes;
+        appearance.shadowColor = [UIColor clearColor];
+        appearance.backgroundImage = nil;
+        navBarAppearanceStandard = appearance;
     }
     [self applyNavBarAppearance];
 
@@ -1517,10 +1531,10 @@ static NSMutableSet* hostList;
     [_settingsButton setAction:@selector(revealToggle:)];
     if (@available(iOS 13.0, *)) {
         [_settingsButton setTitle:nil];
-        UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:23 weight:UIImageSymbolWeightMedium ];
+        UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:GenericUtils.liquidGlassEnabled ? 18 : 23 weight:UIImageSymbolWeightMedium ];
         UIImage *image = [[UIImage systemImageNamed:@"sidebar.left" withConfiguration:config] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
         [_settingsButton setImage:image];
-        _settingsButton.imageInsets = UIEdgeInsetsMake(10, 10, 0, 0);
+        _settingsButton.imageInsets = GenericUtils.liquidGlassEnabled ? UIEdgeInsetsMake(0, 0, 0, 0.55) : UIEdgeInsetsMake(10, 10, 0, 0);
     } else {
         [_settingsButton setTitle:[LocalizationHelper localizedStringForKey:@"Settings"]];
     }
@@ -1531,9 +1545,10 @@ static NSMutableSet* hostList;
     // Set the host name button action. When it's tapped, it'll show the host selection view.
     _upButton = [[UIBarButtonItem alloc] init];
     
+    
     if (@available(iOS 13.0, *)) {
         [_upButton setTitle:@""];
-        UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:21.5 weight:UIImageSymbolWeightMedium ];
+        UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:21.5 weight:UIImageSymbolWeightMedium];
         UIImage *image = [[UIImage systemImageNamed:@"tv" withConfiguration:config] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
         [_upButton setImage:image];
         _upButton.imageInsets = UIEdgeInsetsMake(25, 20, 0, 15);
@@ -1547,21 +1562,23 @@ static NSMutableSet* hostList;
 }
 
 - (void)updateTheme {
-    self.view.backgroundColor = [ThemeManager appBackgroundColor];
-    self.hostCollectionVC.view.backgroundColor = [ThemeManager appBackgroundColor];
-    self.collectionView.backgroundColor = [ThemeManager appBackgroundColor];
+    self.view.backgroundColor = [ThemeManager hostViewBackgroundColor];
+    self.hostCollectionVC.view.backgroundColor = [ThemeManager hostViewBackgroundColor];
+    self.collectionView.backgroundColor = [ThemeManager hostViewBackgroundColor];
 
     if (@available(iOS 13.0, *)) {
-        [navBarAppearanceStandard setValue:[ThemeManager appBackgroundColor] forKey:@"backgroundColor"];
+        UINavigationBarAppearance* appearance = navBarAppearanceStandard;
+        appearance.backgroundColor = [ThemeManager hostViewBackgroundColor];
         NSDictionary* titleTextAttributes = @{
             NSForegroundColorAttributeName: [ThemeManager textColor]
         };
-        [navBarAppearanceStandard setValue:titleTextAttributes forKey:@"titleTextAttributes"];
+        appearance.titleTextAttributes = titleTextAttributes;
+        navBarAppearanceStandard = appearance;
     }
     
     _settingsButton.tintColor = [ThemeManager appPrimaryColor];
     _upButton.tintColor = [ThemeManager appPrimaryColor];
-    ((UIButton*)_addHostButton.customView).backgroundColor = [ThemeManager appPrimaryColor];
+    ((UIButton*)_addHostButton.customView).backgroundColor = GenericUtils.liquidGlassEnabled ? UIColor.clearColor : [ThemeManager appPrimaryColor];
     ((UIButton*)_helpButton.customView).tintColor = [ThemeManager appPrimaryColor];
 
     [self applyNavBarAppearance];
@@ -1587,29 +1604,32 @@ static NSMutableSet* hostList;
 }
 
 - (void)changeDefaultSettings{
-    if(![Utils needUpdateDefaultSettings]) return;
+    if(![GenericUtils needUpdateDefaultSettings]) return;
     DataManager* dataMan = [[DataManager alloc] init];
     Settings* settings = [dataMan retrieveSettings];
+    
+    settings.preferredCodec = VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC) ? CODEC_PREF_HEVC : CODEC_PREF_H264;
+    
     switch ([UIDevice currentDevice].userInterfaceIdiom) {
-        case UIUserInterfaceIdiomPad:
-            settings.sdrPerformanceWorkaround = true;
-            settings.framePacingMode = @(FramePacingModeQueue);
-            break;
         case UIUserInterfaceIdiomPhone:
             settings.sdrPerformanceWorkaround = true;
             settings.framePacingMode = @(FramePacingModeQueue);
+            settings.asyncFrameDequeue = false;
+            settings.touchMoveEventInterval = @(45);
             break;
+        case UIUserInterfaceIdiomPad:
         default:
             settings.sdrPerformanceWorkaround = true;
             settings.framePacingMode = @(FramePacingModeQueue);
+            if([UIScreen mainScreen].maximumFramesPerSecond > 110) settings.asyncFrameDequeue = false;
+            if([UIScreen mainScreen].maximumFramesPerSecond < 65) settings.asyncFrameDequeue = false;
             break;
     }
     
-    if([UIScreen mainScreen].maximumFramesPerSecond > 110) settings.asyncFrameDequeue = true;
-    if([UIScreen mainScreen].maximumFramesPerSecond < 65) settings.asyncFrameDequeue = true;
-    
-    settings.touchMoveEventInterval = [Utils isIPhone] ? @(45) : @(0);
-    if([UIScreen mainScreen].maximumFramesPerSecond < 65) settings.touchMoveEventInterval = @(60);
+    if([UIScreen mainScreen].maximumFramesPerSecond > 110) settings.framerate = @(120);
+    if([UIScreen mainScreen].maximumFramesPerSecond < 65) settings.framerate = @(60);
+
+    // if([UIScreen mainScreen].maximumFramesPerSecond < 65) settings.touchMoveEventInterval = @(60);
     
     settings.pencilTickIntervalUs = @(1750);
     
@@ -1996,7 +2016,7 @@ static NSMutableSet* hostList;
 
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(updateTheme)
-                                                 name:ThemeDidChangeNotification
+                                                 name:ThemeManager.ThemeDidChangeNotification
                                                object:nil];
 
     /* this makes background color works*/

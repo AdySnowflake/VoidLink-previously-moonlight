@@ -5,6 +5,10 @@
 //  Created by Cameron Gutman on 10/18/14.
 //  Copyright (c) 2014 Moonlight Stream. All rights reserved.
 //
+//  Modified by True砖家 since 2026.2
+//  Copyright © 2026 True砖家 @ Bilibili. All rights reserved.
+//
+
 
 @import AVFoundation;
 @import VideoToolbox;
@@ -58,9 +62,7 @@ extern int ff_isom_write_av1c(AVIOContext *pb, const uint8_t *buf, int size,
     FramePacingMode _framePacingMode;
     bool _enableTimebase;
     bool _asyncFrameDequeue;
-    
-    bool isIPhone;
-    
+        
     // CMTime playTime;
     // NSTimeInterval previousLinkTime;
 }
@@ -146,7 +148,6 @@ extern int ff_isom_write_av1c(AVIOContext *pb, const uint8_t *buf, int size,
     _enableTimebase = false;
     _queueSize = tempSettings.frameQueueSize.intValue;
     _needRequeuing = _queueSize>0;
-    isIPhone = [Utils isIPhone];
 
     _frameQueue = [FrameQueue sharedInstance];
     [_frameQueue start];
