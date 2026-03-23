@@ -151,7 +151,7 @@ static NSMutableSet* hostList;
         UINavigationBarAppearance* appearance = navBarAppearanceStandard;
         NSDictionary* titleTextAttributes = @{
             NSFontAttributeName: [UIFont systemFontOfSize:20 weight:UIFontWeightMedium],
-            NSForegroundColorAttributeName: [ThemeManager textColor] // 可选，设置标题颜色
+            NSForegroundColorAttributeName: ThemeManager.textColor // 可选，设置标题颜色
         };
         appearance.titleTextAttributes = titleTextAttributes;
         navBarAppearanceStandard = appearance;
@@ -170,7 +170,7 @@ static NSMutableSet* hostList;
             UINavigationBarAppearance* appearance = navBarAppearanceStandard;
             NSDictionary* titleTextAttributes = @{
                 NSFontAttributeName: [UIFont systemFontOfSize:20 weight:UIFontWeightMedium],
-                NSForegroundColorAttributeName: [ThemeManager textColor] // 可选，设置标题颜色
+                NSForegroundColorAttributeName: ThemeManager.textColor // 可选，设置标题颜色
             };
             appearance.titleTextAttributes = titleTextAttributes;
             navBarAppearanceStandard = appearance;
@@ -178,7 +178,7 @@ static NSMutableSet* hostList;
         /*
         self.navigationController.navigationBar.titleTextAttributes = @{
             NSFontAttributeName: [UIFont systemFontOfSize:24 weight:UIFontWeightSemibold],
-            NSForegroundColorAttributeName: [ThemeManager textColor] // 可选，设置标题颜色
+            NSForegroundColorAttributeName: ThemeManager.textColor // 可选，设置标题颜色
         };*/
         self.title = [LocalizationHelper localizedStringForKey: @"Hosts" ];
         //self.title = nil;
@@ -380,14 +380,14 @@ static NSMutableSet* hostList;
     // [self.view bringSubviewToFront:self.collectionView];
     self.hostCollectionVC.view.hidden = YES;
     self.collectionView.hidden = NO;
-    self.collectionView.backgroundColor = [ThemeManager hostViewBackgroundColor];
+    self.collectionView.backgroundColor = ThemeManager.hostViewBackgroundColor;
     //self.view.backgroundColor = [ThemeManager appBackgroundColor];
 
-    [self.collectionView setContentOffset:CGPointZero animated:NO];
+    // [self.collectionView setContentOffset:CGPointZero animated:NO];
     
     [self attachWaterMark];
     self.navigationItem.rightBarButtonItems = @[_upButton];
-    self.revealViewController.mainFrameIsInHostView = false;
+    self.revealViewController.mainFrameIsInHostView = false;  
     // [self disableNavigation];
     [self updateTitle];
     [self alreadyPaired];
@@ -723,6 +723,7 @@ static NSMutableSet* hostList;
 
 - (void) addHostTapped {
     Log(LOG_D, @"Tapped add host");
+    GenericUtils.autoPopSoftKeyboard = !GenericUtils.isIPhone;
     UIAlertController* alertController = [UIAlertController alertControllerWithTitle:[LocalizationHelper localizedStringForKey:@"Add Host Manually"]
                                                                              message:[LocalizationHelper localizedStringForKey:@"Enter IP address to add host manually"]
                                                                       preferredStyle:UIAlertControllerStyleAlert];
@@ -732,6 +733,7 @@ static NSMutableSet* hostList;
         textField.keyboardType = UIKeyboardTypeASCIICapable;
         textField.autocorrectionType = UITextAutocorrectionTypeNo;
         textField.spellCheckingType = UITextSpellCheckingTypeNo;
+        textField.delegate = self;
     }];
 
     [alertController addAction:[UIAlertAction actionWithTitle:[LocalizationHelper localizedStringForKey:@"Cancel"]
@@ -1389,22 +1391,26 @@ static NSMutableSet* hostList;
 
 - (UIBarButtonItem *)createAddHostButton{
     // 创建按钮
+    
+    bool liquidGlassEnabled = GenericUtils.liquidGlassEnabled;
+    // bool liquidGlassEnabled = false;
+
     CGFloat buttonHeight = 30;
     UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
-    button.backgroundColor = GenericUtils.liquidGlassEnabled ? UIColor.whiteColor : [ThemeManager appPrimaryColor]; // #0A85FF
+    button.backgroundColor = liquidGlassEnabled ? ThemeManager.appPrimaryColor : ThemeManager.appPrimaryColor; // #0A85FF
     button.layer.cornerRadius = buttonHeight/2;
-    button.clipsToBounds = !GenericUtils.liquidGlassEnabled;
+    button.clipsToBounds = !liquidGlassEnabled;
 
     // 设置图标（SF Symbol）
 
     if (@available(iOS 13.0, *)) {
         UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration
-                                              configurationWithPointSize:GenericUtils.liquidGlassEnabled ? 18.7 :17
-                                              weight:GenericUtils.liquidGlassEnabled ? UIImageSymbolWeightRegular :UIImageSymbolWeightMedium];
+                                              configurationWithPointSize:liquidGlassEnabled ? 18.7 :17
+                                              weight:liquidGlassEnabled ? UIImageSymbolWeightRegular :UIImageSymbolWeightMedium];
         UIImage *image = [UIImage systemImageNamed:@"plus.circle" withConfiguration:config];
         [button setImage:image forState:UIControlStateNormal];
-        button.imageEdgeInsets = GenericUtils.liquidGlassEnabled ? UIEdgeInsetsMake(0, 7.6, 0.75, 0) : UIEdgeInsetsZero;;
-        NSString* buttonStringHead = GenericUtils.liquidGlassEnabled ? @"  " : @"";
+        button.imageEdgeInsets = liquidGlassEnabled ? UIEdgeInsetsMake(0, 7.6, 0.75, 0) : UIEdgeInsetsZero;;
+        NSString* buttonStringHead = liquidGlassEnabled ? @"  " : @"";
         [button setTitle: [buttonStringHead stringByAppendingString:
                            [LocalizationHelper localizedStringForKey:@" Add Host"]]
                 forState:UIControlStateNormal]; // 注意空格用于间隔
@@ -1413,16 +1419,16 @@ static NSMutableSet* hostList;
     }
     // [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
 
-    button.titleLabel.font = [UIFont systemFontOfSize:GenericUtils.liquidGlassEnabled ? 17 : 16 weight:UIFontWeightMedium];
+    button.titleLabel.font = [UIFont systemFontOfSize:liquidGlassEnabled ? 16 : 16 weight:UIFontWeightMedium];
     // 文字颜色设置为 tintColor 控制
-    if(GenericUtils.liquidGlassEnabled) button.titleEdgeInsets = UIEdgeInsetsMake(0, 0, 0.9, 0);
-    button.tintColor = GenericUtils.liquidGlassEnabled ? [ThemeManager appPrimaryColor] : UIColor.whiteColor;
+    if(liquidGlassEnabled) button.titleEdgeInsets = UIEdgeInsetsMake(0, 0, 0.9, 0);
+    button.tintColor = liquidGlassEnabled ? ThemeManager.appPrimaryColor : UIColor.whiteColor;
     [button setTitleColor:button.tintColor forState:UIControlStateNormal];
     // button.tintColor = UIColor.whiteColor;
     // [button setTitleColor:button.tintColor forState:UIControlStateNormal];
 
     // 设置按下时的 tintColor（变灰或淡）
-    UIColor *highlightColor = [ThemeManager textColorGray];
+    UIColor *highlightColor = ThemeManager.textColorGray;
     [button setTitleColor:highlightColor forState:UIControlStateHighlighted];
     button.adjustsImageWhenHighlighted = YES; // 图标自动变淡
 
@@ -1461,7 +1467,7 @@ static NSMutableSet* hostList;
 
     button.titleLabel.font = [UIFont systemFontOfSize:buttonHeight*0.6 weight:UIFontWeightMedium];
     // 文字颜色设置为 tintColor 控制
-    button.tintColor = [ThemeManager appPrimaryColor];
+    button.tintColor = ThemeManager.appPrimaryColor;
     [button setTitleColor:button.tintColor forState:UIControlStateNormal];
 
     button.frame = CGRectMake(0, 0, buttonHeight*1.3, buttonHeight*1.05);
@@ -1484,10 +1490,6 @@ static NSMutableSet* hostList;
     }
 }
 
-- (CGFloat)getStandardNavBarHeight{
-    return [self isIPhone] ? UINavigationBarHeightIPhone : UINavigationBarHeightIPad;
-}
-
 - (void)applyNavBarAppearance{
     if (@available(iOS 13.0, *)) {
         self.navigationController.navigationBar.standardAppearance.backgroundColor = [UIColor clearColor]; // old ios depend on this, do not remove
@@ -1497,7 +1499,7 @@ static NSMutableSet* hostList;
     else{
         self.navigationController.navigationBar.backgroundColor = [UIColor clearColor]; // old ios depend on this, do not remove
         self.navigationController.navigationBar.barTintColor = [UIColor clearColor]; // ios 14 depend on this, do not remove
-        self.navigationController.navigationBar.barTintColor = [ThemeManager hostViewBackgroundColor]; // ios 14 depend on this, do not remove
+        self.navigationController.navigationBar.barTintColor = ThemeManager.hostViewBackgroundColor; // ios 14 depend on this, do not remove
     }
 }
 
@@ -1505,10 +1507,10 @@ static NSMutableSet* hostList;
     if (@available(iOS 13.0, *)) {
         UINavigationBarAppearance* appearance = [[UINavigationBarAppearance alloc] init];
         [appearance configureWithOpaqueBackground];
-        appearance.backgroundColor = [ThemeManager hostViewBackgroundColor];
+        appearance.backgroundColor = ThemeManager.hostViewBackgroundColor;
         appearance.shadowColor = nil;
         NSDictionary* titleTextAttributes = @{
-            NSForegroundColorAttributeName: [ThemeManager textColor]
+            NSForegroundColorAttributeName: ThemeManager.textColor
         };
         appearance.titleTextAttributes = titleTextAttributes;
         appearance.shadowColor = [UIColor clearColor];
@@ -1519,6 +1521,12 @@ static NSMutableSet* hostList;
 
     self->_addHostButton = [self createAddHostButton];
     self->_helpButton = [self createHelpButton];
+    if (GenericUtils.liquidGlassEnabled) {
+        if (@available(iOS 26.0, *)) {
+            // _addHostButton.hidesSharedBackground = true;
+            // _helpButton.hidesSharedBackground = true;
+        }
+    }
     //[self setupHostViewTitle];
 
 
@@ -1535,6 +1543,10 @@ static NSMutableSet* hostList;
         UIImage *image = [[UIImage systemImageNamed:@"sidebar.left" withConfiguration:config] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
         [_settingsButton setImage:image];
         _settingsButton.imageInsets = GenericUtils.liquidGlassEnabled ? UIEdgeInsetsMake(0, 0, 0, 0.55) : UIEdgeInsetsMake(10, 10, 0, 0);
+        if(GenericUtils.liquidGlassEnabled){
+            // if(@available(iOS 26.0, *)) _settingsButton.hidesSharedBackground = YES;
+            _settingsButton.tintColor = ThemeManager.appPrimaryColor;
+        }
     } else {
         [_settingsButton setTitle:[LocalizationHelper localizedStringForKey:@"Settings"]];
     }
@@ -1548,10 +1560,10 @@ static NSMutableSet* hostList;
     
     if (@available(iOS 13.0, *)) {
         [_upButton setTitle:@""];
-        UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:21.5 weight:UIImageSymbolWeightMedium];
-        UIImage *image = [[UIImage systemImageNamed:@"tv" withConfiguration:config] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+        UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:GenericUtils.liquidGlassEnabled ? 16 : 21.5 weight:UIImageSymbolWeightMedium];
+        UIImage *image = [[UIImage systemImageNamed:GenericUtils.liquidGlassEnabled ? @"macwindow.on.rectangle" : @"tv" withConfiguration:config] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
         [_upButton setImage:image];
-        _upButton.imageInsets = UIEdgeInsetsMake(25, 20, 0, 15);
+        _upButton.imageInsets = GenericUtils.liquidGlassEnabled ? UIEdgeInsetsMake(0, 0, 0, 1) : UIEdgeInsetsMake(25, 20, 0, 15);
     } else {
         [_upButton setTitle:[LocalizationHelper localizedStringForKey:@"Select New Host"]];
     }
@@ -1562,29 +1574,29 @@ static NSMutableSet* hostList;
 }
 
 - (void)updateTheme {
-    self.view.backgroundColor = [ThemeManager hostViewBackgroundColor];
-    self.hostCollectionVC.view.backgroundColor = [ThemeManager hostViewBackgroundColor];
-    self.collectionView.backgroundColor = [ThemeManager hostViewBackgroundColor];
+    self.view.backgroundColor = ThemeManager.hostViewBackgroundColor;
+    self.hostCollectionVC.view.backgroundColor = ThemeManager.hostViewBackgroundColor;
+    self.collectionView.backgroundColor = ThemeManager.hostViewBackgroundColor;
 
     if (@available(iOS 13.0, *)) {
         UINavigationBarAppearance* appearance = navBarAppearanceStandard;
-        appearance.backgroundColor = [ThemeManager hostViewBackgroundColor];
+        appearance.backgroundColor = ThemeManager.hostViewBackgroundColor;
         NSDictionary* titleTextAttributes = @{
-            NSForegroundColorAttributeName: [ThemeManager textColor]
+            NSForegroundColorAttributeName: ThemeManager.textColor
         };
         appearance.titleTextAttributes = titleTextAttributes;
         navBarAppearanceStandard = appearance;
     }
     
-    _settingsButton.tintColor = [ThemeManager appPrimaryColor];
-    _upButton.tintColor = [ThemeManager appPrimaryColor];
-    ((UIButton*)_addHostButton.customView).backgroundColor = GenericUtils.liquidGlassEnabled ? UIColor.clearColor : [ThemeManager appPrimaryColor];
-    ((UIButton*)_helpButton.customView).tintColor = [ThemeManager appPrimaryColor];
+    _settingsButton.tintColor = ThemeManager.appPrimaryColor;
+    _upButton.tintColor = ThemeManager.appPrimaryColor;
+    ((UIButton*)_addHostButton.customView).backgroundColor = GenericUtils.liquidGlassEnabled ? UIColor.clearColor : ThemeManager.appPrimaryColor;
+    ((UIButton*)_helpButton.customView).tintColor = ThemeManager.appPrimaryColor;
 
     [self applyNavBarAppearance];
     [self updateTitle];
     if (hostViewTitleLabel) {
-        hostViewTitleLabel.textColor = [ThemeManager textColor];
+        hostViewTitleLabel.textColor = ThemeManager.textColor;
     }
     [self.hostCollectionVC updateTheme];
 }
@@ -2394,6 +2406,15 @@ static NSMutableSet* hostList;
     return YES;
 }
 
+- (BOOL)textFieldShouldBeginEditing:(UITextField *)textField {
+    if (GenericUtils.autoPopSoftKeyboard) {
+        return YES;
+    } else {
+        GenericUtils.autoPopSoftKeyboard = YES;
+        return NO;
+    }
+}
+
 #if !TARGET_OS_TV
 - (BOOL)shouldAutorotate {
     return YES;
@@ -2474,3 +2495,4 @@ static NSMutableSet* hostList;
 }
 
 @end
+

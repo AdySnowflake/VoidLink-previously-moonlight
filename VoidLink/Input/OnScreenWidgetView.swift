@@ -54,6 +54,7 @@ import SVGKit
         func replaceBrush(shortcut:String)
         func replaceEraser(shortcut:String)
         func presentPressureCurveVC()
+        func toggleTouch(disabled:Bool)
     }
     
     @objc enum WidgetTypeEnum: UInt8 {
@@ -72,6 +73,7 @@ import SVGKit
     @objc static public var editMode: Bool = false
     @objc static public var buttonVisualFeedbackEnabled: Bool = true
     @objc public var widgetLabel: String
+    private var nonEditableWidgetLabel: String = ""
     @objc public var cmdString: String
     @objc public var sequence: Int16 = -1
     private var buttonString: String = ""
@@ -165,6 +167,7 @@ import SVGKit
     
     @objc public var isStickWheel: Bool = false
     @objc public var isFolder: Bool = false
+    @objc public var hasNonEditableLabel: Bool = false
 
     // for all stick pads
     @objc public var minStickOffset: CGFloat = 0
@@ -288,6 +291,7 @@ import SVGKit
     @objc public var folded: Bool = false
     @objc public var persistedFolded: Bool = false
     @objc public var revealMode: RevealMode = .coexist
+    @objc public var bulkMoveEnabled: Bool = false
     @objc public var sequenceSet: Set<Int16> = Set()
     @objc public var parentSequence: Int16 = -1
     private weak var capturer: OnScreenWidgetView?
@@ -481,6 +485,7 @@ import SVGKit
                               || (self.widgetType == WidgetTypeEnum.button
                                   && (buttonMode == .slideAndHold || buttonMode == .slideToToggle)))*/
         self.hasTrackPoint = true
+        self.hasNonEditableLabel = self.cmdString == "DISABLETOUCH"
     }
     
     // ======================================================================================================
@@ -692,13 +697,13 @@ import SVGKit
     
     private func getDiameter(lengthFactor:CGFloat) -> CGFloat {
         self.getBaselineLenths()
-        let isNormalizedSizeFactor = lengthFactor > 6;
+        let isNormalizedSizeFactor = lengthFactor > 10;
         return isNormalizedSizeFactor ? denormalizeSize(sizeFactor:lengthFactor) : CGFloat(Int(baselineDiameter * lengthFactor / 2) * 2)
     }
     
     private func getRecSize(widthFactor:CGFloat, heightFactor:CGFloat) -> CGSize {
-        let isNormalizedSizeFactor = widthFactor > 6;
-        let isNormalizedHeightFactor = heightFactor > 6;
+        let isNormalizedSizeFactor = widthFactor > 10;
+        let isNormalizedHeightFactor = heightFactor > 10;
         
         self.getBaselineLenths()
 
@@ -777,7 +782,15 @@ import SVGKit
     }
     
     private func setupAtrributedText(){
-        let text = self.widgetLabel.contains("#") ? "\(self.widgetLabel.split(separator: "#").first ?? "")" : SwiftLocalizationHelper.localizedString(forKey: self.widgetLabel)
+        var text = self.widgetLabel.contains("#") ? "\(self.widgetLabel.split(separator: "#").first ?? "")" : SwiftLocalizationHelper.localizedString(forKey: self.widgetLabel)
+        
+        if self.hasNonEditableLabel {
+            if cmdString == "DISABLETOUCH" {
+                self.nonEditableWidgetLabel = SwiftLocalizationHelper.localizedString(forKey: touchDisabledFLag ? "=EnableTouch" : "=DisableTouch" )
+            }
+            text = self.nonEditableWidgetLabel
+        }
+                
         let attr = NSAttributedString(
             string: self.folded ? "[\(text)]" : text,
             attributes: [
@@ -1961,6 +1974,11 @@ import SVGKit
         relocatedDuringStreaming = true
         // center = currentLocation;
         //NSLog("x coord: %f, y coord: %f", self.frame.origin.x, self.frame.origin.y)
+        
+        if isFolder, bulkMoveEnabled, firstTouchMoved {
+            self.moveSubWidgetsInBatch(by: CGVector(dx: offsetX, dy: offsetY))
+        }
+        
         if OnScreenWidgetView.editMode {
             guidelineDelegate?.updateGuidelinesForOnScreenWidget(self)
         }
@@ -2481,9 +2499,18 @@ import SVGKit
             ].contains(Bundle.main.bundleIdentifier) && GenericUtils.isIPad() {
                 self.functionalButtonDelegate?.presentPressureCurveVC()
             }
+        case "DISABLETOUCH":
+            self.handleTouchDisableButtonUp()
         default:
             break
         }
+    }
+    
+    private var touchDisabledFLag:Bool = false
+    private func handleTouchDisableButtonUp(){
+        touchDisabledFLag = !touchDisabledFLag
+        self.setupAtrributedText()
+        self.functionalButtonDelegate?.toggleTouch(disabled: touchDisabledFLag)
     }
 
     private func temporaryDisableFolderButtonAnimation(){
@@ -2826,7 +2853,7 @@ import SVGKit
         }
     }
     
-    private func highlightBorder(highlighted:Bool) {
+    private func highlightBorder(highlighted:Bool, color:CGColor? = nil) {
         if self.isFolder {
             OnScreenWidgetView.setBorder(hilighted: highlighted, in: UIColor.systemYellow.cgColor, for: self)
             self.forEachWidget{ widget in
@@ -2837,7 +2864,7 @@ import SVGKit
             return
         }
         
-        OnScreenWidgetView.setBorder(hilighted: highlighted, in: voidlinkPurple, for: self)
+        OnScreenWidgetView.setBorder(hilighted: highlighted, in: color ?? voidlinkPurple, for: self)
     }
     
     private func isPencilProEnabled() -> Bool {
@@ -2856,6 +2883,18 @@ import SVGKit
         return sequence+1
     }
     
+    @objc func moveSubWidgetsInBatch(by vector:CGVector) {
+        guard isFolder else {return}
+        for sequence in self.sequenceSet {
+            guard let widget = OnScreenWidgetView.mapping[sequence] else {return}
+            widget.storedCenter = CGPoint(x: widget.storedCenter.x+vector.dx, y: widget.storedCenter.y+vector.dy)
+            if !widget.isHidden {
+                widget.center = CGPoint(x: widget.center.x+vector.dx, y: widget.center.y+vector.dy)
+            }
+            widget.relocatedDuringStreaming = true
+        }
+    }
+    
     @objc static var enableFolderAnimation:Bool = true
     private static func setCollection(hidden:Bool, for folder:OnScreenWidgetView, exception:OnScreenWidgetView? = nil, recursive:Bool = false) {
         guard folder.isFolder else {return}
@@ -2867,8 +2906,9 @@ import SVGKit
                 guard let widget = OnScreenWidgetView.mapping[sequence], widget != exception else {continue}
                 DispatchQueue.main.async {
                     widget.isUserInteractionEnabled = false
-                    if widget.widgetType == .touchPad {
-                        widget.highlightBorder(highlighted: true)
+                    if ((folder.buttonMode != .slideAndHold && widget.widgetType == .touchPad)
+                        || abs(widget.backgroundAlpha) < 0.1){
+                        widget.highlightBorder(highlighted: true, color: UIColor.systemBlue.cgColor)
                     }
                     let duration = OnScreenWidgetView.enableFolderAnimation ? (folder.buttonMode == .slideAndHold ? 0.05 : 0.15) : 0
                     UIView.animate(withDuration: duration, animations: {
@@ -2877,7 +2917,8 @@ import SVGKit
                         widget.isUserInteractionEnabled = !hidden
                         widget.center = folder.folded ? folder.storedCenter : widget.storedCenter
                         widget.isHidden = folder.folded
-                        if widget.widgetType == .touchPad {
+                        if ((folder.buttonMode != .slideAndHold && widget.widgetType == .touchPad)
+                            || abs(widget.backgroundAlpha) < 0.1){
                             widget.highlightBorder(highlighted: false)
                         }
                     })
@@ -2892,8 +2933,9 @@ import SVGKit
                     widget.capturedTouches.removeAllObjects()
                     widget.center = folder.storedCenter
                     widget.isHidden = false
-                    if widget.widgetType == .touchPad {
-                        widget.highlightBorder(highlighted: true)
+                    if ((folder.buttonMode != .slideAndHold && widget.widgetType == .touchPad)
+                        || abs(widget.backgroundAlpha) < 0.1){
+                        widget.highlightBorder(highlighted: true, color: UIColor.systemBlue.cgColor)
                     }
                     UIView.animate(withDuration: OnScreenWidgetView.enableFolderAnimation ? (folder.buttonMode == .slideAndHold ? 0.05 : 0.15) : 0, animations: {
                         widget.center = widget.storedCenter
@@ -2902,7 +2944,8 @@ import SVGKit
                         widget.isUserInteractionEnabled = !folder.folded
                         widget.center = folder.folded ? folder.storedCenter : widget.storedCenter
                         widget.isHidden = folder.folded
-                        if widget.widgetType == .touchPad {
+                        if ((folder.buttonMode != .slideAndHold && widget.widgetType == .touchPad)
+                            || abs(widget.backgroundAlpha) < 0.1){
                             widget.highlightBorder(highlighted: false)
                         }
                     })
@@ -3112,6 +3155,7 @@ import SVGKit
         var verticallyAligned = false
         widget.forEachWidget{ otherWidget in
             guard otherWidget != widget else {return}
+            if widget.isFolder, widget.bulkMoveEnabled, widget.sequenceSet.contains(otherWidget.sequence) {return}
             verticallyAligned = verticallyAligned ? verticallyAligned : widget.center.x > otherWidget.center.x-1 && widget.center.x < otherWidget.center.x+1
             horizontallyAligned = horizontallyAligned ? horizontallyAligned : widget.center.y > otherWidget.center.y-1 && widget.center.y < otherWidget.center.y+1
         }

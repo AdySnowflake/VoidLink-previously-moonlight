@@ -280,7 +280,7 @@ static CGRect layoutViewBounds;
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     
     // NSString* persistedKey = @"widgetProfileUpdated-20251015";
-    NSString* persistedKey = @"widgetProfileUpdated-20260213";
+    NSString* persistedKey = @"widgetProfileUpdated-20260322";
     BOOL needImportDefaultTemplates = [defaults objectForKey:persistedKey] == nil;
     
     if(profiles.count == 0 || needImportDefaultTemplates){
@@ -450,6 +450,7 @@ static CGRect layoutViewBounds;
         buttonState.parentSequence = widgetView.parentSequence;
         buttonState.folded = widgetView.folded;
         buttonState.revealMode = widgetView.revealMode;
+        buttonState.bulkMoveEnabled = widgetView.bulkMoveEnabled;
         buttonState.widthFactor = [self normalizeSizeWidthFactorWith:widgetView];
         buttonState.heightFactor = [self normalizeSizeHeightFactorWith:widgetView];
         buttonState.componentSizeFactor = [self normalizeComponentSizeFactorWith:widgetView];

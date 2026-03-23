@@ -17,6 +17,7 @@
 @property (nonatomic, strong) UIButton *toggleArea;
 @property (nonatomic, strong) NSLayoutConstraint *heightConstraint;
 @property (nonatomic, strong) UIView *headerView;
+@property (assign) CGFloat titleOffset;
 
 @end
 
@@ -61,6 +62,7 @@ static BOOL overridePersistedFoldState = YES;
     _subStackViews = [NSMutableArray array];
     _headerViewHeight = 37;
     _headerViewVerticalSpacing = 25;
+    _titleOffset = 41.5;
     
     // 设置视图
     self.layer.cornerRadius = 10.0;
@@ -76,15 +78,15 @@ static BOOL overridePersistedFoldState = YES;
     _iconImageView = [[UIImageView alloc] init];
     _iconImageView.contentMode = UIViewContentModeScaleAspectFit;
     _iconImageView.translatesAutoresizingMaskIntoConstraints = NO;
-    _iconImageView.tintColor = [ThemeManager textColor];
+    _iconImageView.tintColor = ThemeManager.textColor;
     [_headerView addSubview:_iconImageView];
     
     // 标题标签
     _titleLabel = [[UILabel alloc] init];
     _titleLabel.text = _sectionTitle;
     _titleLabel.accessibilityIdentifier = @"menuSectionTitleLabel";
-    _titleLabel.font = [UIFont systemFontOfSize:19 weight:UIFontWeightSemibold];
-    _titleLabel.textColor = [ThemeManager textColor];
+    _titleLabel.font = [UIFont systemFontOfSize:19.5 weight:UIFontWeightMedium];
+    _titleLabel.textColor = ThemeManager.textColor;
     _titleLabel.textAlignment = NSTextAlignmentLeft;
     _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [_headerView addSubview:_titleLabel];
@@ -116,7 +118,7 @@ static BOOL overridePersistedFoldState = YES;
     
     // 分隔线
     _separatorLine = [[UIView alloc] init];
-    _separatorLine.backgroundColor = [ThemeManager separatorColor];
+    _separatorLine.backgroundColor = ThemeManager.separatorColor;
     _separatorLine.translatesAutoresizingMaskIntoConstraints = NO;
     
     [self addSubview:_separatorLine];
@@ -146,7 +148,7 @@ static BOOL overridePersistedFoldState = YES;
     // 标题约束
     if(@available(iOS 13.0, *)){
         [NSLayoutConstraint activateConstraints:@[
-            [_titleLabel.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:39],
+            [_titleLabel.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:_titleOffset],
             [_titleLabel.centerYAnchor constraintEqualToAnchor:_headerView.centerYAnchor],
             [_titleLabel.trailingAnchor constraintEqualToAnchor:_toggleButton.leadingAnchor constant:-8]
         ]];
@@ -191,7 +193,7 @@ static BOOL overridePersistedFoldState = YES;
         [_separatorLine.centerXAnchor constraintEqualToAnchor:self.centerXAnchor],
         [_separatorLine.widthAnchor constraintEqualToAnchor:self.widthAnchor constant:-5], // //mark: settingMenuLayout
         [_separatorLine.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
-        [_separatorLine.heightAnchor constraintEqualToConstant:0.7]
+        [_separatorLine.heightAnchor constraintEqualToConstant:GenericUtils.menuSectionSeparatorWidth]
     ]];
     
     [NSLayoutConstraint activateConstraints:@[
@@ -214,13 +216,13 @@ static BOOL overridePersistedFoldState = YES;
     } else {
         _iconImageView.image = icon;
     }
-    _iconImageView.tintColor = [ThemeManager textColor];
+    _iconImageView.tintColor = ThemeManager.textColor;
     _iconImageView.hidden = (icon == nil);
     
     // 图标约束
     [NSLayoutConstraint activateConstraints:@[
         [_iconImageView.centerXAnchor constraintEqualToAnchor:_headerView.leadingAnchor constant:_leadingTrailingPadding+_headerViewHeight/2-3],
-        [_iconImageView.centerYAnchor constraintEqualToAnchor:_headerView.centerYAnchor constant:-0.5],
+        [_iconImageView.centerYAnchor constraintEqualToAnchor:_headerView.centerYAnchor constant:-0],
         [_iconImageView.widthAnchor constraintEqualToConstant:_headerViewHeight+constant],
         [_iconImageView.heightAnchor constraintEqualToConstant:_headerViewHeight+constant]
     ]];
@@ -240,7 +242,7 @@ static BOOL overridePersistedFoldState = YES;
     } else {
         _iconImageView.image = icon;
     }
-    _iconImageView.tintColor = [ThemeManager textColor];
+    _iconImageView.tintColor = ThemeManager.textColor;
     _iconImageView.hidden = (icon == nil);
     
     // 图标约束

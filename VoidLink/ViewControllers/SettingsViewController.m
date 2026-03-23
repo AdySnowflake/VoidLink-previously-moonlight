@@ -33,6 +33,7 @@
 
     NSInteger _bitrate;
     NSInteger _lastSelectedResolutionIndex;
+    CGFloat softKeyboardHeight;
     bool settingsViewJustLoaded;
     bool settingsViewJustExpanded;
     bool settingsViewAlreadyAppeared;
@@ -54,7 +55,7 @@
     MenuSectionView *otherSection;
     MenuSectionView *experimentalSection;
     NSMutableSet* hiddenStacks;
-    
+        
     GCController *capturedController;
 }
 
@@ -267,7 +268,7 @@ CGSize resolutionTable[RESOLUTION_TABLE_SIZE];
     }
     
     // Add a bit of padding so the view doesn't end right at the button of the display
-    self.scrollView.contentSize = CGSizeMake(self.scrollView.contentSize.width, _parentStack.frame.size.height + [self getStandardNavBarHeight] + 20);
+    self.scrollView.contentSize = CGSizeMake(self.scrollView.contentSize.width, _parentStack.frame.size.height + GenericUtils.settingsMenuNavigationBarHeight + 20);
     double delayInSeconds = 3;
     // Convert the delay into a dispatch_time_t value
     dispatch_time_t delayTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
@@ -601,10 +602,6 @@ BOOL isCustomResolution(int resolutionSelected) {
     return [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPhone;
 }
 
-- (CGFloat)getStandardNavBarHeight{
-    return [self isIPhone] ? UINavigationBarHeightIPhone : UINavigationBarHeightIPad;
-}
-
 - (void)initParentStack{
     self.scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAutomatic;
     // 可选：确保 scrollView 开启垂直滚动
@@ -619,7 +616,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     if(!_parentStack.superview){
         [self.scrollView addSubview:_parentStack];
         [NSLayoutConstraint activateConstraints:@[
-            [_parentStack.topAnchor constraintEqualToAnchor:self.scrollView.contentLayoutGuide.topAnchor constant: currentSettingsMenuMode == AllSettings ? [self getStandardNavBarHeight] : [self getStandardNavBarHeight]+10],
+            [_parentStack.topAnchor constraintEqualToAnchor:self.scrollView.contentLayoutGuide.topAnchor constant: currentSettingsMenuMode == AllSettings ? GenericUtils.settingsMenuNavigationBarHeight : GenericUtils.settingsMenuNavigationBarHeight+10],
             [_parentStack.bottomAnchor constraintEqualToAnchor:self.scrollView.contentLayoutGuide.bottomAnchor constant:-20],
         ]];
     }
@@ -754,7 +751,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     label.textAlignment = NSTextAlignmentCenter;
     // label.adjustsFontSizeToFitWidth = YES;
     label.accessibilityIdentifier = @"dynamicLabel";
-    label.textColor = [ThemeManager appPrimaryColor];
+    label.textColor = ThemeManager.appPrimaryColor;
     label.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
     label.translatesAutoresizingMaskIntoConstraints = NO;
     [stack addSubview:label];
@@ -790,7 +787,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     videoSection.sectionTitle = [LocalizationHelper localizedStringForKey:@"Video"];
     videoSection.identifier = @"SettingsSectionVideo";
     if (@available(iOS 13.0, *)) {
-        [videoSection setSectionWithIcon:[UIImage systemImageNamed:@"waveform"] size:13 sizeConstraint:-17];
+        [videoSection setSectionWithIcon:[UIImage systemImageNamed:@"waveform"] size:13 sizeConstraint:-15];
     }
     [self addSetting:self.resolutionStack ofId:@"resolutionStack" withInfoTag:NO withDynamicLabel:YES to:videoSection];
     [self addSetting:self.fpsStack ofId:@"fpsStack" withInfoTag:NO withDynamicLabel:NO to:videoSection];
@@ -812,7 +809,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     touchControlSection.sectionTitle = [LocalizationHelper localizedStringForKey:@"Touch Control"];
     touchControlSection.identifier = @"SettingsSectionTouch&Controller";
     if (@available(iOS 13.0, *)) {
-        [touchControlSection setSectionWithIcon:[UIImage imageNamed:@"arcade.stick.console"] size:22 sizeConstraint:-15];
+        [touchControlSection setSectionWithIcon:[UIImage imageNamed:@"arcade.stick.console"] size:22 sizeConstraint:-13];
     }
     [self addSetting:self.touchModeStack ofId:@"touchModeStack" withInfoTag:YES withDynamicLabel:NO to:touchControlSection];
     [self addSetting:self.mousePointerVelocityStack ofId:@"mousePointerVelocityStack" withInfoTag:NO withDynamicLabel:YES to:touchControlSection];
@@ -836,7 +833,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     controllerSection.sectionTitle = [LocalizationHelper localizedStringForKey:@"Controller"];
     controllerSection.identifier = @"SettingsSectionController";
     if (@available(iOS 13.0, *)) {
-        [controllerSection setSectionWithIcon:[UIImage systemImageNamed:@"gamecontroller"] size:30 sizeConstraint:-12];
+        [controllerSection setSectionWithIcon:[UIImage systemImageNamed:@"gamecontroller"] size:30 sizeConstraint:-10];
     }
     [self addSetting:self.swapAbxyStack ofId:@"swapAbaxyStack" withInfoTag:NO withDynamicLabel:NO to:controllerSection];
     [self addSetting:self.hapticEngineStack ofId:@"hapticEngineStack" withInfoTag:NO withDynamicLabel:NO to:controllerSection];
@@ -854,7 +851,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     motionControlSection.delegate = self;
     motionControlSection.sectionTitle = [LocalizationHelper localizedStringForKey:@"Motion Control"];
     motionControlSection.identifier = @"SettingsSectionMotionControl";
-    if (@available(iOS 13.0, *)) [motionControlSection setSectionWithIcon:[UIImage imageNamed:@"gyroscope"] size:23 sizeConstraint:-20];
+    if (@available(iOS 13.0, *)) [motionControlSection setSectionWithIcon:[UIImage imageNamed:@"gyroscope"] size:23 sizeConstraint:-18];
     [self addSetting:self.controllerGyroSwitchButtonStack ofId:@"controllerGyroSwitchButtonStack" withInfoTag:YES withDynamicLabel:YES to:motionControlSection];
     [self addSetting:self.reverseHoldButtonStack ofId:@"reverseHoldButtonStack" withInfoTag:YES withDynamicLabel:YES to:motionControlSection];
     [self addSetting:self.mapGyroToStack ofId:@"mapGyroToStack" withInfoTag:YES withDynamicLabel:NO to:motionControlSection];
@@ -879,7 +876,7 @@ BOOL isCustomResolution(int resolutionSelected) {
         pencilSection.sectionTitle = [LocalizationHelper localizedStringForKey:@"Drawing Toolkit"];
         pencilSection.identifier = @"SettingsSectionPencil";
         if (@available(iOS 13.0, *)) {
-            [pencilSection setSectionWithIcon:[UIImage systemImageNamed:@"pencil.and.outline"] size:19 weight:UIImageSymbolWeightHeavy sizeConstraint:-17.5];
+            [pencilSection setSectionWithIcon:[UIImage systemImageNamed:@"pencil.and.outline"] size:19 weight:UIImageSymbolWeightHeavy sizeConstraint:-16.5];
         }
         [self addSetting:self.pencilTickStack ofId:@"pencilTickStack" withInfoTag:YES withDynamicLabel:NO to:pencilSection];
         [self addSetting:self.pencilTickIntervalStack ofId:@"pencilTickIntervalStack" withInfoTag:NO withDynamicLabel:YES to:pencilSection];
@@ -898,7 +895,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     gesturesSection.sectionTitle = [LocalizationHelper localizedStringForKey:@"Gestures"];  
     gesturesSection.identifier = @"SettingsSectionGestures";
     if (@available(iOS 13.0, *)) {
-        [gesturesSection setSectionWithIcon:[UIImage systemImageNamed:@"hand.draw"] size:23 sizeConstraint:-13.3];
+        [gesturesSection setSectionWithIcon:[UIImage systemImageNamed:@"hand.draw"] size:23 sizeConstraint:-11.3];
     }
     
     [self addSetting:self.softKeyboardGestureStack ofId:@"softKeyboardGestureStack" withInfoTag:YES withDynamicLabel:NO to:gesturesSection];
@@ -914,7 +911,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     peripheralSection.sectionTitle = [LocalizationHelper localizedStringForKey:@"Peripherals"];
     peripheralSection.identifier = @"SettingsSectionPeripherals";
     if (@available(iOS 13.0, *)) {
-        [peripheralSection setSectionWithIcon:[UIImage imageNamed:@"cable.connector.video"] size:20 sizeConstraint:-17.9];
+        [peripheralSection setSectionWithIcon:[UIImage imageNamed:@"cable.connector.video"] size:20 sizeConstraint:-16.9];
     }
     if (@available(iOS 13.0, *)) {
         [self addSetting:self.externalDisplayModeStack ofId:@"externalDisplayModeStack" withInfoTag:YES withDynamicLabel:NO to:peripheralSection];
@@ -932,7 +929,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     audioSection.sectionTitle = [LocalizationHelper localizedStringForKey:@"Audio"];
     audioSection.identifier = @"SettingsSectionAudio";
     if (@available(iOS 13.0, *)) {
-        [audioSection setSectionWithIcon:[UIImage imageNamed:@"speaker.wave.2"] size:20 sizeConstraint:-16.7];
+        [audioSection setSectionWithIcon:[UIImage imageNamed:@"speaker.wave.2"] size:20 sizeConstraint:-15.7];
     }
     
     [self addSetting:self.audioOnPcStack ofId:@"audioOnPcStack" withInfoTag:NO withDynamicLabel:NO to:audioSection];
@@ -954,7 +951,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     otherSection.sectionTitle = [LocalizationHelper localizedStringForKey:@"Others"];
     otherSection.identifier = @"SettingsSectionOthers";
     if (@available(iOS 13.0, *)) {
-        [otherSection setSectionWithIcon:[UIImage systemImageNamed:@"cube"] size:20.5 sizeConstraint:-17];
+        [otherSection setSectionWithIcon:[UIImage systemImageNamed:@"cube"] size:19.5 sizeConstraint:-17];
     }
     [self addSetting:self.statsOverlayStack ofId:@"statsOverlayStack" withInfoTag:NO withDynamicLabel:NO to:otherSection];
     [self addSetting:self.unlockDisplayOrientationStack ofId:@"unlockDisplayOrientationStack" withInfoTag:YES withDynamicLabel:NO to:otherSection];
@@ -963,6 +960,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     [self addSetting:self.optimizeGamesStack ofId:@"optimizeGamesStack" withInfoTag:YES withDynamicLabel:NO to:otherSection];
     [self addSetting:self.multiControllerStack ofId:@"multiControllerStack" withInfoTag:NO withDynamicLabel:NO to:otherSection];
     [self addSetting:self.softKeyboardToolbarStack ofId:@"softKeyboardToolbarStack" withInfoTag:NO withDynamicLabel:NO to:otherSection];
+    [self addSetting:self.softKeyboardHeightStack ofId:@"softKeyboardHeightStack" withInfoTag:YES withDynamicLabel:NO to:otherSection];
     [self addSetting:self.rememberFoldStateStack ofId:@"rememberFoldStateStack" withInfoTag:NO withDynamicLabel:NO to:otherSection];
 
     [otherSection addToParentStack:_parentStack];
@@ -974,7 +972,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     experimentalSection.sectionTitle = [LocalizationHelper localizedStringForKey:@"Experimental"];
     experimentalSection.identifier = @"SettingsSectionExperimental";
     if (@available(iOS 13.0, *)) {
-        [experimentalSection setSectionWithIcon:[UIImage imageNamed:@"flask"] size:20 sizeConstraint:-19];
+        [experimentalSection setSectionWithIcon:[UIImage imageNamed:@"flask"] size:19 sizeConstraint:-19];
     }
     
     [self addSetting:self.touchModeStack2 ofId:@"touchModeStack2" withInfoTag:NO withDynamicLabel:NO to:experimentalSection];
@@ -1124,7 +1122,7 @@ BOOL isCustomResolution(int resolutionSelected) {
         view.layer.cornerRadius = 6;
         view.layer.masksToBounds = YES;
         view.clipsToBounds = YES;
-        view.backgroundColor = [ThemeManager appPrimaryColorWithAlpha];
+        view.backgroundColor = ThemeManager.appPrimaryColorWithAlpha;
     } completion:^(BOOL finished){
         if(completion) completion();
     }];
@@ -1328,7 +1326,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     }
     button.accessibilityIdentifier = @"infoButton";
     button.translatesAutoresizingMaskIntoConstraints = NO;
-    button.tintColor = [ThemeManager appPrimaryColor];
+    button.tintColor = ThemeManager.appPrimaryColor;
     
     [button addTarget:self action:@selector(infoButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
     
@@ -1530,6 +1528,10 @@ BOOL isCustomResolution(int resolutionSelected) {
         tipText = [LocalizationHelper localizedStringForKey:@"pencilTickStackTip"];
         showOnlineDocAction = true;
         onlineDocLink = [LocalizationHelper localizedStringForKey:@"PencilProPackURL"];
+    }
+    if([sender.superview.accessibilityIdentifier isEqualToString: @"softKeyboardHeightStack"]){
+        tipText = [LocalizationHelper localizedStringForKey:@"softKeyboardHeightStackTip"];
+        showOnlineDocAction = false;
     }
     
     UIAlertController *tipsAlertController = [UIAlertController alertControllerWithTitle: [LocalizationHelper localizedStringForKey:@"Tips"] message:tipText preferredStyle:UIAlertControllerStyleAlert];
@@ -2074,6 +2076,11 @@ BOOL isCustomResolution(int resolutionSelected) {
 
         // showkeyboard toolbar setting
         [self.softKeyboardToolbarSwitch setOn:self->tempSettings.showKeyboardToolbar];// Load old setting
+        
+        self->softKeyboardHeight = self->tempSettings.softKeyboardHeight;
+        [self.softKeyboardHeightSwitch setOn:self->softKeyboardHeight!=0];// Load old setting
+        [self.softKeyboardHeightSwitch addTarget:self action:@selector(softKeyboardHeightSwitchFlipped:) forControlEvents:UIControlEventValueChanged];
+
 
         // reverse mouse wheel direction setting
         [self.reverseMouseWheelDirectionSelector setSelectedSegmentIndex:self->tempSettings.reverseMouseWheelDirection ? 1 : 0];// Load old setting
@@ -2224,6 +2231,7 @@ BOOL isCustomResolution(int resolutionSelected) {
 }
 
 - (void)showCustomOswTip {
+    GenericUtils.autoPopSoftKeyboard = !GenericUtils.isIPhone;
     NSString* edgeSide = self.slideToSettingsScreenEdgeSelector.selectedSegmentIndex == 1 ? [LocalizationHelper localizedStringForKey:@"left"] : [LocalizationHelper localizedStringForKey:@"right"];
     UIAlertController *alertController = [UIAlertController alertControllerWithTitle:[LocalizationHelper localizedStringForKey:@"Rebase in Streaming"]
                                                                              message:[LocalizationHelper localizedStringForKey:@"Open widget tool in streaming by:\nSliding from %@ screen edge to open cmd tool.\nOr tap %d fingers on stream view, number of fingers required:", edgeSide, self->oswLayoutFingers]
@@ -2232,6 +2240,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     [alertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {
         textField.placeholder = [LocalizationHelper localizedStringForKey:@"%d", self->oswLayoutFingers];
         textField.keyboardType = UIKeyboardTypeNumberPad;
+        textField.delegate = self;
     }];
     
     UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:[LocalizationHelper localizedStringForKey:@"Cancel"]
@@ -2583,7 +2592,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     Settings* currentSettings = [dataMan retrieveSettings];
     [AlertControllerUtil showAlertIn:self
                                 title:[LocalizationHelper localizedStringForKey:@"Map controller to mouse"]
-                              message:[LocalizationHelper localizedStringForKey:@"Press a button for switching to controller mouse mode (long press for 1 second during streaming)"]
+                              message:[LocalizationHelper localizedStringForKey:@"mouseModeSwitchButtonTip"]
                            withCancel:YES
                           buttonTitle:@""
                             countdown:0
@@ -2986,6 +2995,53 @@ BOOL isCustomResolution(int resolutionSelected) {
     else [self pinchGestureSwitchFlipped:_pinchGestureSwitch];
 }
 
+- (void)softKeyboardHeightSwitchFlipped:(UISwitch* )sender{
+    if(sender.isOn && !settingsViewJustLoaded){
+        GenericUtils.autoPopSoftKeyboard = false;
+        [GenericUtils setVerticalScaleWithView:self.view show:true];
+        UIAlertController *alertController = [UIAlertController alertControllerWithTitle:[LocalizationHelper localizedStringForKey:@""]
+                                                                                 message:[LocalizationHelper localizedStringForKey:@"Enter the relative height of the soft keyboard according to the scale (make sure app is in landscape fullscreen mode):"]
+                                                                          preferredStyle:UIAlertControllerStyleAlert];
+        
+        [alertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+            textField.placeholder = [LocalizationHelper localizedStringForKey:@"e.g. 0.45"];
+            textField.keyboardType = UIKeyboardTypeASCIICapable;
+            textField.autocorrectionType = UITextAutocorrectionTypeNo;
+            textField.spellCheckingType = UITextSpellCheckingTypeNo;
+            textField.delegate = self;
+            textField.text = self->softKeyboardHeight == 0 ? nil : [NSString stringWithFormat:@"%.2f", self->softKeyboardHeight];
+        }];
+        
+        UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:[LocalizationHelper localizedStringForKey:@"Cancel"]
+                                                               style:UIAlertActionStyleCancel
+                                                             handler:^(UIAlertAction *action) {
+            [GenericUtils setVerticalScaleWithView:self.view show:false];
+            [sender setOn:self->softKeyboardHeight!=0];
+        }];
+        
+        UIAlertAction *okAction = [UIAlertAction actionWithTitle:[LocalizationHelper localizedStringForKey:@"OK"]
+                                                           style:UIAlertActionStyleDefault
+                                                         handler:^(UIAlertAction *action) {
+            self->softKeyboardHeight = [GenericUtils toCGFloat:alertController.textFields[0].text];
+            [GenericUtils setVerticalScaleWithView:self.view show:false];
+            [sender setOn:self->softKeyboardHeight!=0];
+        }];
+        [alertController addAction:cancelAction];
+        [alertController addAction:okAction];
+        [self presentViewController:alertController animated:YES completion:nil];
+    }
+}
+
+// UITextFieldDelegate
+- (BOOL)textFieldShouldBeginEditing:(UITextField *)textField {
+    if (GenericUtils.autoPopSoftKeyboard) {
+        return YES;
+    } else {
+        GenericUtils.autoPopSoftKeyboard = YES;
+        return NO;
+    }
+}
+
 - (void)pinchGestureSwitchFlipped:(UISwitch* )sender{
     [self setHidden:!sender.isOn forStack:_pinchSensitivityStack];
     [self setHidden:!sender.isOn forStack:_ctrlDownForPinchStack];
@@ -3135,6 +3191,7 @@ BOOL isCustomResolution(int resolutionSelected) {
 }
 
 - (void) promptCustomResolutionDialog {
+    GenericUtils.autoPopSoftKeyboard = !GenericUtils.isIPhone;
     UIAlertController *alertController = [UIAlertController alertControllerWithTitle:[LocalizationHelper localizedStringForKey: @"Enter Custom Resolution"] message:nil preferredStyle:UIAlertControllerStyleAlert];
 
     [alertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {
@@ -3142,6 +3199,7 @@ BOOL isCustomResolution(int resolutionSelected) {
         textField.clearButtonMode = UITextFieldViewModeAlways;
         textField.borderStyle = UITextBorderStyleRoundedRect;
         textField.keyboardType = UIKeyboardTypeNumberPad;
+        textField.delegate = self;
         
         if (resolutionTable[RESOLUTION_TABLE_CUSTOM_INDEX].width == 0) {
             textField.text = @"";
@@ -3156,6 +3214,7 @@ BOOL isCustomResolution(int resolutionSelected) {
         textField.clearButtonMode = UITextFieldViewModeAlways;
         textField.borderStyle = UITextBorderStyleRoundedRect;
         textField.keyboardType = UIKeyboardTypeNumberPad;
+        textField.delegate = self;
         
         if (resolutionTable[RESOLUTION_TABLE_CUSTOM_INDEX].height == 0) {
             textField.text = @"";
@@ -3337,7 +3396,7 @@ BOOL isCustomResolution(int resolutionSelected) {
             if (@available(iOS 13.0, *)) {
                 label.layer.filters = nil;
                 label.textColor = [UIColor clearColor];
-                label.textColor = [ThemeManager textColor];
+                label.textColor = ThemeManager.textColor;
             } else {
                 UIView *view = label;
                 bool isPartOfSelector = false;
@@ -3361,9 +3420,9 @@ BOOL isCustomResolution(int resolutionSelected) {
             UISegmentedControl *selector = (UISegmentedControl *)subview;
             if (@available(iOS 13.0, *)) {
                 selector.selectedSegmentTintColor = [UIColor clearColor];
-                selector.selectedSegmentTintColor = [ThemeManager appSecondaryColor];
+                selector.selectedSegmentTintColor = ThemeManager.appSecondaryColor;
             } else {
-                selector.tintColor = [ThemeManager appSecondaryColor];
+                selector.tintColor = ThemeManager.appSecondaryColor;
             }
         }
         [self updateThemeForSelectors:subview];
@@ -3375,9 +3434,22 @@ BOOL isCustomResolution(int resolutionSelected) {
         if ([subview isKindOfClass:[UISlider class]]) {
             UISlider *slider = (UISlider *)subview;
             slider.tintColor = [UIColor clearColor];
-            slider.tintColor = [ThemeManager appSecondaryColor];
+            slider.tintColor = ThemeManager.appSecondaryColor;
+            if(GenericUtils.liquidGlassEnabled) slider.maximumTrackTintColor = ThemeManager.liquidGlassSliderMaxTrackTint;
         }
         [self updateThemeForSliders:subview];
+    }
+}
+
+- (void)updateThemeForSwitches:(UIView *)view {
+    if (@available(iOS 26.0, *)) {
+        for (UIView *subview in view.subviews) {
+            if ([subview isKindOfClass:[UISwitch class]]) {
+                UISwitch *uiSwitch = (UISwitch *)subview;
+                [GenericUtils applyOffTintColor:uiSwitch];
+            }
+            [self updateThemeForSwitches:subview];
+        }
     }
 }
 
@@ -3385,11 +3457,11 @@ BOOL isCustomResolution(int resolutionSelected) {
     for (UIView *subview in view.subviews) {
         if ([subview isKindOfClass:[MenuSectionView class]]) {
             MenuSectionView *section = (MenuSectionView *)subview;
-            section.titleLabel.textColor = [ThemeManager sectionLabelTextColor];
+            section.titleLabel.textColor = ThemeManager.sectionLabelTextColor;
             section.iconImageView.tintColor = [UIColor clearColor];
-            section.iconImageView.tintColor = [ThemeManager sectionLabelTextColor];
+            section.iconImageView.tintColor = ThemeManager.sectionLabelTextColor;
             section.separatorLine.backgroundColor = [UIColor clearColor];
-            section.separatorLine.backgroundColor = [ThemeManager separatorColor];
+            section.separatorLine.backgroundColor = ThemeManager.separatorColor;
         }
         [self updateThemeForMenuSections:subview];
     }
@@ -3397,11 +3469,12 @@ BOOL isCustomResolution(int resolutionSelected) {
 
 - (void)updateTheme{
     self.view.backgroundColor = [UIColor clearColor];
-    self.view.backgroundColor = [ThemeManager menuBackgroundColor];
+    self.view.backgroundColor = ThemeManager.menuBackgroundColor;
     [self updateThemeForMenuSections:self.view];
     [self updateThemeForLabels:self.view];
     [self updateThemeForSelectors:self.view];
     [self updateThemeForSliders:self.view];
+    if(GenericUtils.liquidGlassEnabled) [self updateThemeForSwitches:self.view];
 }
 
 - (void) frameQueueSizeSliderMoved:(UISlider* )sender {
@@ -3680,6 +3753,7 @@ BOOL isCustomResolution(int resolutionSelected) {
     NSInteger controllerGyroSwitchMode = self.controllerGyroSwitchButtonSetter.selectedSegmentIndex;
     BOOL enableFrameTimebase = false;
     BOOL asyncFrameDequeue = self.asyncFrameDequeueSwitch.isOn;
+    CGFloat softKeyboardHeight = self.softKeyboardHeightSwitch.isOn ? self->softKeyboardHeight : 0;
     NSInteger backgroundSessionTimer = self.backgroundSessionTimerSlider.value == self.backgroundSessionTimerSlider.maximumValue ? (uint32_t) INT16_MAX : (uint32_t)self.backgroundSessionTimerSlider.value;
     
     [dataMan saveSettings:currentSettings
@@ -3756,6 +3830,7 @@ BOOL isCustomResolution(int resolutionSelected) {
                  enableFrameTimebase:enableFrameTimebase
                    asyncFrameDequeue:asyncFrameDequeue
             sdrPerformanceWorkaround:sdrPerformanceWorkaround
+                  softKeyboardHeight:softKeyboardHeight
               backgroundSessionTimer:backgroundSessionTimer];
 }
 

@@ -585,9 +585,9 @@
 }
 
 - (void)updateTheme {
-    self.view.backgroundColor = [ThemeManager menuBackgroundColor];
-    _stageLabel.textColor = [[ThemeManager textColor] colorWithAlphaComponent:0.9];
-    _spinner.color = [ThemeManager textColor];
+    self.view.backgroundColor = ThemeManager.menuBackgroundColor;
+    _stageLabel.textColor = [ThemeManager.textColor colorWithAlphaComponent:0.9];
+    _spinner.color = ThemeManager.textColor;
 }
 
 - (void)viewDidLoad
@@ -1662,6 +1662,10 @@
     if(PencilHandler.shared){
         [PencilHandler.shared replaceEraserWith:shortcut];
     }
+}
+
+- (void)toggleTouchWithDisabled:(BOOL)disabled{
+    [_streamView toggleTouchDisabled:disabled];
 }
 
 - (void)presentPressureCurveVC{
