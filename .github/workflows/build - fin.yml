@@ -23,6 +23,9 @@ jobs:
           echo "Last Commit Time: $COMMIT_TIME"
           echo "COMMIT_TIME=$COMMIT_TIME" >> $GITHUB_ENV
 
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
+
       - name: Build
         run: |
           xcodebuild -scheme "VoidLink" -configuration Release -sdk iphoneos archive -archivePath ./build/vl.xcarchive CODE_SIGN_IDENTITY="" CODE_SIGN_REQUIRED="NO" CODE_SIGN_ENTITLEMENTS="" CODE_SIGNING_ALLOWED="NO" MARKETING_VERSION=$COMMIT_TIME
