@@ -12,6 +12,7 @@
 #import "SettingsViewController.h"
 #import "TemporarySettings.h"
 #import "DataManager.h"
+#import "ControllerSupport.h"
 #import "VoidLink-Swift.h"
 #import "Connection.h"
 #import "Plot.h"
@@ -55,6 +56,8 @@
     MenuSectionView *otherSection;
     MenuSectionView *experimentalSection;
     NSMutableSet* hiddenStacks;
+    UIStackView *_steamControllerRawHidStack;
+    UISwitch *_steamControllerRawHidSwitch;
         
     GCController *capturedController;
 }
@@ -817,6 +820,38 @@ BOOL isCustomResolution(int resolutionSelected) {
     }
 }
 
+- (UIStackView *)steamControllerRawHidStack {
+    if (_steamControllerRawHidStack != nil) {
+        return _steamControllerRawHidStack;
+    }
+
+    UILabel *label = [[UILabel alloc] init];
+    label.text = [LocalizationHelper localizedStringForKey:@"Steam Controller"];
+    label.textAlignment = NSTextAlignmentNatural;
+    label.lineBreakMode = NSLineBreakByTruncatingTail;
+    label.minimumScaleFactor = 0.65;
+    label.adjustsFontSizeToFitWidth = YES;
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+
+    _steamControllerRawHidSwitch = [[UISwitch alloc] init];
+    [_steamControllerRawHidSwitch setOn:[ControllerSupport isSteamControllerRawHidSupportEnabled]];
+    [_steamControllerRawHidSwitch addTarget:self action:@selector(steamControllerRawHidSwitchFlipped:) forControlEvents:UIControlEventValueChanged];
+    [_steamControllerRawHidSwitch setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+
+    _steamControllerRawHidStack = [[UIStackView alloc] initWithArrangedSubviews:@[label, _steamControllerRawHidSwitch]];
+    _steamControllerRawHidStack.axis = UILayoutConstraintAxisHorizontal;
+    _steamControllerRawHidStack.alignment = UIStackViewAlignmentCenter;
+    _steamControllerRawHidStack.distribution = UIStackViewDistributionFill;
+    _steamControllerRawHidStack.spacing = 20;
+    _steamControllerRawHidStack.translatesAutoresizingMaskIntoConstraints = NO;
+
+    return _steamControllerRawHidStack;
+}
+
+- (void)steamControllerRawHidSwitchFlipped:(UISwitch *)sender {
+    [ControllerSupport setSteamControllerRawHidSupportEnabled:sender.isOn];
+}
+
 - (void)addSetting:(UIStackView *)stack ofId:(NSString* )identifier to:(MenuSectionView* )menuSection{
     stack.accessibilityIdentifier = identifier;
     [_settingStackDict setObject:stack forKey:identifier];
@@ -933,6 +968,8 @@ BOOL isCustomResolution(int resolutionSelected) {
     self.emulatedControllerTypeStack.hasInfoTag = YES;
     // self.emulatedControllerTypeStack.isGameProfileSetting = YES;
     [self addSetting:self.emulatedControllerTypeStack ofId:@"emulatedControllerTypeStack" to:controllerSection];
+
+    [self addSetting:[self steamControllerRawHidStack] ofId:@"steamControllerRawHidStack" to:controllerSection];
 
     self.gyroModeStack.hasInfoTag = YES;
     // self.gyroModeStack.isGameProfileSetting = YES;

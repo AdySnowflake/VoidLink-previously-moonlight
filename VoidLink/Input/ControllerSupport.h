@@ -48,11 +48,14 @@
 -(void) rumbleTriggers:(uint16_t)controllerNumber leftTrigger:(uint16_t)leftTrigger rightTrigger:(uint16_t)rightTrigger;
 -(void) setMotionEventState:(uint16_t)controllerNumber motionType:(uint8_t)motionType reportRateHz:(uint16_t)reportRateHz;
 -(void) setControllerLed:(uint16_t)controllerNumber r:(uint8_t)r g:(uint8_t)g b:(uint8_t)b;
+-(void) controllerRawHidReport:(uint16_t)controllerNumber reportType:(uint8_t)reportType reportData:(const uint8_t*)reportData reportLength:(uint8_t)reportLength;
 -(void) updateTimerStateForOsc;
 
 -(uint16_t) getActiveGamepadMask;
 
 +(int) getConnectedGamepadMask:(StreamConfiguration*)streamConfig;
++(BOOL)isSteamControllerRawHidSupportEnabled;
++(void)setSteamControllerRawHidSupportEnabled:(BOOL)enabled;
 
 -(NSUInteger) getConnectedGamepadCount;
 

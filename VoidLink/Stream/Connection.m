@@ -566,6 +566,11 @@ void ClSetControllerLED(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t
     [_callbacks setControllerLed:controllerNumber r:r g:g b:b];
 }
 
+void ClControllerRawHidReport(uint16_t controllerNumber, uint8_t reportType, const uint8_t* reportData, uint8_t reportLength)
+{
+    [_callbacks controllerRawHidReport:controllerNumber reportType:reportType reportData:reportData reportLength:reportLength];
+}
+
 -(void) terminate
 {
     // Interrupt any action blocking LiStartConnection(). This is
@@ -725,6 +730,7 @@ void ClSetControllerLED(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t
     _clCallbacks.rumbleTriggers = ClRumbleTriggers;
     _clCallbacks.setMotionEventState = ClSetMotionEventState;
     _clCallbacks.setControllerLED = ClSetControllerLED;
+    _clCallbacks.controllerRawHidReport = ClControllerRawHidReport;
     
     [[NSNotificationCenter defaultCenter] addObserver:self
            selector:@selector(handleAudioSessionInterruption:)

@@ -39,6 +39,56 @@
 #import <AVKit/UIWindow.h>
 #endif
 
+static NSString* SteamRawHidProbeHex(const uint8_t *data, NSUInteger length) {
+    if (data == NULL || length == 0) {
+        return @"";
+    }
+
+    NSMutableString *hex = [NSMutableString string];
+    NSUInteger limit = MIN(length, (NSUInteger)16);
+    for (NSUInteger i = 0; i < limit; i++) {
+        [hex appendFormat:@"%02x", data[i]];
+        if (i + 1 < limit) {
+            [hex appendString:@" "];
+        }
+    }
+    if (length > limit) {
+        [hex appendString:@" ..."];
+    }
+    return hex;
+}
+
+static void SteamRawHidProbeLog(NSString *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    NSString *message = [[NSString alloc] initWithFormat:fmt arguments:args];
+    va_end(args);
+
+    NSArray<NSString*> *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    if (paths.count == 0) {
+        return;
+    }
+
+    NSString *path = [paths[0] stringByAppendingPathComponent:@"steam_raw_hid_probe.log"];
+    NSString *line = [NSString stringWithFormat:@"%@ %@\n", [NSDate date], message];
+    NSData *data = [line dataUsingEncoding:NSUTF8StringEncoding];
+    if (data == nil) {
+        return;
+    }
+
+    @synchronized([StreamFrameViewController class]) {
+        if (![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+            [data writeToFile:path atomically:YES];
+            return;
+        }
+
+        NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:path];
+        [handle seekToEndOfFile];
+        [handle writeData:data];
+        [handle closeFile];
+    }
+}
+
 @interface AVDisplayCriteria()
 @property(readonly) int videoDynamicRange;
 @property(readonly, nonatomic) float refreshRate;
@@ -1708,6 +1758,17 @@
     Log(LOG_I, @"Set controller LED on gamepad %d: l%02x%02x%02x", controllerNumber, r, g, b);
     
     [_controllerSupport setControllerLed:controllerNumber r:r g:g b:b];
+}
+
+- (void) controllerRawHidReport:(uint16_t)controllerNumber reportType:(uint8_t)reportType reportData:(const uint8_t*)reportData reportLength:(uint8_t)reportLength {
+    Log(LOG_I, @"Raw HID report on gamepad %d: type=%02x length=%u", controllerNumber, reportType, reportLength);
+    SteamRawHidProbeLog(@"stream host raw report controller=%u type=0x%02x len=%u data=%@",
+                        controllerNumber,
+                        reportType,
+                        reportLength,
+                        SteamRawHidProbeHex(reportData, reportLength));
+
+    [_controllerSupport controllerRawHidReport:controllerNumber reportType:reportType reportData:reportData reportLength:reportLength];
 }
 
 - (void)connectionStatusUpdate:(int)status {

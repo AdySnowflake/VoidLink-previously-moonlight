@@ -18,6 +18,8 @@
 #include "Limelight.h"
 
 @import GameController;
+@import CoreBluetooth;
+@import QuartzCore;
 #if !TARGET_OS_TV
     @import CoreMotion;
 #endif
@@ -25,9 +27,826 @@
 
 static const double MOUSE_SPEED_DIVISOR = 1.25;
 
+static double SteamRawHidProbeNowMs(void) {
+    return CACurrentMediaTime() * 1000.0;
+}
+
+static NSString* SteamRawHidProbeHex(const uint8_t *data, NSUInteger length) {
+    if (data == NULL || length == 0) {
+        return @"";
+    }
+
+    NSMutableString *hex = [NSMutableString string];
+    NSUInteger limit = MIN(length, (NSUInteger)16);
+    for (NSUInteger i = 0; i < limit; i++) {
+        [hex appendFormat:@"%02x", data[i]];
+        if (i + 1 < limit) {
+            [hex appendString:@" "];
+        }
+    }
+    if (length > limit) {
+        [hex appendString:@" ..."];
+    }
+    return hex;
+}
+
+static void SteamRawHidProbeLog(NSString *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    NSString *message = [[NSString alloc] initWithFormat:fmt arguments:args];
+    va_end(args);
+
+    NSArray<NSString*> *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    if (paths.count == 0) {
+        return;
+    }
+
+    NSString *path = [paths[0] stringByAppendingPathComponent:@"steam_raw_hid_probe.log"];
+    NSString *line = [NSString stringWithFormat:@"%@ %@\n", [NSDate date], message];
+    NSData *data = [line dataUsingEncoding:NSUTF8StringEncoding];
+    if (data == nil) {
+        return;
+    }
+
+    @synchronized([ControllerSupport class]) {
+        if (![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+            [data writeToFile:path atomically:YES];
+            return;
+        }
+
+        NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:path];
+        [handle seekToEndOfFile];
+        [handle writeData:data];
+        [handle closeFile];
+    }
+}
+
 @interface ControllerSupport()
 
 @property (assign,nonatomic) bool shallDisableGyroHotSwitch;
+
+@end
+
+@interface SteamControllerRawHidBridge : NSObject<CBCentralManagerDelegate, CBPeripheralDelegate>
+
+-(id)initWithControllerSupport:(ControllerSupport*)controllerSupport;
+-(void)start;
+-(void)stop;
+-(void)connectionEstablished;
+-(void)runTritonHapticProbeIfReady;
+-(void)controllerRawHidReport:(uint16_t)controllerNumber reportType:(uint8_t)reportType reportData:(const uint8_t*)reportData reportLength:(uint8_t)reportLength;
+-(void)controllerRawHidReportOnMain:(uint16_t)controllerNumber reportType:(uint8_t)reportType report:(NSData*)report hostRawAtMs:(double)hostRawAtMs;
+-(void)writeData:(NSData*)data toCharacteristic:(CBCharacteristic*)characteristic preferResponse:(BOOL)preferResponse latencyTag:(NSString*)latencyTag hostRawAtMs:(double)hostRawAtMs hostRawSeq:(uint64_t)hostRawSeq;
++(BOOL)isSteamControllerGameController:(GCController*)controller;
+
+@end
+
+@implementation SteamControllerRawHidBridge {
+    __weak ControllerSupport *_controllerSupport;
+    CBCentralManager *_centralManager;
+    NSMutableArray<CBPeripheral*> *_peripherals;
+    CBPeripheral *_activePeripheral;
+    CBCharacteristic *_inputCharacteristic;
+    CBCharacteristic *_reportCharacteristic;
+    NSMutableDictionary<NSNumber*, CBCharacteristic*> *_outputReportCharacteristics;
+    NSMutableArray<NSDictionary<NSString*, id>*> *_pendingBleWrites;
+    BOOL _bleWriteWithResponseInFlight;
+    NSData *_inFlightBleWriteData;
+    BOOL _streamConnected;
+    BOOL _reportedArrival;
+    uint8_t _controllerNumber;
+    uint16_t _productId;
+    uint32_t _inputReportLogCount;
+    uint32_t _bleWriteSubmitCount;
+    uint32_t _bleWriteCompleteCount;
+    uint64_t _hostRawReportSequence;
+    BOOL _hapticProbeSent;
+}
+
+static NSString * const kSteamControllerServiceUuid = @"100F6C32-1735-4313-B402-38567131E5F3";
+static NSString * const kSteamControllerD0GInputUuid = @"100F6C33-1735-4313-B402-38567131E5F3";
+static NSString * const kSteamControllerReportUuid = @"100F6C34-1735-4313-B402-38567131E5F3";
+static NSString * const kSteamControllerTritonInputUuid = @"100F6C7A-1735-4313-B402-38567131E5F3";
+static NSString * const kSteamControllerRawHidSupportDefaultsKey = @"steamControllerRawHidSupport";
+static const BOOL kSteamRawHidTritonHapticProbeEnabled = NO;
+static const BOOL kSteamRawHidUseSteamLinkApkWriteSlice = YES;
+
+-(id)initWithControllerSupport:(ControllerSupport*)controllerSupport {
+    self = [super init];
+    if (self) {
+        _controllerSupport = controllerSupport;
+        _peripherals = [[NSMutableArray alloc] init];
+        _outputReportCharacteristics = [[NSMutableDictionary alloc] init];
+        _pendingBleWrites = [[NSMutableArray alloc] init];
+        _controllerNumber = 0;
+        _productId = 0;
+    }
+    return self;
+}
+
++(BOOL)isSteamControllerGameController:(GCController*)controller {
+    if (controller == nil) {
+        return NO;
+    }
+
+    NSString *vendorName = controller.vendorName ?: @"";
+    NSString *productCategory = @"";
+    if (@available(iOS 14.0, tvOS 14.0, *)) {
+        productCategory = controller.productCategory ?: @"";
+    }
+
+    BOOL isSteam = [vendorName rangeOfString:@"Steam" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+                   [productCategory rangeOfString:@"Steam" options:NSCaseInsensitiveSearch].location != NSNotFound;
+    SteamRawHidProbeLog(@"gamecontroller inspect vendor=%@ category=%@ steam=%d",
+                        vendorName,
+                        productCategory,
+                        isSteam);
+    return isSteam;
+}
+
+-(CBUUID*)steamControllerServiceUuid {
+    return [CBUUID UUIDWithString:kSteamControllerServiceUuid];
+}
+
+-(void)clearBleWriteQueue {
+    [_pendingBleWrites removeAllObjects];
+    _bleWriteWithResponseInFlight = NO;
+    _inFlightBleWriteData = nil;
+}
+
+-(void)start {
+    if (_centralManager == nil) {
+        SteamRawHidProbeLog(@"bridge start");
+        _centralManager = [[CBCentralManager alloc] initWithDelegate:self queue:nil];
+    }
+}
+
+-(void)stop {
+    SteamRawHidProbeLog(@"bridge stop");
+    _streamConnected = NO;
+    _reportedArrival = NO;
+
+    if (_centralManager) {
+        [_centralManager stopScan];
+        for (CBPeripheral *peripheral in [_peripherals copy]) {
+            [_centralManager cancelPeripheralConnection:peripheral];
+        }
+    }
+
+    [_peripherals removeAllObjects];
+    [_outputReportCharacteristics removeAllObjects];
+    [self clearBleWriteQueue];
+    _activePeripheral = nil;
+    _inputCharacteristic = nil;
+    _reportCharacteristic = nil;
+    _productId = 0;
+    _hapticProbeSent = NO;
+}
+
+-(void)connectionEstablished {
+    _streamConnected = YES;
+    SteamRawHidProbeLog(@"stream connection established");
+    [self reportArrivalIfNeeded];
+    [self runTritonHapticProbeIfReady];
+}
+
+-(uint16_t)activeGamepadMaskWithSteamController {
+    uint16_t mask = [_controllerSupport getActiveGamepadMask];
+    mask |= (uint16_t)(1u << _controllerNumber);
+    return mask;
+}
+
+-(BOOL)reportArrivalIfNeeded {
+    if (_reportedArrival) {
+        return YES;
+    }
+    if (!_streamConnected || _activePeripheral == nil || _inputCharacteristic == nil) {
+        return NO;
+    }
+
+    int err = LiSendControllerArrivalEvent(_controllerNumber,
+                                           [self activeGamepadMaskWithSteamController],
+                                           LI_CTYPE_STEAM,
+                                           0,
+                                           LI_CCAP_RAW_HID_REPORTS);
+    if (err != 0) {
+        SteamRawHidProbeLog(@"arrival failed controller=%u err=%d", _controllerNumber, err);
+        return NO;
+    }
+
+    _reportedArrival = YES;
+    SteamRawHidProbeLog(@"arrival sent controller=%u product=0x%04x capabilities=0x%04x", _controllerNumber, _productId, LI_CCAP_RAW_HID_REPORTS);
+    Log(LOG_I, @"Steam Controller raw HID bridge reported arrival on controller %u", _controllerNumber);
+    return YES;
+}
+
+-(void)reportRemovalIfNeeded {
+    if (!_streamConnected || !_reportedArrival) {
+        _reportedArrival = NO;
+        return;
+    }
+
+    uint16_t mask = [_controllerSupport getActiveGamepadMask];
+    mask &= (uint16_t)~(1u << _controllerNumber);
+    LiSendMultiControllerEvent(_controllerNumber, mask, 0, 0, 0, 0, 0, 0, 0);
+    SteamRawHidProbeLog(@"removal sent controller=%u", _controllerNumber);
+    _reportedArrival = NO;
+}
+
+-(void)sendInputReport:(NSData*)report {
+    if (report.length == 0) {
+        return;
+    }
+    if (![self reportArrivalIfNeeded]) {
+        return;
+    }
+
+    NSUInteger length = MIN(report.length, (NSUInteger)LI_HID_MAX_REPORT_SIZE);
+    _inputReportLogCount++;
+    if (_inputReportLogCount <= 20 || (_inputReportLogCount % 100) == 0) {
+        SteamRawHidProbeLog(@"input report #%u len=%lu data=%@",
+                            _inputReportLogCount,
+                            (unsigned long)length,
+                            SteamRawHidProbeHex(report.bytes, length));
+    }
+    int err = LiSendControllerRawHidReport(_controllerNumber,
+                                           LI_HID_REPORT_TYPE_INPUT,
+                                           report.bytes,
+                                           (uint8_t)length);
+    if (err != 0 || _inputReportLogCount <= 20 || (_inputReportLogCount % 100) == 0) {
+        SteamRawHidProbeLog(@"send raw input #%u controller=%u type=0x%02x len=%lu err=%d",
+                            _inputReportLogCount,
+                            _controllerNumber,
+                            LI_HID_REPORT_TYPE_INPUT,
+                            (unsigned long)length,
+                            err);
+    }
+}
+
+-(void)pumpBleWriteQueue {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self pumpBleWriteQueue];
+        });
+        return;
+    }
+
+    if (_activePeripheral == nil || _bleWriteWithResponseInFlight || _pendingBleWrites.count == 0) {
+        return;
+    }
+
+    NSDictionary<NSString*, id> *entry = _pendingBleWrites.firstObject;
+    if (entry == nil) {
+        return;
+    }
+    [_pendingBleWrites removeObject:entry];
+
+    CBCharacteristic *characteristic = [entry objectForKey:@"characteristic"];
+    NSData *data = [entry objectForKey:@"data"];
+    BOOL useResponse = [[entry objectForKey:@"response"] boolValue];
+    if (characteristic == nil || data.length == 0) {
+        [self pumpBleWriteQueue];
+        return;
+    }
+
+    if (!useResponse && !_activePeripheral.canSendWriteWithoutResponse) {
+        [_pendingBleWrites insertObject:entry atIndex:0];
+        SteamRawHidProbeLog(@"ble write wait no-response ready char=%@ len=%lu queue=%lu data=%@",
+                            characteristic.UUID.UUIDString,
+                            (unsigned long)data.length,
+                            (unsigned long)_pendingBleWrites.count,
+                            SteamRawHidProbeHex(data.bytes, data.length));
+        return;
+    }
+
+    _bleWriteSubmitCount++;
+    double submitMs = SteamRawHidProbeNowMs();
+
+    CBCharacteristicWriteType writeType = useResponse ? CBCharacteristicWriteWithResponse : CBCharacteristicWriteWithoutResponse;
+    if (useResponse) {
+        _bleWriteWithResponseInFlight = YES;
+        _inFlightBleWriteData = data;
+    }
+
+    [_activePeripheral writeValue:data forCharacteristic:characteristic type:writeType];
+    SteamRawHidProbeLog(@"ble write submit #%u char=%@ len=%lu queue=%lu type=%@ data=%@",
+                        _bleWriteSubmitCount,
+                        characteristic.UUID.UUIDString,
+                        (unsigned long)data.length,
+                        (unsigned long)_pendingBleWrites.count,
+                        useResponse ? @"response" : @"no-response",
+                        SteamRawHidProbeHex(data.bytes, data.length));
+
+    NSString *latencyTag = [entry objectForKey:@"latencyTag"];
+    NSNumber *hostRawAtMs = [entry objectForKey:@"hostRawAtMs"];
+    NSNumber *enqueueMs = [entry objectForKey:@"enqueueMs"];
+    NSNumber *hostRawSeq = [entry objectForKey:@"hostRawSeq"];
+    if (latencyTag != nil && hostRawAtMs != nil && enqueueMs != nil) {
+        SteamRawHidProbeLog(@"ble latency tag=%@ hostSeq=%llu submitMs=%.3f hostToSubmitMs=%.3f enqueueToSubmitMs=%.3f char=%@ len=%lu queue=%lu data=%@",
+                            latencyTag,
+                            hostRawSeq ? hostRawSeq.unsignedLongLongValue : 0,
+                            submitMs,
+                            submitMs - hostRawAtMs.doubleValue,
+                            submitMs - enqueueMs.doubleValue,
+                            characteristic.UUID.UUIDString,
+                            (unsigned long)data.length,
+                            (unsigned long)_pendingBleWrites.count,
+                            SteamRawHidProbeHex(data.bytes, data.length));
+    }
+
+    if (!useResponse) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.02 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [self pumpBleWriteQueue];
+        });
+    }
+}
+
+-(void)writeData:(NSData*)data toCharacteristic:(CBCharacteristic*)characteristic preferResponse:(BOOL)preferResponse {
+    [self writeData:data toCharacteristic:characteristic preferResponse:preferResponse latencyTag:nil hostRawAtMs:0 hostRawSeq:0];
+}
+
+-(void)writeData:(NSData*)data toCharacteristic:(CBCharacteristic*)characteristic preferResponse:(BOOL)preferResponse latencyTag:(NSString*)latencyTag hostRawAtMs:(double)hostRawAtMs hostRawSeq:(uint64_t)hostRawSeq {
+    if (![NSThread isMainThread]) {
+        NSData *dataCopy = [data copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self writeData:dataCopy toCharacteristic:characteristic preferResponse:preferResponse latencyTag:latencyTag hostRawAtMs:hostRawAtMs hostRawSeq:hostRawSeq];
+        });
+        return;
+    }
+
+    if (_activePeripheral == nil || characteristic == nil || data.length == 0) {
+        return;
+    }
+
+    BOOL useResponse = NO;
+    if (preferResponse && (characteristic.properties & CBCharacteristicPropertyWrite)) {
+        useResponse = YES;
+    }
+    else if (!(characteristic.properties & CBCharacteristicPropertyWriteWithoutResponse)) {
+        SteamRawHidProbeLog(@"ble write unsupported char=%@ properties=0x%lx len=%lu",
+                            characteristic.UUID.UUIDString,
+                            (unsigned long)characteristic.properties,
+                            (unsigned long)data.length);
+        return;
+    }
+
+    NSMutableDictionary<NSString*, id> *entry = [@{
+        @"characteristic": characteristic,
+        @"data": data,
+        @"response": @(useResponse),
+        @"enqueueMs": @(SteamRawHidProbeNowMs())
+    } mutableCopy];
+    if (latencyTag != nil) {
+        [entry setObject:latencyTag forKey:@"latencyTag"];
+        [entry setObject:@(hostRawAtMs) forKey:@"hostRawAtMs"];
+        [entry setObject:@(hostRawSeq) forKey:@"hostRawSeq"];
+    }
+
+    [_pendingBleWrites addObject:entry];
+    if (_pendingBleWrites.count > 256) {
+        [_pendingBleWrites removeObjectAtIndex:0];
+        SteamRawHidProbeLog(@"ble write queue overflow, dropped oldest entry");
+    }
+
+    SteamRawHidProbeLog(@"ble write enqueue char=%@ len=%lu queue=%lu type=%@ data=%@",
+                        characteristic.UUID.UUIDString,
+                        (unsigned long)data.length,
+                        (unsigned long)_pendingBleWrites.count,
+                        useResponse ? @"response" : @"no-response",
+                        SteamRawHidProbeHex(data.bytes, data.length));
+    [self pumpBleWriteQueue];
+}
+
+-(void)writeData:(NSData*)data toCharacteristic:(CBCharacteristic*)characteristic {
+    [self writeData:data toCharacteristic:characteristic preferResponse:YES];
+}
+
+-(NSData*)steamLinkApkWritePayloadFromReport:(const uint8_t*)reportData reportLength:(uint8_t)reportLength startIndex:(NSUInteger)startIndex reason:(NSString*)reason {
+    if (reportData == NULL || reportLength == 0) {
+        return nil;
+    }
+
+    NSUInteger endIndex = reportLength;
+    if (kSteamRawHidUseSteamLinkApkWriteSlice && endIndex > 0) {
+        // Match Steam Link APK HIDDeviceBLESteamController.writeReport():
+        // Arrays.copyOfRange(report, 1, report.length - 1).
+        endIndex -= 1;
+    }
+
+    if (startIndex >= endIndex) {
+        SteamRawHidProbeLog(@"apk write slice empty reason=%@ len=%u start=%lu end=%lu",
+                            reason ?: @"",
+                            reportLength,
+                            (unsigned long)startIndex,
+                            (unsigned long)endIndex);
+        return nil;
+    }
+
+    return [NSData dataWithBytes:reportData + startIndex length:endIndex - startIndex];
+}
+
+-(void)writeReportCharacteristicPayload:(const uint8_t*)reportData reportLength:(uint8_t)reportLength stripReportId:(BOOL)stripReportId useApkSlice:(BOOL)useApkSlice reason:(NSString*)reason {
+    if (_reportCharacteristic == nil || reportData == NULL || reportLength == 0) {
+        return;
+    }
+
+    NSData *data = nil;
+    if (useApkSlice) {
+        data = [self steamLinkApkWritePayloadFromReport:reportData
+                                           reportLength:reportLength
+                                             startIndex:stripReportId ? 1 : 0
+                                                 reason:reason];
+    }
+    else {
+        const uint8_t *payload = reportData;
+        NSUInteger payloadLength = reportLength;
+        if (stripReportId && reportLength > 1) {
+            payload = reportData + 1;
+            payloadLength = reportLength - 1;
+        }
+        data = [NSData dataWithBytes:payload length:payloadLength];
+    }
+
+    if (data.length == 0) {
+        return;
+    }
+
+    [self writeData:data toCharacteristic:_reportCharacteristic];
+}
+
+-(void)writeTritonOutputReportId:(uint8_t)reportId payload:(const uint8_t*)payload payloadLength:(NSUInteger)payloadLength preferResponse:(BOOL)preferResponse reason:(NSString*)reason {
+    if (_productId != 0x1303 || payload == NULL || payloadLength == 0) {
+        return;
+    }
+
+    CBCharacteristic *characteristic = [_outputReportCharacteristics objectForKey:@(reportId)];
+    if (characteristic == nil) {
+        SteamRawHidProbeLog(@"triton output write missing report=0x%02x reason=%@",
+                            reportId,
+                            reason ?: @"");
+        return;
+    }
+
+    NSData *data = [NSData dataWithBytes:payload length:payloadLength];
+    SteamRawHidProbeLog(@"triton output write report=0x%02x reason=%@ char=%@ len=%lu preferResponse=%d data=%@",
+                        reportId,
+                        reason ?: @"",
+                        characteristic.UUID.UUIDString,
+                        (unsigned long)data.length,
+                        preferResponse,
+                        SteamRawHidProbeHex(data.bytes, data.length));
+    [self writeData:data toCharacteristic:characteristic preferResponse:preferResponse];
+}
+
+-(void)runTritonHapticProbeIfReady {
+    if (!kSteamRawHidTritonHapticProbeEnabled || _hapticProbeSent || _productId != 0x1303 || _activePeripheral == nil) {
+        return;
+    }
+    if (!_streamConnected || !_reportedArrival) {
+        SteamRawHidProbeLog(@"triton haptic probe waiting streamConnected=%d reportedArrival=%d product=0x%04x",
+                            _streamConnected,
+                            _reportedArrival,
+                            _productId);
+        return;
+    }
+
+    CBCharacteristic *rumbleCharacteristic = [_outputReportCharacteristics objectForKey:@(0x80)];
+    CBCharacteristic *commandCharacteristic = [_outputReportCharacteristics objectForKey:@(0x82)];
+    CBCharacteristic *pulseCharacteristic = [_outputReportCharacteristics objectForKey:@(0x81)];
+    if (rumbleCharacteristic == nil || commandCharacteristic == nil || pulseCharacteristic == nil) {
+        SteamRawHidProbeLog(@"triton haptic probe waiting rumbleChar=%d commandChar=%d pulseChar=%d outputCount=%lu",
+                            rumbleCharacteristic != nil,
+                            commandCharacteristic != nil,
+                            pulseCharacteristic != nil,
+                            (unsigned long)_outputReportCharacteristics.count);
+        return;
+    }
+
+    _hapticProbeSent = YES;
+    SteamRawHidProbeLog(@"triton haptic probe scheduled after stream arrival product=0x%04x outputCount=%lu",
+                        _productId,
+                        (unsigned long)_outputReportCharacteristics.count);
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        SteamRawHidProbeLog(@"triton haptic probe start post-arrival product=0x%04x outputCount=%lu",
+                            _productId,
+                            (unsigned long)_outputReportCharacteristics.count);
+
+        uint8_t clickRight[] = { 0x01, 0x02, 0x0c };
+        [self writeTritonOutputReportId:0x82
+                                 payload:clickRight
+                           payloadLength:sizeof(clickRight)
+                          preferResponse:NO
+                                  reason:@"probe-command-click-right"];
+    });
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        uint8_t leftPulse[] = { 0x00, 0x10, 0x27, 0x10, 0x27, 0x20, 0x00, 0x0c, 0x00 };
+        [self writeTritonOutputReportId:0x81
+                                 payload:leftPulse
+                           payloadLength:sizeof(leftPulse)
+                          preferResponse:NO
+                                  reason:@"probe-pulse-left"];
+    });
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        uint8_t rightPulse[] = { 0x01, 0x10, 0x27, 0x10, 0x27, 0x20, 0x00, 0x0c, 0x00 };
+        [self writeTritonOutputReportId:0x81
+                                 payload:rightPulse
+                           payloadLength:sizeof(rightPulse)
+                          preferResponse:NO
+                                  reason:@"probe-pulse-right"];
+    });
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.9 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        uint8_t rumbleBoth[] = { 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x00 };
+        [self writeTritonOutputReportId:0x80
+                                 payload:rumbleBoth
+                           payloadLength:sizeof(rumbleBoth)
+                          preferResponse:NO
+                                  reason:@"probe-rumble-both-max-intensity"];
+    });
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        uint8_t rumbleStop[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+        [self writeTritonOutputReportId:0x80
+                                 payload:rumbleStop
+                           payloadLength:sizeof(rumbleStop)
+                          preferResponse:NO
+                                  reason:@"probe-rumble-stop"];
+    });
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        uint8_t stopLeft[] = { 0x00, 0x00, 0x00 };
+        uint8_t stopRight[] = { 0x01, 0x00, 0x00 };
+        [self writeTritonOutputReportId:0x82
+                                 payload:stopLeft
+                           payloadLength:sizeof(stopLeft)
+                          preferResponse:NO
+                                  reason:@"probe-stop-left"];
+        [self writeTritonOutputReportId:0x82
+                                 payload:stopRight
+                           payloadLength:sizeof(stopRight)
+                          preferResponse:NO
+                                  reason:@"probe-stop-right"];
+    });
+}
+
+-(void)controllerRawHidReport:(uint16_t)controllerNumber reportType:(uint8_t)reportType reportData:(const uint8_t*)reportData reportLength:(uint8_t)reportLength {
+    if (controllerNumber != _controllerNumber || reportData == NULL || reportLength == 0) {
+        return;
+    }
+
+    double hostRawAtMs = SteamRawHidProbeNowMs();
+    NSData *report = [NSData dataWithBytes:reportData length:reportLength];
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self controllerRawHidReportOnMain:controllerNumber reportType:reportType report:report hostRawAtMs:hostRawAtMs];
+        });
+        return;
+    }
+
+    [self controllerRawHidReportOnMain:controllerNumber reportType:reportType report:report hostRawAtMs:hostRawAtMs];
+}
+
+-(void)controllerRawHidReportOnMain:(uint16_t)controllerNumber reportType:(uint8_t)reportType report:(NSData*)report hostRawAtMs:(double)hostRawAtMs {
+    if (controllerNumber != _controllerNumber || report.length == 0) {
+        return;
+    }
+
+    const uint8_t *reportData = report.bytes;
+    uint8_t reportLength = (uint8_t)MIN(report.length, (NSUInteger)UINT8_MAX);
+    _hostRawReportSequence++;
+    uint64_t hostRawSeq = _hostRawReportSequence;
+
+    SteamRawHidProbeLog(@"host raw report seq=%llu monoMs=%.3f controller=%u type=0x%02x len=%u data=%@",
+                        hostRawSeq,
+                        hostRawAtMs,
+                        controllerNumber,
+                        reportType,
+                        reportLength,
+                        SteamRawHidProbeHex(reportData, reportLength));
+
+    if (reportType == LI_HID_REPORT_TYPE_FEATURE) {
+        [self writeReportCharacteristicPayload:reportData
+                                  reportLength:reportLength
+                                 stripReportId:YES
+                                   useApkSlice:NO
+                                        reason:@"feature-report-strip-only"];
+        return;
+    }
+
+    if (reportType != LI_HID_REPORT_TYPE_OUTPUT) {
+        return;
+    }
+
+    if (_productId == 0x1303 && reportLength > 1) {
+        NSNumber *reportId = @(reportData[0]);
+        CBCharacteristic *characteristic = [_outputReportCharacteristics objectForKey:reportId];
+        if (characteristic != nil) {
+            NSData *payload = [NSData dataWithBytes:reportData + 1 length:reportLength - 1];
+            if (payload.length != 0) {
+                SteamRawHidProbeLog(@"triton output write report=0x%02x reason=host-raw-direct-bt char=%@ len=%lu preferResponse=0 data=%@",
+                                    reportData[0],
+                                    characteristic.UUID.UUIDString,
+                                    (unsigned long)payload.length,
+                                    SteamRawHidProbeHex(payload.bytes, payload.length));
+                NSString *latencyTag = reportData[0] == 0x82 ? @"host-raw-0x82" : nil;
+                [self writeData:payload toCharacteristic:characteristic preferResponse:NO latencyTag:latencyTag hostRawAtMs:hostRawAtMs hostRawSeq:hostRawSeq];
+            }
+            return;
+        }
+
+        SteamRawHidProbeLog(@"triton output unknown report=0x%02x len=%u",
+                            reportData[0],
+                            reportLength);
+        return;
+    }
+
+    [self writeReportCharacteristicPayload:reportData
+                              reportLength:reportLength
+                             stripReportId:(_productId != 0x1106)
+                               useApkSlice:(_productId != 0x1106)
+                                    reason:@"output-report-fallback"];
+}
+
+-(void)trackAndConnectPeripheral:(CBPeripheral*)peripheral {
+    if (peripheral == nil || [_peripherals containsObject:peripheral]) {
+        return;
+    }
+
+    [_peripherals addObject:peripheral];
+    peripheral.delegate = self;
+    SteamRawHidProbeLog(@"connect request peripheral=%@ name=%@", peripheral.identifier.UUIDString, peripheral.name ?: @"");
+    [_centralManager connectPeripheral:peripheral options:nil];
+}
+
+-(void)centralManagerDidUpdateState:(CBCentralManager*)central {
+    SteamRawHidProbeLog(@"central state=%ld", (long)central.state);
+    if (central.state != CBManagerStatePoweredOn) {
+        return;
+    }
+
+    NSArray<CBPeripheral*> *connected = [central retrieveConnectedPeripheralsWithServices:@[[self steamControllerServiceUuid]]];
+    SteamRawHidProbeLog(@"retrieveConnected count=%lu", (unsigned long)connected.count);
+    for (CBPeripheral *peripheral in connected) {
+        [self trackAndConnectPeripheral:peripheral];
+    }
+
+    SteamRawHidProbeLog(@"scan start service=%@", kSteamControllerServiceUuid);
+    [central scanForPeripheralsWithServices:@[[self steamControllerServiceUuid]]
+                                    options:@{ CBCentralManagerScanOptionAllowDuplicatesKey: @NO }];
+}
+
+-(void)centralManager:(CBCentralManager*)central didDiscoverPeripheral:(CBPeripheral*)peripheral advertisementData:(NSDictionary<NSString*, id>*)advertisementData RSSI:(NSNumber*)RSSI {
+    SteamRawHidProbeLog(@"discover peripheral=%@ name=%@ rssi=%@", peripheral.identifier.UUIDString, peripheral.name ?: @"", RSSI);
+    [self trackAndConnectPeripheral:peripheral];
+}
+
+-(void)centralManager:(CBCentralManager*)central didConnectPeripheral:(CBPeripheral*)peripheral {
+    SteamRawHidProbeLog(@"connected peripheral=%@ name=%@", peripheral.identifier.UUIDString, peripheral.name ?: @"");
+    Log(LOG_I, @"Steam Controller BLE peripheral connected: %@", peripheral.identifier.UUIDString);
+
+    if (_activePeripheral == nil) {
+        _activePeripheral = peripheral;
+    }
+    [peripheral discoverServices:@[[self steamControllerServiceUuid]]];
+}
+
+-(void)centralManager:(CBCentralManager*)central didDisconnectPeripheral:(CBPeripheral*)peripheral error:(NSError*)error {
+    SteamRawHidProbeLog(@"disconnect peripheral=%@ error=%@", peripheral.identifier.UUIDString, error);
+    if (peripheral == _activePeripheral) {
+        [self reportRemovalIfNeeded];
+        _activePeripheral = nil;
+        _inputCharacteristic = nil;
+        _reportCharacteristic = nil;
+        [_outputReportCharacteristics removeAllObjects];
+        [self clearBleWriteQueue];
+        _productId = 0;
+        _hapticProbeSent = NO;
+    }
+
+    [_peripherals removeObject:peripheral];
+    if (central.state == CBManagerStatePoweredOn) {
+        [self trackAndConnectPeripheral:peripheral];
+    }
+}
+
+-(void)peripheral:(CBPeripheral*)peripheral didDiscoverServices:(NSError*)error {
+    SteamRawHidProbeLog(@"services discovered peripheral=%@ count=%lu error=%@",
+                        peripheral.identifier.UUIDString,
+                        (unsigned long)peripheral.services.count,
+                        error);
+    for (CBService *service in peripheral.services) {
+        SteamRawHidProbeLog(@"service uuid=%@", service.UUID.UUIDString);
+        if ([service.UUID isEqual:[self steamControllerServiceUuid]]) {
+            [peripheral discoverCharacteristics:nil forService:service];
+        }
+    }
+}
+
+-(NSNumber*)tritonOutputReportIdForCharacteristic:(CBCharacteristic*)characteristic {
+    NSString *uuid = characteristic.UUID.UUIDString.uppercaseString;
+    NSRange prefix = [uuid rangeOfString:@"100F6C"];
+    if (prefix.location == NSNotFound || uuid.length < prefix.location + 8) {
+        return nil;
+    }
+
+    NSString *suffixString = [uuid substringWithRange:NSMakeRange(prefix.location + 6, 2)];
+    unsigned int suffix = 0;
+    NSScanner *scanner = [NSScanner scannerWithString:suffixString];
+    if (![scanner scanHexInt:&suffix]) {
+        return nil;
+    }
+
+    int reportId = (int)suffix - 0x35;
+    if (reportId < 0x80 || reportId > 0xFF) {
+        return nil;
+    }
+
+    return @(reportId);
+}
+
+-(void)peripheral:(CBPeripheral*)peripheral didDiscoverCharacteristicsForService:(CBService*)service error:(NSError*)error {
+    SteamRawHidProbeLog(@"characteristics discovered service=%@ count=%lu error=%@",
+                        service.UUID.UUIDString,
+                        (unsigned long)service.characteristics.count,
+                        error);
+    for (CBCharacteristic *characteristic in service.characteristics) {
+        NSString *uuid = characteristic.UUID.UUIDString.uppercaseString;
+        SteamRawHidProbeLog(@"characteristic uuid=%@ properties=0x%lx",
+                            uuid,
+                            (unsigned long)characteristic.properties);
+
+        if ([uuid isEqualToString:kSteamControllerTritonInputUuid]) {
+            _productId = 0x1303;
+            _inputCharacteristic = characteristic;
+            [peripheral setNotifyValue:YES forCharacteristic:characteristic];
+            SteamRawHidProbeLog(@"triton input characteristic selected");
+        }
+        else if ([uuid isEqualToString:kSteamControllerD0GInputUuid]) {
+            _productId = 0x1106;
+            _inputCharacteristic = characteristic;
+            [peripheral setNotifyValue:YES forCharacteristic:characteristic];
+            SteamRawHidProbeLog(@"d0g input characteristic selected");
+        }
+        else if ([uuid isEqualToString:kSteamControllerReportUuid]) {
+            _reportCharacteristic = characteristic;
+            SteamRawHidProbeLog(@"report characteristic selected");
+        }
+        else {
+            NSNumber *reportId = [self tritonOutputReportIdForCharacteristic:characteristic];
+            if (reportId != nil) {
+                [_outputReportCharacteristics setObject:characteristic forKey:reportId];
+                SteamRawHidProbeLog(@"triton output characteristic reportId=0x%02x uuid=%@",
+                                    reportId.unsignedIntValue,
+                                    uuid);
+            }
+        }
+    }
+
+    SteamRawHidProbeLog(@"characteristic summary product=0x%04x hasInput=%d hasReport=%d outputCount=%lu",
+                        _productId,
+                        _inputCharacteristic != nil,
+                        _reportCharacteristic != nil,
+                        (unsigned long)_outputReportCharacteristics.count);
+    if (_productId != 0) {
+        [self reportArrivalIfNeeded];
+        [self runTritonHapticProbeIfReady];
+    }
+}
+
+-(void)peripheral:(CBPeripheral*)peripheral didUpdateValueForCharacteristic:(CBCharacteristic*)characteristic error:(NSError*)error {
+    if (error != nil || characteristic != _inputCharacteristic || characteristic.value.length == 0) {
+        if (error != nil) {
+            SteamRawHidProbeLog(@"input update error char=%@ error=%@", characteristic.UUID.UUIDString, error);
+        }
+        return;
+    }
+
+    [self sendInputReport:characteristic.value];
+}
+
+-(void)peripheral:(CBPeripheral*)peripheral didWriteValueForCharacteristic:(CBCharacteristic*)characteristic error:(NSError*)error {
+    _bleWriteCompleteCount++;
+    SteamRawHidProbeLog(@"ble write complete #%u char=%@ len=%lu error=%@ data=%@",
+                        _bleWriteCompleteCount,
+                        characteristic.UUID.UUIDString,
+                        (unsigned long)_inFlightBleWriteData.length,
+                        error,
+                        SteamRawHidProbeHex(_inFlightBleWriteData.bytes, _inFlightBleWriteData.length));
+
+    _bleWriteWithResponseInFlight = NO;
+    _inFlightBleWriteData = nil;
+    [self pumpBleWriteQueue];
+}
+
+-(void)peripheralIsReadyToSendWriteWithoutResponse:(CBPeripheral*)peripheral {
+    SteamRawHidProbeLog(@"ble no-response ready peripheral=%@ queue=%lu",
+                        peripheral.identifier.UUIDString,
+                        (unsigned long)_pendingBleWrites.count);
+    [self pumpBleWriteQueue];
+}
 
 @end
 
@@ -98,6 +917,7 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
     ControllerGyroSwitchMode _gyroSwitchMode;
 
     __weak MotionHandler* motionHandler;
+    SteamControllerRawHidBridge *_steamControllerRawHidBridge;
 }
 
 // UPDATE_BUTTON_FLAG(controller, flag, pressed)
@@ -105,6 +925,17 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
 ((y) ? [self setButtonFlag:controller flags:x] : [self clearButtonFlag:controller flags:x])
 
 #define MAX_MAGNITUDE(x, y) (abs(x) > abs(y) ? (x) : (y))
+
++ (BOOL)isSteamControllerRawHidSupportEnabled {
+    [[NSUserDefaults standardUserDefaults] registerDefaults:@{
+        kSteamControllerRawHidSupportDefaultsKey: @YES
+    }];
+    return [[NSUserDefaults standardUserDefaults] boolForKey:kSteamControllerRawHidSupportDefaultsKey];
+}
+
++ (void)setSteamControllerRawHidSupportEnabled:(BOOL)enabled {
+    [[NSUserDefaults standardUserDefaults] setBool:enabled forKey:kSteamControllerRawHidSupportDefaultsKey];
+}
 
 -(void) rumble:(unsigned short)controllerNumber lowFreqMotor:(unsigned short)lowFreqMotor highFreqMotor:(unsigned short)highFreqMotor
 {
@@ -462,6 +1293,10 @@ static const double MOUSE_SPEED_DIVISOR = 1.25;
         
         controller.gamepad.light.color = [[GCColor alloc] initWithRed:(r / 255.0f) green:(g / 255.0f) blue:(b / 255.0f)];
     }
+}
+
+-(void) controllerRawHidReport:(uint16_t)controllerNumber reportType:(uint8_t)reportType reportData:(const uint8_t*)reportData reportLength:(uint8_t)reportLength {
+    [_steamControllerRawHidBridge controllerRawHidReport:controllerNumber reportType:reportType reportData:reportData reportLength:reportLength];
 }
 
 -(void) updateLeftStick:(VoidController*)controller x:(short)x y:(short)y
@@ -1656,6 +2491,10 @@ double rc_expo(double x, double expo) {
 }
 
 +(bool) isSupportedGamepad:(GCController*) controller {
+    if ([ControllerSupport isSteamControllerRawHidSupportEnabled] &&
+        [SteamControllerRawHidBridge isSteamControllerGameController:controller]) {
+        return false;
+    }
     return controller.extendedGamepad != nil;
 }
 
@@ -1833,6 +2672,13 @@ double rc_expo(double x, double expo) {
     _voidControllers = [[NSMutableDictionary alloc] init];
     [ControllerUtil.activeGCControllers removeAllObjects];
     _controllerNumbers = 0;
+    if ([ControllerSupport isSteamControllerRawHidSupportEnabled]) {
+        _steamControllerRawHidBridge = [[SteamControllerRawHidBridge alloc] initWithControllerSupport:self];
+        [_steamControllerRawHidBridge start];
+    }
+    else {
+        Log(LOG_I, @"Steam Controller raw HID bridge disabled by settings");
+    }
     
     _captureMouse = (streamConfig.localMousePointerMode == 0);
     if (@available(iOS 14.0, tvOS 14.0, *)) {
@@ -2008,6 +2854,8 @@ double rc_expo(double x, double expo) {
 }
 
 -(void)connectionEstablished {
+    [_steamControllerRawHidBridge connectionEstablished];
+
     for (VoidController* voidController in _voidControllers.allValues) {
         if(voidController.playerIndex != 0) [self updateFinished:voidController];
     }
@@ -2085,6 +2933,9 @@ double rc_expo(double x, double expo) {
 
 -(void) cleanup
 {
+    [_steamControllerRawHidBridge stop];
+    _steamControllerRawHidBridge = nil;
+
     [[NSNotificationCenter defaultCenter] removeObserver:_controllerConnectObserver];
     [[NSNotificationCenter defaultCenter] removeObserver:_controllerDisconnectObserver];
     [[NSNotificationCenter defaultCenter] removeObserver:_mouseConnectObserver];
