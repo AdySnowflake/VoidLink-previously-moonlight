@@ -39,6 +39,11 @@
 #import <AVKit/UIWindow.h>
 #endif
 
+#ifndef STEAM_RAW_HID_PROBE_LOGGING
+#define STEAM_RAW_HID_PROBE_LOGGING 0
+#endif
+
+#if STEAM_RAW_HID_PROBE_LOGGING
 static NSString* SteamRawHidProbeHex(const uint8_t *data, NSUInteger length) {
     if (data == NULL || length == 0) {
         return @"";
@@ -58,7 +63,7 @@ static NSString* SteamRawHidProbeHex(const uint8_t *data, NSUInteger length) {
     return hex;
 }
 
-static void SteamRawHidProbeLog(NSString *fmt, ...) {
+static void SteamRawHidProbeLogImpl(NSString *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     NSString *message = [[NSString alloc] initWithFormat:fmt arguments:args];
@@ -88,6 +93,10 @@ static void SteamRawHidProbeLog(NSString *fmt, ...) {
         [handle closeFile];
     }
 }
+#define SteamRawHidProbeLog(...) SteamRawHidProbeLogImpl(__VA_ARGS__)
+#else
+#define SteamRawHidProbeLog(...) do {} while (0)
+#endif
 
 @interface AVDisplayCriteria()
 @property(readonly) int videoDynamicRange;
@@ -1761,7 +1770,7 @@ static void SteamRawHidProbeLog(NSString *fmt, ...) {
 }
 
 - (void) controllerRawHidReport:(uint16_t)controllerNumber reportType:(uint8_t)reportType reportData:(const uint8_t*)reportData reportLength:(uint8_t)reportLength {
-    Log(LOG_I, @"Raw HID report on gamepad %d: type=%02x length=%u", controllerNumber, reportType, reportLength);
+    Log(LOG_D, @"Raw HID report on gamepad %d: type=%02x length=%u", controllerNumber, reportType, reportLength);
     SteamRawHidProbeLog(@"stream host raw report controller=%u type=0x%02x len=%u data=%@",
                         controllerNumber,
                         reportType,

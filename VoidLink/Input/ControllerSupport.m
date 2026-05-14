@@ -31,6 +31,11 @@ static double SteamRawHidProbeNowMs(void) {
     return CACurrentMediaTime() * 1000.0;
 }
 
+#ifndef STEAM_RAW_HID_PROBE_LOGGING
+#define STEAM_RAW_HID_PROBE_LOGGING 0
+#endif
+
+#if STEAM_RAW_HID_PROBE_LOGGING
 static NSString* SteamRawHidProbeHex(const uint8_t *data, NSUInteger length) {
     if (data == NULL || length == 0) {
         return @"";
@@ -50,7 +55,7 @@ static NSString* SteamRawHidProbeHex(const uint8_t *data, NSUInteger length) {
     return hex;
 }
 
-static void SteamRawHidProbeLog(NSString *fmt, ...) {
+static void SteamRawHidProbeLogImpl(NSString *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     NSString *message = [[NSString alloc] initWithFormat:fmt arguments:args];
@@ -80,6 +85,10 @@ static void SteamRawHidProbeLog(NSString *fmt, ...) {
         [handle closeFile];
     }
 }
+#define SteamRawHidProbeLog(...) SteamRawHidProbeLogImpl(__VA_ARGS__)
+#else
+#define SteamRawHidProbeLog(...) do {} while (0)
+#endif
 
 @interface ControllerSupport()
 
@@ -236,7 +245,7 @@ static const BOOL kSteamRawHidUseSteamLinkApkWriteSlice = YES;
 
     _reportedArrival = YES;
     SteamRawHidProbeLog(@"arrival sent controller=%u product=0x%04x capabilities=0x%04x", _controllerNumber, _productId, LI_CCAP_RAW_HID_REPORTS);
-    Log(LOG_I, @"Steam Controller raw HID bridge reported arrival on controller %u", _controllerNumber);
+    Log(LOG_D, @"Steam Controller raw HID bridge reported arrival on controller %u", _controllerNumber);
     return YES;
 }
 
@@ -705,7 +714,7 @@ static const BOOL kSteamRawHidUseSteamLinkApkWriteSlice = YES;
 
 -(void)centralManager:(CBCentralManager*)central didConnectPeripheral:(CBPeripheral*)peripheral {
     SteamRawHidProbeLog(@"connected peripheral=%@ name=%@", peripheral.identifier.UUIDString, peripheral.name ?: @"");
-    Log(LOG_I, @"Steam Controller BLE peripheral connected: %@", peripheral.identifier.UUIDString);
+    Log(LOG_D, @"Steam Controller BLE peripheral connected: %@", peripheral.identifier.UUIDString);
 
     if (_activePeripheral == nil) {
         _activePeripheral = peripheral;
@@ -2677,7 +2686,7 @@ double rc_expo(double x, double expo) {
         [_steamControllerRawHidBridge start];
     }
     else {
-        Log(LOG_I, @"Steam Controller raw HID bridge disabled by settings");
+        Log(LOG_D, @"Steam Controller raw HID bridge disabled by settings");
     }
     
     _captureMouse = (streamConfig.localMousePointerMode == 0);
