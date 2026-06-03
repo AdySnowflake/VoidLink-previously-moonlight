@@ -8,6 +8,13 @@
 import UIKit
 
 @objc class AlertControllerUtil: NSObject {
+    private static func makeCountdownMessage(baseMessage: String?, remainingSeconds: Int) -> String {
+        let countdownText = "\(remainingSeconds)"
+        guard let baseMessage, !baseMessage.isEmpty else {
+            return countdownText
+        }
+        return "\(baseMessage)\n\n\(countdownText)"
+    }
 
     /// 类方法，直接在任何 UIViewController 上显示倒计时弹窗
     /// - Parameters:
@@ -24,7 +31,7 @@ import UIKit
     @objc public static var autoCompletion:Bool = false
 
     @objc class func showAlert(
-        in viewController: UIViewController,
+        in viewController: UIViewController? = nil,
         title: String?,
         message: String?,
         withCancel: Bool,
@@ -34,16 +41,26 @@ import UIKit
         completion: (() -> Void)? = nil
     ) {
         var remainingSeconds = countdown
+        let originalMessage = message
+        var isAlertDismissed = false
+        
+        guard let viewController = viewController else {return}
 
-        alertController = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alertController = UIAlertController(
+            title: title,
+            message: (countdown > 0 && !autoCompletion) ? makeCountdownMessage(baseMessage: originalMessage, remainingSeconds: remainingSeconds) : message,
+            preferredStyle: .alert
+        )
 
-        let confirmAction = UIAlertAction(title: "\(remainingSeconds)", style: .default) { _ in
+        let confirmAction = UIAlertAction(title: buttonTitle, style: .default) { _ in
+            isAlertDismissed = true
             actionCancelled = false
             completion?()
             cancelButtonString = "Cancel"
         }
         
-        let cancelAction = UIAlertAction(title: SwiftLocalizationHelper.localizedString(forKey: cancelButtonString), style: .cancel) { _ in
+        let cancelAction = UIAlertAction(title: LocalizationHelper.localizedString(forKey: cancelButtonString), style: .cancel) { _ in
+            isAlertDismissed = true
             actionCancelled = true
             completion?()
             cancelButtonString = "Cancel"
@@ -55,7 +72,6 @@ import UIKit
         if buttonTitle != "" && !autoCompletion {alertController.addAction(confirmAction)}
         
         if(countdown == 0) {
-            confirmAction.setValue(buttonTitle, forKey: "title")
             confirmAction.isEnabled = buttonTitle != ""
         }
 
@@ -65,22 +81,46 @@ import UIKit
 
         // 倒计时
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
-        timer.schedule(deadline: .now(), repeating: 1.0, leeway: .milliseconds(50))
+        timer.schedule(deadline: .now() + (autoCompletion ? 0.5 : 1.0), repeating: autoCompletion ? 0.1: 1.0, leeway: .milliseconds(50))
         timer.setEventHandler {
+            guard !isAlertDismissed else {
+                timer.cancel()
+                return
+            }
+
             remainingSeconds -= 1
 
             if remainingSeconds <= 0 {
+                isAlertDismissed = true
                 timer.cancel()
-                confirmAction.isEnabled = true
-                confirmAction.setValue(buttonTitle, forKey: "title")
                 if autoCompletion {
+                    alertController.message = originalMessage
                     autoCompletion = false
                     completion?()
                     alertController.dismiss(animated: false)
                     return
                 }
+
+                if GenericUtils.isRunningOnMacAsiPadApp && buttonTitle != "" {
+                    alertController.dismiss(animated: false) {
+                        showAlert(
+                            in: viewController,
+                            title: title,
+                            message: originalMessage,
+                            withCancel: withCancel,
+                            buttonTitle: buttonTitle,
+                            countdown: 0,
+                            action: nil,
+                            completion: completion
+                        )
+                    }
+                    return
+                }
+
+                confirmAction.isEnabled = true
+                alertController.message = originalMessage
             } else {
-                confirmAction.setValue("\(remainingSeconds)", forKey: "title")
+                if !autoCompletion {alertController.message = makeCountdownMessage(baseMessage: originalMessage, remainingSeconds: remainingSeconds)}
             }
         }
         timer.resume()

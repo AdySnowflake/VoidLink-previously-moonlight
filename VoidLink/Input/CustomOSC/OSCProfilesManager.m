@@ -12,7 +12,6 @@
 #import "OSCProfilesManager.h"
 #import "OnScreenButtonState.h"
 #import "VoidLink-Swift.h"
-#import "LayoutOnScreenControlsViewController.h"
 #import "OnScreenControls.h"
 
 @implementation OSCProfilesManager
@@ -206,7 +205,15 @@ static CGRect layoutViewBounds;
             NSSet *classes = [NSSet setWithObjects: [NSMutableData class], [NSMutableArray class], nil];
             profilesEncoded = [NSKeyedUnarchiver unarchivedObjectOfClasses:classes fromData:fileData error:&error];
             [self importEncodedProfiles:profilesEncoded];
-            [self setProfileToSelected:0];
+            
+            NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];
+            /*
+            bool isRegularTF = !([bundleId isEqualToString:@"com.voidlink.iOS"]
+                                      || [bundleId isEqualToString:@"com.voidlinkextreme.iOS"]
+                                      || [bundleId isEqualToString:@"com.voidlink.tf.debug10.iOS"]);
+
+            [self setProfileToSelected: GenericUtils.isIPhone ? 1 : (isRegularTF ? 1: 2)]; */
+            [self setProfileToSelected: 0];
         }
     }
 }
@@ -275,12 +282,16 @@ static CGRect layoutViewBounds;
 }
 
 - (OSCProfile *) getSelectedProfile {
-    NSLog(@"getAllProfiles test %f", CACurrentMediaTime());
+    // NSLog(@"getAllProfiles test %f", CACurrentMediaTime());
     NSMutableArray *profiles = [self getAllProfiles];
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     
     // NSString* persistedKey = @"widgetProfileUpdated-20251015";
-    NSString* persistedKey = @"widgetProfileUpdated-20260322";
+    // NSString* persistedKey = @"widgetProfileUpdated-20260322";
+    // NSString* persistedKey = @"widgetProfileUpdated-20260413-2";
+    // NSString* persistedKey = @"widgetProfileUpdated-20260430-1";
+    // NSString* persistedKey = @"widgetProfileUpdated-20260513-1";
+    NSString* persistedKey = @"widgetProfileUpdated-20260530";
     BOOL needImportDefaultTemplates = [defaults objectForKey:persistedKey] == nil;
     
     if(profiles.count == 0 || needImportDefaultTemplates){
@@ -441,29 +452,31 @@ static CGRect layoutViewBounds;
     
     // save on-screen widget views (keyboard & mouse command) as buttonstate:
     _widgetSizeTransition = keepWidgetSize;
-    for(OnScreenWidgetView* widgetView in OnScreenWidgetViews){
+    for(OnScreenWidgetView* widgetView in OnScreenWidgetView.mapping.allValues){
         CGPoint normalizedPosition = [self normalizeWidgetPosition:widgetView.storedCenter];
         OnScreenButtonState *buttonState = [[OnScreenButtonState alloc] initWithButtonName:widgetView.cmdString buttonType:CustomOnScreenWidget andPosition:normalizedPosition];
         buttonState.alias = widgetView.widgetLabel;
         buttonState.sequence = widgetView.sequence;
         buttonState.sequenceSet = widgetView.sequenceSet;
         buttonState.parentSequence = widgetView.parentSequence;
+        buttonState.autoDockTimer = widgetView.autoDockIdleDuration;
+        buttonState.dockedAlpha = widgetView.autoDockSettledAlpha;
         buttonState.folded = widgetView.folded;
         buttonState.revealMode = widgetView.revealMode;
         buttonState.bulkMoveEnabled = widgetView.bulkMoveEnabled;
         buttonState.widthFactor = [self normalizeSizeWidthFactorWith:widgetView];
         buttonState.heightFactor = [self normalizeSizeHeightFactorWith:widgetView];
-        buttonState.componentSizeFactor = [self normalizeComponentSizeFactorWith:widgetView];
-        buttonState.backgroundAlpha = widgetView.backgroundAlpha;
-        buttonState.labelAlpha = widgetView.labelAlpha;
+        buttonState.backgroundAlpha = widgetView.originalBackgroundAlpha;
+        buttonState.labelAlpha = widgetView.originalLabelAlpha;
         buttonState.borderAlpha = widgetView.borderAlpha;
         buttonState.highlightAlpha = widgetView.highlightAlpha;
         buttonState.borderWidth = widgetView.borderWidth;
         buttonState.highlightSizeFactor = widgetView.highlightSizeFactor;
         buttonState.autoTapInterval = widgetView.autoTapInterval;
+        buttonState.autoTapRepeats = widgetView.autoTapRepeats;
         buttonState.vibrationStyle = widgetView.vibrationStyle;
         buttonState.mouseButtonAction = widgetView.mouseButtonAction;
-        buttonState.sensitivityFactorX = widgetView.sensitivityFactorX;
+        buttonState.animatesTransition = widgetView.animatesTransition;
         buttonState.sensitivityFactorY = widgetView.sensitivityFactorY;
         buttonState.slideThreshold = widgetView.slideThreshold;
         buttonState.yawFactor = widgetView.yawFactor;
@@ -471,12 +484,20 @@ static CGRect layoutViewBounds;
         buttonState.rollFactor = widgetView.rollFactor;
         buttonState.decelerationRateX = widgetView.decelerationRateX;
         buttonState.decelerationRateY = widgetView.decelerationRateY;
-        buttonState.stickIndicatorOffset = widgetView.stickIndicatorOffset;
         buttonState.widgetShape = widgetView.shape;
         buttonState.walkModeThreshold = widgetView.dWheelWalkModeThreshold;
         buttonState.minStickOffset = widgetView.minStickOffset;
         buttonState.buttonMode = widgetView.buttonMode;
-        
+        buttonState.sprintKeyActionType = widgetView.sprintKeyActionType;
+        buttonState.sprintKeyThreshold = widgetView.sprintKeyThreshold;
+        buttonState.walkKeyActionType = widgetView.walkKeyActionType;
+        buttonState.walkKeyThreshold = widgetView.walkKeyThreshold;
+        ///
+        buttonState.sensitivityFactorX = widgetView.sensitivityFactorX;
+        buttonState.componentSizeFactor = [self normalizeComponentSizeFactorWith:widgetView];
+        buttonState.touchPointAnchored = widgetView.touchPointAnchored;
+        buttonState.stickIndicatorOffset = widgetView.stickIndicatorOffset;
+
         NSData *buttonStateEncoded = [NSKeyedArchiver archivedDataWithRootObject:buttonState requiringSecureCoding:YES error:nil];
         [buttonStatesEncoded addObject: buttonStateEncoded];
     }
@@ -502,7 +523,8 @@ static CGRect layoutViewBounds;
 }
 
 - (CGFloat)normalizeComponentSizeFactorWith:(OnScreenWidgetView* )widget{
-    if(widget.isStickWheel) {
+    if(widget.isStickWheel
+       || widget.isDisplacementBasedStickPad) {
         return widget.denormalizedComponentSizeFactor*widget.baselineDiameter/[self getReferenceLen] * 10000;
     }
     return 1;
