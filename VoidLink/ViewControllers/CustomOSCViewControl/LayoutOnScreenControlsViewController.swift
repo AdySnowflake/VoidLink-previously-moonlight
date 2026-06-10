@@ -307,6 +307,9 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
         widgetPanelStoredCenter = widgetPanelStack.center
         setupWidgetPanel()
         profileRefresh()
+        if !toolbarStackView.isHidden {
+            GenericUtils.handleLayoutToolTip(in: self)
+        }
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -392,7 +395,7 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
             if folder != nil {
                 if buttonState.alias == "=widgets"
                     || buttonState.alias == "=pickProfile"
-                    || buttonState.alias == "widgetTool" {
+                    || buttonState.alias == "=widgetTool" {
                     continue
                 }
             }
@@ -474,12 +477,16 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
         
         if let folder = folder {
             for widget in newWidgetBatch where
-            widget.isFolder
-            && widget.parentSequence != -1
+            widget.parentSequence != -1
             && widget != folder
             {
-                widget.sequenceSet = Set(widget.sequenceSet.map {importedWidgetSequenceMap[$0] ?? -1})
-                if !independentWidgetSequencesPriorToImport.contains(widget.sequence) {widget.parentSequence = importedWidgetSequenceMap[widget.parentSequence] ?? -1}
+                if widget.isFolder {widget.sequenceSet = Set(widget.sequenceSet.map {importedWidgetSequenceMap[$0] ?? -1})}
+                if !independentWidgetSequencesPriorToImport.contains(widget.sequence) {
+                    widget.parentSequence = importedWidgetSequenceMap[widget.parentSequence] ?? folder.sequence
+                    if widget.parentSequence == folder.sequence {
+                        folder.sequenceSet.insert(widget.sequence)
+                    }
+                }
                 // print("label: \(widget.widgetLabel) sequence: \(widget.sequence) set: \(widget.sequenceSet) parent: \(String(describing: OnScreenWidgetView.mapping[widget.parentSequence]?.widgetLabel))")
             }
         }
@@ -487,9 +494,9 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
         for case let widget as OnScreenWidgetView in self.onScreenWidgetViews {
             widget.accessWidgetAttributes()
         }
-
-        OnScreenWidgetView.unfoldedExclusiveFolderSequence = oscProfile.unfoldedExclusiveFolderSequence
-        OnScreenWidgetView.setPostExclusiveUnfoldeds(oscProfile.postExclusiveUnfoldedSequences as NSSet)
+        
+        OnScreenWidgetView.unfoldedExclusiveFolderSequence = folder == nil ? -1 : oscProfile.unfoldedExclusiveFolderSequence
+        if folder == nil {OnScreenWidgetView.setPostExclusiveUnfoldeds(oscProfile.postExclusiveUnfoldedSequences as NSSet)}
         OnScreenWidgetView.restoreFoldedStates()
         
         if hasLegacyWidget {
@@ -503,12 +510,15 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
         
         OnScreenWidgetView.deepestButton = nil;
         _ = OnScreenWidgetView.getDeepestButton()
+        var motionControlButtons = Set<OnScreenWidgetView>()
         if let deepestButton = OnScreenWidgetView.deepestButton {
             for widget in OnScreenWidgetView.mapping.values {
                 if widget.widgetType == .touchPad {
-                    widget.superview?.insertSubview(widget, belowSubview: deepestButton)
+                    self.view.insertSubview(widget, belowSubview: deepestButton)
                 }
+                if widget.isMotionControlButton {motionControlButtons.insert(widget)}
             }
+            for button in motionControlButtons {self.view.insertSubview(button, belowSubview: deepestButton)}
         }
         
         view.bringSubviewToFront(toolbarRootView)
@@ -580,15 +590,9 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
     }
 
     @IBAction func clearFolderButtonTapped(_ sender: Any?) {
-        for widget in OnScreenWidgetView.mapping.values {
-            if widget.parentSequence == selectedWidget?.sequence, widget.sequenceSet.isEmpty {
-                selectedWidget?.sequenceSet.remove(widget.sequence)
-                OnScreenWidgetView.mapping.removeValue(forKey: widget.sequence)
-                widget.removeFromSuperview()
-            }
+        if let selectedWidget = selectedWidget {
+            OnScreenWidgetView.clearSubWidgets(for: selectedWidget, recursive: true)
         }
-                
-        selectedWidget?.sequenceSet = Set()
     }
     
     private func setBulkEditStackHidden(_ hidden:Bool) {
@@ -832,7 +836,7 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
         let key = decelerationRateSliderMode == .decelerationRateX ? "DecelerationRateX: %.3f  " : "DecelerationRateY: %.3f  "
         decelerationRateLabel.text = LocalizationHelper.localizedString(forKey: key, decelerationRateSlider.value)
     }
-
+    
     private func refreshPanelForSelectedWidget(_ widgetView: OnScreenWidgetView) {
         // hideStickIndicators()
         if OnScreenWidgetView.gamepadArrivalReported {clearSickInput()}
@@ -848,12 +852,12 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
 
         autoFitLabel(currentProfileLabel)
         currentProfileLabel.textAlignment = .left
-        currentProfileLabel.text = LocalizationHelper.localizedString(forKey: "  Profile: %@    Alias: %@    Cmd: %@    Parent: %@", profilesManager.getSelectedProfile().name, widgetView.widgetLabel, widgetView.cmdString,           LocalizationHelper.localizedString(forKey:OnScreenWidgetView.mapping[widgetView.parentSequence]?.widgetLabel ?? "null"))
+        currentProfileLabel.text = LocalizationHelper.localizedString(forKey: "  Profile: %@    Alias: %@    Cmd: %@    Parent: %@", profilesManager.getSelectedProfile().name.localizedProfileName, widgetView.widgetLabel, widgetView.cmdString,  (OnScreenWidgetView.mapping[widgetView.parentSequence]?.widgetLabel ?? "null").localized)
         if selectedWidget?.hasWalkSprintKeys == true {
             let cmdCounts = widgetView.comboButtonStrings.count
             currentProfileLabel.text = LocalizationHelper.localizedString(forKey: "  Cmd: %@    Sprint: %@    Walk: %@    Parent: %@",
                 widgetView.cmdString, cmdCounts>0 ? widgetView.comboButtonStrings[0] : LocalizationHelper.localizedString(forKey: "null"),
-                cmdCounts>1 ? widgetView.comboButtonStrings[1] : LocalizationHelper.localizedString(forKey: "null"),  LocalizationHelper.localizedString(forKey:OnScreenWidgetView.mapping[widgetView.parentSequence]?.widgetLabel ?? "null"))
+                                                                          cmdCounts>1 ? widgetView.comboButtonStrings[1] : LocalizationHelper.localizedString(forKey: "null"), (OnScreenWidgetView.mapping[widgetView.parentSequence]?.widgetLabel ?? "null").localized)
         }
         
         undoButton.alpha = widgetView.layoutChanges.count > 1 ? 1.0 : 0.3
@@ -1083,8 +1087,12 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
         }
         refreshPanelForSelectedWidget(widgetView)
         
-        if (widgetView.isFolder && GenericUtils.isFirstTappingFolderInLayoutTool()) {
+        if widgetView.isFolder && GenericUtils.isFirstTappingFolderInLayoutTool() {
             self.popFolderTutorialTip()
+        }
+        if widgetView.widgetLabel == "=virtualGamepad"
+            || widgetView.widgetLabel == "=kbm" {
+            GenericUtils.handleGamingLayoutFolderTip(in: self)
         }
     }
 
@@ -1109,7 +1117,7 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
 
         autoFitLabel(currentProfileLabel)
         currentProfileLabel.textAlignment = .left
-        currentProfileLabel.text = LocalizationHelper.localizedString(forKey: "  Profile: %@    Widget: %@", profilesManager.getSelectedProfile().name, selectedControllerLayer?.name ?? "")
+        currentProfileLabel.text = LocalizationHelper.localizedString(forKey: "  Profile: %@    Widget: %@", profilesManager.getSelectedProfile().name.localizedProfileName, selectedControllerLayer?.name ?? "")
 
         let sizeFactor = OnScreenControls.getControllerLayerSizeFactor(controllerLayer)
         widgetSizeSlider.value = Float(sizeFactor)
@@ -1274,6 +1282,7 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
         guard newWidget.widgetType == widget.widgetType else { return }
         view.insertSubview(newWidget, belowSubview: widgetPanelStack)
         newWidget.accessWidgetAttributes()
+        newWidget.folded = newWidget.isFolder && widget.folded
         newWidget.buttonMode = (newWidget.widgetType == .button && newWidget.touchPadString != "") ? .regular : widget.buttonMode
         newWidget.sensitivityFactorX = widget.sensitivityFactorX
         newWidget.componentSizeFactor = widget.componentSizeFactor
@@ -1292,8 +1301,11 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
         OnScreenWidgetView.set(widget: newWidget, for: newWidget.sequence)
         newWidget.sizeReference = widget.sizeReference
         newWidget.resizeWidgetView()
-        newWidget.adjustTransparency(alpha: widget.backgroundAlpha, tweakBorderAlpha: false)
-        newWidget.tweakLabelAlpha(alpha: widget.labelAlpha)
+        
+        newWidget.adjustTransparency(alpha: widget.originalBackgroundAlpha, tweakBorderAlpha: false)
+        newWidget.tweakLabelAlpha(alpha: widget.originalLabelAlpha)
+        if newWidget.isFolder {newWidget.reverseColorPhase(reversed: !newWidget.folded)}
+
         newWidget.tweakBorderAlpha(alpha: widget.borderAlpha)
         newWidget.tweakHighlightAlpha(alpha: widget.highlightAlpha)
         newWidget.adjustBorder(width: widget.borderWidth)
@@ -1622,7 +1634,9 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
             if oscProfilesTableViewController?.loadingMode != .pickProfileData {
                 setupWidgetPanel()
             }
-            else {widgetPanelStack.isHidden = false}
+            else {
+                widgetPanelStack.isHidden = false
+            }
         case .selectProfileFromMainFrame, .selectProfileFromStreamView:
             clearOnScreenWidgets()
             dismiss(animated: false)
@@ -1740,7 +1754,7 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
         widgetPanelStack.clipsToBounds = true
         widgetPanelStack.backgroundColor = UIColor.black.withAlphaComponent(0.5)
 
-        currentProfileLabel.text = LocalizationHelper.localizedString(forKey: "Profile: %@", profilesManager.getSelectedProfile().name)
+        currentProfileLabel.text = LocalizationHelper.localizedString(forKey: "Profile: %@", profilesManager.getSelectedProfile().name.localizedProfileName)
         currentProfileLabel.layer.cornerRadius = isIPhone() ? 9 : 12
         currentProfileLabel.clipsToBounds = true
         currentProfileLabel.textAlignment = .center
@@ -2547,7 +2561,7 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
         widgetPanelStack.isUserInteractionEnabled = true
         if let selectedWidget {
             view.insertSubview(selectedWidget, belowSubview: widgetPanelStack)
-            if selectedWidget.widgetType == .touchPad {
+            if selectedWidget.widgetType == .touchPad || selectedWidget.isMotionControlButton {
                 view.sendSubviewToBack(selectedWidget)
             }
         }

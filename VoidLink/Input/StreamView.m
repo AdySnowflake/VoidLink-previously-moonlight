@@ -17,7 +17,6 @@
 #import "ControllerSupport.h"
 #import "KeyboardSupport.h"
 #import "VoidLink-Swift.h"
-#import "OSCProfilesManager.h"
 #import "NativeTouchPointer.h"
 #import "NativeTouchHandler.h"
 #import "PureNativeTouchHandler.h"
@@ -316,6 +315,7 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
         [self liftMetalVideoViewIfNeeded:HeightViewLiftedTo];
         
         [self refreshKeyboardToggleRecognizer:settings.keyboardToggleFingers.intValue];
+        if(keyboardToggleTip.superview && !keyboardToggleTip.hidden) [OnScreenWidgetView restoreFromTemporaryHideAll];
         [keyboardToggleTip removeFromSuperview];
     }
     NSLog(@"keyboard will show %f", CACurrentMediaTime());
@@ -325,6 +325,7 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     dispatch_time_t delayTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.05 * NSEC_PER_SEC));
     dispatch_after(delayTime, dispatch_get_main_queue(), ^{// Code to execute after the delay
         if(!self->dockedKeyboardActionDetected){
+            if(self->keyboardToggleTip.superview && !self->keyboardToggleTip.hidden) [OnScreenWidgetView restoreFromTemporaryHideAll];
             [self->keyboardToggleTip removeFromSuperview];
             if(!self->isInputingText) [self keyboardWillHide];
             [self refreshKeyboardToggleRecognizer:self->settings.keyboardToggleFingers.intValue];
@@ -430,7 +431,12 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     NSLog(@"change num of fingers required");
     [self refreshKeyboardToggleRecognizer:1];
     keyboardToggleTip.translatesAutoresizingMaskIntoConstraints = NO;
-    NSLog(@"tip obj: %@", keyboardToggleTip);
+    
+    dispatch_time_t delayTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC));
+    dispatch_after(delayTime, dispatch_get_main_queue(), ^{// Code to execute after the delay
+        [OnScreenWidgetView temporaryHideAll];
+    });
+
     [self addSubview:keyboardToggleTip];
     [NSLayoutConstraint activateConstraints:@[
         [keyboardToggleTip.centerXAnchor constraintEqualToAnchor:self.centerXAnchor constant:0],
@@ -448,7 +454,9 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     if (isInputingText) {
         Log(LOG_D, @"Closing the keyboard");
         [keyInputField resignFirstResponder];
+        if(self->keyboardToggleTip.superview && !self->keyboardToggleTip.hidden) [OnScreenWidgetView restoreFromTemporaryHideAll];
         [keyboardToggleTip removeFromSuperview];
+        [OnScreenWidgetView restoreFromTemporaryHideAll];
     } else {
         Log(LOG_D, @"Opening the keyboard");
         [self addSubview:keyInputField];
@@ -784,7 +792,10 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
                     
                     if(widgetView.isFolder && widgetView.parentSequence<0 && widgetView.autoDockIdleDuration>0) {
                         [widgetView setAutoDockWithEnabled:true];
-                        if(ControllerUtil.activeGCControllers.count > 0) [widgetView restartAutoDockCountdown];
+                        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
+                                       dispatch_get_main_queue(), ^{
+                            if(!AlertControllerUtil.isCountingDown) [widgetView restartAutoDockCountdown];
+                        });
                     }
                         
                     if(sequenceGenerated){
@@ -804,6 +815,7 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
             
             OnScreenWidgetView.deepestButton = nil;
             UIView* deepestButton = [OnScreenWidgetView getDeepestButton];
+            NSMutableSet* motionControlButtons = [NSMutableSet new];
             if(deepestButton){
                 for (UIView *subview in self->_streamFrameTopLayerView.subviews) {
                     if ([subview isKindOfClass:[OnScreenWidgetView class]]) {
@@ -811,7 +823,11 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
                         if(widget.widgetType == WidgetTypeEnumTouchPad){
                             [self->_streamFrameTopLayerView insertSubview:subview belowSubview:deepestButton];
                         }
+                        if(widget.isMotionControlButton) [motionControlButtons addObject:widget];
                     }
+                }
+                for(OnScreenWidgetView* button in motionControlButtons) {
+                    [self->_streamFrameTopLayerView insertSubview:button belowSubview:deepestButton];
                 }
             }
         }

@@ -24,8 +24,6 @@
 #import "CustomTapGestureRecognizer.h"
 #import "LocalizationHelper.h"
 #import "VoidLink-Swift.h"
-#import "OSCProfilesManager.h"
-#import "VoidLink-Swift.h"
 #import "NativeTouchPointer.h"
 
 #include <sys/socket.h>
@@ -1059,6 +1057,30 @@ static NSString* VLTerminationHintForErrorCode(int errorCode) {
 }
 
 - (void)enterPip{
+    if (@available(iOS 15.0, tvOS 15.0, *)) {
+        if(!_settings.enablePIP){
+            AlertControllerUtil.autoCompletion = true;
+            [AlertControllerUtil showAlertIn:self
+                                       title:@""
+                                     message:[LocalizationHelper localizedStringForKey:@"pipDisabled"]
+                                  withCancel:NO
+                                 buttonTitle:@""
+                                   countdown:1
+                                      action:^{}
+                                  completion:^{}];
+        }
+    }
+    else {
+        AlertControllerUtil.autoCompletion = true;
+        [AlertControllerUtil showAlertIn:self
+                                   title:@""
+                                 message:[LocalizationHelper localizedStringForKey:@"pipNotSupported"]
+                              withCancel:NO
+                             buttonTitle:@""
+                               countdown:1
+                                  action:^{}
+                              completion:^{}];
+    }
     [self.pipController startPictureInPicture];
 }
 
@@ -1434,7 +1456,7 @@ static NSString* VLTerminationHintForErrorCode(int errorCode) {
 - (void)applicationWillResignActive:(NSNotification *)notification {
     //[self.pipController startPictureInPicture];
     //sleep(1);
-    appDidEnterBackgroundWithoutPip = true;
+    if(_settings.framePacingMode.intValue == FramePacingModeQueue) appDidEnterBackgroundWithoutPip = true;
     
     NSLog(@"applicationWillResignActive %f", CACurrentMediaTime());
     [_streamView saveStreamingGameProfileChanges];
