@@ -724,6 +724,8 @@ static NSString* VLTerminationHintForErrorCode(int errorCode) {
     
     [self restorePersistedStreamViewOffsetAndScaleWithProfile:_oscProfile];
     
+    GenericUtils.pencilInStreaming = false;
+    
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(updateContentOffsetAndScale:)
                                                  name:@"GameProfileSelectedNotification"
@@ -1101,7 +1103,7 @@ static NSString* VLTerminationHintForErrorCode(int errorCode) {
 }
 
 - (void)setMagnifierViewportInteractionEnabled:(BOOL)enabled {
-    _magnifierViewportInteractionActive = enabled || (_oscProfile.touchMode == AbsoluteTouch && !_settings.passthroughGestures);
+    _magnifierViewportInteractionActive = enabled || (_oscProfile.touchMode == AbsoluteTouch && !_settings.passthroughGestures && !GenericUtils.pencilInStreaming);
     [self updateScrollViewInteractionState];
 }
 
@@ -1474,6 +1476,23 @@ static NSString* VLTerminationHintForErrorCode(int errorCode) {
 }
 
 - (void)applicationDidBecomeActive:(NSNotification *)notification {
+    if(!GenericUtils.isIPhone){
+        for(OnScreenWidgetView* widget in OnScreenWidgetView.mapping.allValues){
+            if(widget.parentSequence != -1 && !widget.autoDockEnabled) continue;
+            if(widget.autoDockEnabled){
+                widget.autoDockIdleDuration = fmax(widget.autoDockIdleDuration, 3.0);
+                [widget autoDockStopCountdown];
+            }
+            dispatch_time_t delayTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC));
+            dispatch_after(delayTime, dispatch_get_main_queue(), ^{
+                if(widget.autoDockEnabled){
+                    OnScreenWidgetView.autoDockRestoreInitByViewResize = true;
+                    [widget restoreFromAutoDockWithAnimated:true];
+                }
+            });
+        }
+    }
+    
     appDidEnterBackgroundWithoutPip = false;
     [_streamMan setNeedRequeuing:true];
     // dispatch_time_t delay = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(15 * NSEC_PER_SEC));
@@ -1998,17 +2017,18 @@ static NSString* VLTerminationHintForErrorCode(int errorCode) {
     [self reConfigStreamViewRealtime];
 }
 
+/*
 - (NSMutableDictionary *)startGyroUpdate:(OnScreenWidgetView *)sender yawFactor:(CGFloat)yawFactor pitchFactor:(CGFloat)pitchFactor rollFactor:(CGFloat)rollFactor{
     NSMutableDictionary* gyroControlPreviousStatus = [NSMutableDictionary dictionary];
 
-    if(!_motionHandler.gyroControlStarted) [gyroControlPreviousStatus setObject:sender forKey:@"gyroControlStarter"];
+    if(!_motionHandler.motionControlStarted) [gyroControlPreviousStatus setObject:sender forKey:@"gyroControlStarter"];
     [gyroControlPreviousStatus setObject:@(_motionHandler.widgetYawFactor) forKey:@"previousYawFactor"];
     [gyroControlPreviousStatus setObject:@(_motionHandler.widgetPitchFactor) forKey:@"previousPitchFactor"];
     [gyroControlPreviousStatus setObject:@(_motionHandler.widgetRollFactor) forKey:@"previousRollFactor"];
     _motionHandler.widgetYawFactor = yawFactor;
     _motionHandler.widgetPitchFactor = pitchFactor;
     _motionHandler.widgetRollFactor = rollFactor;
-    [_motionHandler startGyroUpdate];
+    [_motionHandler startMotionUpdate];
 
     return gyroControlPreviousStatus;
 }
@@ -2016,8 +2036,8 @@ static NSString* VLTerminationHintForErrorCode(int errorCode) {
 
 - (NSMutableDictionary*)start:(CGFloat)yawFactor pitchFactor:(CGFloat)pitchFactor rollFactor:(CGFloat)rollFactor{
     NSMutableDictionary* gyroControlPreviousStatus = [NSMutableDictionary dictionary];
-    if(!_motionHandler.gyroControlStarted){
-        [gyroControlPreviousStatus setObject:@(_motionHandler.gyroControlStarted) forKey:@"gyroStarted"];
+    if(!_motionHandler.motionControlStarted){
+        [gyroControlPreviousStatus setObject:@(_motionHandler.motionControlStarted) forKey:@"gyroStarted"];
     }
     [gyroControlPreviousStatus setObject:@(_motionHandler.widgetYawFactor) forKey:@"previousYawFactor"];
     [gyroControlPreviousStatus setObject:@(_motionHandler.widgetPitchFactor) forKey:@"previousPitchFactor"];
@@ -2026,17 +2046,18 @@ static NSString* VLTerminationHintForErrorCode(int errorCode) {
     _motionHandler.widgetYawFactor = yawFactor;
     _motionHandler.widgetPitchFactor = pitchFactor;
     _motionHandler.widgetRollFactor = rollFactor;
-    [_motionHandler startGyroUpdate];
+    [_motionHandler startMotionUpdate];
     
     return gyroControlPreviousStatus;
 }
+*/
 
 - (void)startAccelUpdate{
     [_motionHandler startAccelUpdate];
 }
 
 - (void)stopGyroUpdateWithInterruptNoneGyroInput:(BOOL)interruption{
-    [_motionHandler stopGyroUpdateWithInterruptNoneGyroInput:interruption resetLeftStick:false];
+    [_motionHandler stopMotionUpdateWithInterruptNoneGyroInput:interruption];
 }
 
 - (void)stopAccelUpdate{
