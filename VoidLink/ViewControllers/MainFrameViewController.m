@@ -882,6 +882,7 @@ static NSMutableSet* hostList;
     _streamConfig.asyncNativeTouchPriority = streamSettings.asyncNativeTouchPriority; // new streamConfig segment
     _streamConfig.gyroMode = [streamSettings.gyroMode intValue];
     _streamConfig.emulatedControllerType = streamSettings.emulatedControllerType.intValue;
+    _streamConfig.hapticEngine = streamSettings.hapticEngine.intValue;
     //NSLog(@"gyroMode from settings: %ld", _streamConfig.gyroMode);
     
     // multiController must be set before calling getConnectedGamepadMask
@@ -2325,6 +2326,7 @@ static NSMutableSet* hostList;
         ControllerNavigator.controllerMouseRightButton = (ControllerElement)settings.controllerMouseRightButton.intValue;
         ControllerNavigator.controllerMouseExpo = settings.controllerMouseExpo.floatValue;
         if(ControllerNavigator.enabled) [ControllerNavigator start];
+
     }
 }
 
@@ -2811,7 +2813,8 @@ static NSMutableSet* hostList;
     dispatch_async(dispatch_get_main_queue(), ^{
         switch (item) {
             case RadialMenuItemSettings:
-                [[self revealViewController] revealToggleAnimated:YES];
+                if(self.isStreaming && !self.settingsViewExpanded) [self->streamFrameViewController expandSettingsView];
+                else [[self revealViewController] revealToggleAnimated:YES];
                 break;
             case RadialMenuItemAllSettings:
                 [self.revealViewController allSettingSelected];
