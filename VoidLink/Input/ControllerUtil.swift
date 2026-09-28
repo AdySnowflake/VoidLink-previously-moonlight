@@ -11,7 +11,7 @@ import GameController
 import Combine
 import CoreGraphics
 import Foundation
-#if !VOIDLINK_PREVIEW
+#if os(tvOS) && !VOIDLINK_PREVIEW
 import Collections
 #endif
 #if os(iOS) && !VOIDLINK_PREVIEW
