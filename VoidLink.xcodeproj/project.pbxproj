@@ -235,8 +235,6 @@
 		A703000000000000000003 /* libxml2.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 9890CF6A203B7EE1006C4B06 /* libxml2.tbd */; };
 		A703000000000000000004 /* libmoonlight-common.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 98AB2E841CAD46840089BB98 /* libmoonlight-common.a */; };
 		A703000000000000000005 /* libavutil.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 98882A092AF60F9000C5A11C /* libavutil.a */; };
-		A703000000000000000006 /* DequeModule in Frameworks */ = {isa = PBXBuildFile; productRef = 182760F62E83E2EA00EC1C5C /* DequeModule */; };
-		A703000000000000000007 /* Collections in Frameworks */ = {isa = PBXBuildFile; productRef = 182760FC2E83E68B00EC1C5C /* Collections */; };
 		A703000000000000000008 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FB290CF319B2C406004C83CF /* CoreGraphics.framework */; };
 		A703000000000000000009 /* CoreData.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FB290CF719B2C406004C83CF /* CoreData.framework */; };
 		A70300000000000000000A /* OpenSSL in Frameworks */ = {isa = PBXBuildFile; productRef = F74BEF9B2C1A705600224667 /* OpenSSL */; };
@@ -633,8 +631,6 @@
 				A703000000000000000003 /* libxml2.tbd in Frameworks */,
 				A703000000000000000004 /* libmoonlight-common.a in Frameworks */,
 				A703000000000000000005 /* libavutil.a in Frameworks */,
-				A703000000000000000006 /* DequeModule in Frameworks */,
-				A703000000000000000007 /* Collections in Frameworks */,
 				A703000000000000000008 /* CoreGraphics.framework in Frameworks */,
 				A703000000000000000009 /* CoreData.framework in Frameworks */,
 				A70300000000000000000A /* OpenSSL in Frameworks */,
@@ -1220,13 +1216,12 @@
 			);
 			fileSystemSynchronizedGroups = (
 				18A0EE282EFBCBFB00BA853A /* SVGs */,
+				C76000000000000000000001 /* ThirdParty/SwiftCollections */,
 			);
 			name = "VoidLink TV";
 			packageProductDependencies = (
 				18A0EE262EFB9B5A00BA853A /* SVGKitSwift */,
 				18A0EE242EFB9B5A00BA853A /* SVGKit */,
-				182760F62E83E2EA00EC1C5C /* DequeModule */,
-				182760FC2E83E68B00EC1C5C /* Collections */,
 				F74BEF9B2C1A705600224667 /* OpenSSL */,
 			);
 			productName = "VoidLink TV";
@@ -1287,7 +1282,6 @@
 			mainGroup = FB290CE519B2C406004C83CF;
 			packageReferences = (
 				F74BEF9A2C1A705600224667 /* XCRemoteSwiftPackageReference "OpenSSL-Package" */,
-				182760F52E83E2EA00EC1C5C /* XCRemoteSwiftPackageReference "swift-collections" */,
 				18A0EE232EFB9B5A00BA853A /* XCRemoteSwiftPackageReference "SVGKit" */,
 			);
 			productRefGroup = FB290CEF19B2C406004C83CF /* Products */;
@@ -2218,14 +2212,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		182760F52E83E2EA00EC1C5C /* XCRemoteSwiftPackageReference "swift-collections" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/apple/swift-collections.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.1.4;
-			};
-		};
 		18A0EE232EFB9B5A00BA853A /* XCRemoteSwiftPackageReference "SVGKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/SVGKit/SVGKit.git";
@@ -2245,16 +2231,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		182760F62E83E2EA00EC1C5C /* DequeModule */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 182760F52E83E2EA00EC1C5C /* XCRemoteSwiftPackageReference "swift-collections" */;
-			productName = DequeModule;
-		};
-		182760FC2E83E68B00EC1C5C /* Collections */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 182760F52E83E2EA00EC1C5C /* XCRemoteSwiftPackageReference "swift-collections" */;
-			productName = Collections;
-		};
 		18A0EE242EFB9B5A00BA853A /* SVGKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 18A0EE232EFB9B5A00BA853A /* XCRemoteSwiftPackageReference "SVGKit" */;

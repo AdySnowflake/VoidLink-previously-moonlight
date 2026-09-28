@@ -6,9 +6,6 @@
 //  Copyright © 2025 True砖家 on Bilibili. All rights reserved.
 
 import AVFoundation
-#if os(tvOS)
-import Collections
-#endif
 
 @objc public protocol MicHandlerDelegate: AnyObject {
     @objc optional func micHandlerDidFinishPlayback(_ handler: MicHandler)
