@@ -1794,6 +1794,7 @@ final class SettingsSession: NSObject, ObservableObject {
     fileprivate weak var presentingController: UIViewController?
     private var cachedDisplaySizes: [Int: CGSize] = [:]
     private var cachedSafeAreaSizes: [Int: CGSize] = [:]
+    private var isPersistingSettings = false
     private var screenConnectionNotificationTokens: [NSObjectProtocol] = []
     private var controllerNavigationSetupCoordinator: ControllerNavigationSetupCoordinator?
     private weak var capturedGyroSwitchController: GCController?
@@ -3896,6 +3897,7 @@ final class SettingsSession: NSObject, ObservableObject {
     /// a window. Persistence happens after dismissal, when that window may no
     /// longer exist, so retain the last measured pixel sizes per display mode.
     private func refreshDynamicResolutionSizeCache() {
+        guard !isPersistingSettings else { return }
         guard let window = presentingController?.viewIfLoaded?.window else { return }
 
         let displayMode = itemRegistry.externalDisplayMode.value
@@ -4570,6 +4572,8 @@ final class SettingsSession: NSObject, ObservableObject {
     /// remains only as an integration bridge; persistence itself is not
     /// section-specific.
     func persistSettings() {
+        isPersistingSettings = true
+        defer { isPersistingSettings = false }
 
         if isStreaming,
            let settingsController = presentingController as? SettingsViewController,
@@ -4591,9 +4595,12 @@ final class SettingsSession: NSObject, ObservableObject {
 
         // MARK: Video
 
-        settings.width = NSNumber(value: isStreaming ? customWidth : chosenWidth)
-        settings.height = NSNumber(value: isStreaming ? customHeight : chosenHeight)
-        settings.resolutionSelected = NSNumber(value: itemRegistry.usesCustomResolution.value ? 5 : itemRegistry.resolution.value)
+        if !isStreaming {
+            settings.width = NSNumber(value: chosenWidth)
+            settings.height = NSNumber(value: chosenHeight)
+            settings.resolutionSelected = NSNumber(value: itemRegistry.usesCustomResolution.value ? 5 : itemRegistry.resolution.value)
+        }
+        
         settings.framerate = NSNumber(value: itemRegistry.frameRate.value)
         settings.bitrate = NSNumber(value: Int(itemRegistry.bitrate.value.rounded()))
         settings.preferredCodec = Int32(itemRegistry.codec.value)
