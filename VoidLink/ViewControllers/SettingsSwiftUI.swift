@@ -1988,6 +1988,13 @@ final class SettingsSession: NSObject, ObservableObject {
                 queue: .main
             ) { [weak self] _ in
                 self?.refreshResolutionGeometry()
+            },
+            NotificationCenter.default.addObserver(
+                forName: Notification.Name("ScreenChanged"),
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.refreshResolutionGeometry()
             }
         ]
         
@@ -3864,9 +3871,23 @@ final class SettingsSession: NSObject, ObservableObject {
         }
     }
 
+    private var externalDisplayScreen: UIScreen? {
+#if !os(tvOS)
+        if #available(iOS 16.0, *) {
+            if let externalScene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.session.role == .windowExternalDisplayNonInteractive }) {
+                return externalScene.screen
+            }
+        }
+#endif
+        return UIScreen.screens.first(where: { $0 !== UIScreen.main })
+    }
+
     private var targetScreen: UIScreen {
-        if itemRegistry.externalDisplayMode.value == 1, UIScreen.screens.count > 1 {
-            return UIScreen.screens.last ?? UIScreen.main
+        if itemRegistry.externalDisplayMode.value == ExternalDisplayMode.extended.rawValue,
+           let externalDisplayScreen {
+            return externalDisplayScreen
         }
         return presentingController?.view.window?.screen ?? UIScreen.main
     }
@@ -3878,9 +3899,10 @@ final class SettingsSession: NSObject, ObservableObject {
         guard let window = presentingController?.viewIfLoaded?.window else { return }
 
         let displayMode = itemRegistry.externalDisplayMode.value
-        let usesExternalDisplay = displayMode == ExternalDisplayMode.extended.rawValue && UIScreen.screens.count > 1
+        let externalScreen = externalDisplayScreen
+        let usesExternalDisplay = displayMode == ExternalDisplayMode.extended.rawValue && externalScreen != nil
         let displayScreen = usesExternalDisplay
-            ? (UIScreen.screens.last ?? UIScreen.main)
+            ? (externalScreen ?? UIScreen.main)
             : window.screen
         let displayBounds = usesExternalDisplay ? displayScreen.bounds : window.bounds
         cachedDisplaySizes[displayMode] = CGSize(

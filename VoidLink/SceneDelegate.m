@@ -1,6 +1,13 @@
 #import "SceneDelegate.h"
 #import "StreamFrameViewController.h"
 #import <GameController/GameController.h>
+#if TARGET_OS_IOS && !TARGET_OS_MACCATALYST && !TARGET_OS_VISION && __has_include(<UIKit/UISceneAccessory.h>)
+#import <UIKit/UISceneAccessory.h>
+#import <UIKit/UISceneAccessoryRegistration.h>
+#define VL_HAS_EXTERNAL_DISPLAY_ACCESSORY 1
+#else
+#define VL_HAS_EXTERNAL_DISPLAY_ACCESSORY 0
+#endif
 #if TARGET_OS_TV
 #import "MainFrameViewController.h"
 #import "SettingsViewController.h"
@@ -212,6 +219,18 @@ API_AVAILABLE(ios(13.0), tvos(13.0))
 
 static UIView *_sharedStreamVideoRenderView = nil;
 static UIWindow *_externalSceneWindow = nil;
+#if VL_HAS_EXTERNAL_DISPLAY_ACCESSORY
+static UISceneAccessoryRegistration *_externalDisplayAccessoryRegistration = nil;
+#endif
+
+static BOOL VLIsExternalDisplaySession(UISceneSession *session) {
+    if (@available(iOS 16.0, tvOS 16.0, *)) {
+        if ([session.role isEqualToString:UIWindowSceneSessionRoleExternalDisplayNonInteractive]) {
+            return YES;
+        }
+    }
+    return [session.role isEqualToString:UIWindowSceneSessionRoleExternalDisplay];
+}
 
 - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions {
     if (![scene isKindOfClass:[UIWindowScene class]]) {
@@ -259,6 +278,16 @@ static UIWindow *_externalSceneWindow = nil;
 #endif
         self.window.rootViewController = [[VoidLinkControllerRootViewController alloc] initWithContentViewController:initialViewController];
         [self.window makeKeyAndVisible];
+#if VL_HAS_EXTERNAL_DISPLAY_ACCESSORY
+        if (@available(iOS 27.0, *)) {
+            UISceneConfiguration *configuration = [[UISceneConfiguration alloc]
+                initWithName:@"VoidLink External Display"
+                sessionRole:UIWindowSceneSessionRoleExternalDisplayNonInteractive];
+            configuration.delegateClass = SceneDelegate.class;
+            UISceneAccessory *accessory = [UISceneAccessory externalNonInteractiveSceneAccessoryWithConfiguration:configuration];
+            _externalDisplayAccessoryRegistration = [self.window.rootViewController registerSceneAccessory:accessory];
+        }
+#endif
 #if TARGET_OS_TV
         // SWReveal keeps the rear controller unloaded until it is revealed.
         // Preheat the SwiftUI settings hierarchy without consuming its
@@ -273,7 +302,7 @@ static UIWindow *_externalSceneWindow = nil;
 #endif
         Log(LOG_I, @"SceneDelegate: Main app scene connected.");
 
-    } else if ([session.role isEqualToString:UIWindowSceneSessionRoleExternalDisplay]) {
+    } else if (VLIsExternalDisplaySession(session)) {
         Log(LOG_I, @"SceneDelegate: External display scene connecting for screen: %@", ((UIWindowScene *)scene).screen.description);
         UIWindowScene *windowScene = (UIWindowScene *)scene;
 #if TARGET_OS_TV
@@ -290,6 +319,7 @@ static UIWindow *_externalSceneWindow = nil;
             [_externalSceneWindow.rootViewController.view addSubview:_sharedStreamVideoRenderView];
             Log(LOG_I, @"SceneDelegate: External display scene connected.");
         }
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"ScreenChanged" object:windowScene];
     }
 }
 
@@ -333,13 +363,14 @@ static UIWindow *_externalSceneWindow = nil;
 - (void)sceneDidDisconnect:(UIScene *)scene {
     Log(LOG_I, @"SceneDelegate: Scene disconnected: %@, role: %@", scene.title, scene.session.role);
 
-    if ([scene.session.role isEqualToString:UIWindowSceneSessionRoleExternalDisplay]) {
+    if (VLIsExternalDisplaySession(scene.session)) {
         if ([scene isKindOfClass:[UIWindowScene class]]) {
             UIWindowScene *windowScene = (UIWindowScene *)scene;
             if (_externalSceneWindow == windowScene.windows.firstObject) { // Compare with the window from the disconnecting scene
                 [SceneDelegate clearExternalDisplayRenderView]; // Clears the shared view
                 _externalSceneWindow = nil;
                 Log(LOG_I, @"SceneDelegate: External display scene fully disconnected and cleaned up.");
+                [[NSNotificationCenter defaultCenter] postNotificationName:@"ScreenChanged" object:windowScene];
             } else {
                 Log(LOG_W, @"SceneDelegate: Disconnecting scene is not the one holding our _externalSceneWindow.");
             }
