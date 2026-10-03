@@ -11,9 +11,6 @@ import GameController
 import Combine
 import CoreGraphics
 import Foundation
-#if !VOIDLINK_PREVIEW
-import Collections
-#endif
 #if os(iOS) && !VOIDLINK_PREVIEW
 import SwiftUI
 import UIKit
@@ -270,6 +267,7 @@ import UIKit
 @objc enum ControllerHardware: UInt8 {
     case generic
     case g8PlusMFi
+    case razerKishi
 }
 
 @objc protocol ControllerUtilDelegate: AnyObject {
@@ -1152,12 +1150,14 @@ import UIKit
                 
         gamepad.valueChangedHandler = { gamepad, element in
             handler(elementDict, gamepad, element)
+#if !os(tvOS)
             if #available(iOS 13.0, *) {
                 // print("controller.playerIndex \(controller.playerIndex)")
                 if controller.playerIndex == .index1 {
                     GamepadOverlayStateCenter.shared.publish(snapshot: GamepadOverlaySnapshot(gamepad: gamepad))
                 }
             }
+#endif
         }
     }
     
@@ -1288,8 +1288,15 @@ import UIKit
             object: nil,
             queue: .main
         ) { notification in
-            guard (notification.object as? GCController)?.extendedGamepad != nil else { return }
-            preparePrimaryController()
+            guard let controller = notification.object as? GCController else {return}
+            
+            if controller.extendedGamepad != nil {
+                preparePrimaryController()
+            }
+            
+            if PublicUtils.isTVOS {
+                prepareSideController()
+            }
         }
 
         disconnectObserver = NotificationCenter.default.addObserver(
@@ -1333,11 +1340,17 @@ import UIKit
             return
         }
         
-        guard GCController.controllers().count == 1 else { return }
+        if PublicUtils.isTVOS {
+            guard GCController.controllers().count == 1
+                    || GCController.controllers().count == 2 else { return }
+        }
+        else {
+            guard GCController.controllers().count == 1 else { return }
+        }
         
         if let mainFrameVC = delegate as? MainFrameViewController {
             let vc = mainFrameVC.isStreaming() ? StreamFrameViewController.sharedInstance() : mainFrameVC
-            GenericUtils.handleFirstGamepadConnection(in: vc) {
+            GenericUtils.handleFirstGamepadConnection(in: vc, with: controller) {
                 setGCControllerToPrimary(controller)
                 return
             }
@@ -1346,7 +1359,42 @@ import UIKit
         setGCControllerToPrimary(controller)
     }
     
-    private static func setGCControllerToPrimary(_ controller: GCController) {
+    private static func prepareSideController() {
+#if os(tvOS)
+        
+        for controller in GCController.controllers() {
+            if let gamepad = controller.microGamepad, controller.extendedGamepad == nil {
+                disableSysGestures(controller)
+                
+                gamepad.buttonMenu.pressedChangedHandler = { [weak controller] _, _, pressed in
+                    guard !pressed, let controller else { return }
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(
+                            name: .VoidLinkTvOSRemoteMenuTapped,
+                            object: controller
+                        )
+                    }
+                }
+
+                gamepad.buttonX.pressedChangedHandler = { [weak controller] _, _, pressed in
+                    guard !pressed, let controller else { return }
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(
+                            name: .VoidLinkTvOSRemotePlayPauseTapped,
+                            object: controller
+                        )
+                    }
+                }
+                
+                return
+            }
+        }
+        
+
+#endif
+    }
+    
+    static func setGCControllerToPrimary(_ controller: GCController) {
         primaryGCController = controller
         _ = buildMapping(for: controller, swapABXY: false)
         disableSysGestures(controller)
@@ -1436,6 +1484,174 @@ import UIKit
 
     
     
+
+    // MARK: - adaptive triggers
+
+    // Adaptive trigger fixes
+    // Pull request originally submitted by sirius128@github to VoidLink on 2026/9/14
+    // Copyright © 2026 sirius128@github
+    // Licensed under GPL-3.0
+
+    private enum AdaptiveTriggerMode {
+        case unsupported, off, feedback, positionalFeedback, weapon, slopeFeedback, vibration, positionalVibration
+    }
+
+    private struct AdaptiveTriggerEffect {
+        var mode: AdaptiveTriggerMode = .unsupported
+        var startPosition: Float = 0
+        var endPosition: Float = 0
+        var startStrength: Float = 0
+        var endStrength: Float = 0
+        var frequency: Float = 0
+        var positionalStrength = Array(repeating: Float(0), count: 10)
+    }
+
+    private static func clamp01(_ value: Float) -> Float { max(0, min(1, value)) }
+    private static func stepPosition(_ step: Int, count: Int) -> Float {
+        clamp01(Float(step) / Float(count - 1))
+    }
+    private static func byteScale(_ value: UInt8) -> Float { stepPosition(Int(value), count: 256) }
+    private static func zonePosition(_ zone: Int) -> Float { stepPosition(zone, count: 10) }
+
+    private static func zoneMask(_ bytes: [UInt8]) -> UInt16 {
+        (UInt16(bytes[0]) | (UInt16(bytes[1]) << 8)) & 0x03ff
+    }
+    private static func firstZone(_ mask: UInt16) -> Int? {
+        mask == 0 ? nil : mask.trailingZeroBitCount
+    }
+    private static func lastZone(_ mask: UInt16) -> Int? {
+        mask == 0 ? nil : 15 - mask.leadingZeroBitCount
+    }
+    private static func setSpan(_ effect: inout AdaptiveTriggerEffect, first: Int?, last: Int?, count: Int) {
+        let start = max(0, min(first ?? 0, count - 2))
+        let end = max(start + 1, min(last ?? (start + 1), count - 1))
+        effect.startPosition = stepPosition(start, count: count)
+        effect.endPosition = stepPosition(end, count: count)
+    }
+
+    private static func decodeZoned(_ bytes: [UInt8], mode: AdaptiveTriggerMode) -> AdaptiveTriggerEffect {
+        var effect = AdaptiveTriggerEffect(mode: mode)
+        let mask = zoneMask(bytes)
+        let packed = UInt32(bytes[2]) | (UInt32(bytes[3]) << 8) |
+            (UInt32(bytes[4]) << 16) | (UInt32(bytes[5]) << 24)
+        for zone in 0..<10 where mask & (1 << zone) != 0 {
+            let strength = clamp01(Float(((packed >> (3 * zone)) & 7) + 1) / 8)
+            effect.positionalStrength[zone] = strength
+            effect.startStrength = max(effect.startStrength, strength)
+        }
+        effect.startPosition = zonePosition(firstZone(mask) ?? 0)
+        return effect
+    }
+
+    private static func decode(type: UInt8, bytes: [UInt8]) -> AdaptiveTriggerEffect {
+        var effect = AdaptiveTriggerEffect()
+        switch type {
+        case 0x00, 0x05:
+            effect.mode = .off
+        case 0x01, 0x11:
+            effect.mode = .feedback
+            effect.startPosition = byteScale(bytes[0])
+            effect.startStrength = type == 0x01 ? byteScale(bytes[1]) : clamp01(Float(bytes[1]) / 10)
+        case 0x02, 0x12:
+            effect.mode = .weapon
+            setSpan(&effect, first: Int(bytes[0]), last: Int(bytes[1]), count: 256)
+            effect.startStrength = type == 0x02 ? byteScale(bytes[2]) : clamp01(Float(bytes[2]) / 10)
+        case 0x06:
+            effect.mode = .vibration
+            effect.frequency = clamp01(Float(bytes[0]) / 255)
+            effect.startStrength = byteScale(bytes[1])
+            effect.startPosition = byteScale(bytes[2])
+        case 0x21:
+            effect = decodeZoned(bytes, mode: .positionalFeedback)
+        case 0x26:
+            effect = decodeZoned(bytes, mode: .positionalVibration)
+            effect.frequency = clamp01(Float(bytes[8]) / 255)
+        case 0x25:
+            effect.mode = .weapon
+            setSpan(&effect, first: firstZone(zoneMask(bytes)), last: lastZone(zoneMask(bytes)), count: 10)
+            effect.startStrength = Float((bytes[2] & 7) + 1) / 8
+        case 0x22:
+            effect.mode = .slopeFeedback
+            setSpan(&effect, first: firstZone(zoneMask(bytes)), last: lastZone(zoneMask(bytes)), count: 10)
+            effect.startStrength = Float((bytes[2] & 7) + 1) / 8
+            effect.endStrength = Float(((bytes[2] >> 3) & 7) + 1) / 8
+        case 0x23, 0x27:
+            effect.mode = .vibration
+            effect.startPosition = zonePosition(firstZone(zoneMask(bytes)) ?? 0)
+            effect.startStrength = type == 0x23 ? 0.5 :
+                clamp01(Float(max(bytes[2] & 7, (bytes[2] >> 3) & 7)) / 7)
+            effect.frequency = clamp01(Float(bytes[3]) / 255)
+        default:
+            effect.mode = .off
+        }
+
+        switch effect.mode {
+        case .vibration, .positionalVibration:
+            if effect.frequency <= 0 || max(effect.startStrength, effect.endStrength) <= 0 { effect.mode = .off }
+        case .feedback, .positionalFeedback, .weapon, .slopeFeedback:
+            if max(effect.startStrength, effect.endStrength) <= 0 { effect.mode = .off }
+        default:
+            break
+        }
+        return effect
+    }
+
+    @available(iOS 14.5, tvOS 14.5, *)
+    @objc static func applyAdaptiveTrigger(_ trigger: GCDualSenseAdaptiveTrigger, type: UInt8, payload: Data) {
+        let bytes = Array(payload)
+        guard bytes.count >= 10 else { trigger.setModeOff(); return }
+
+        var effect = decode(type: type, bytes: bytes)
+        if #available(iOS 15.4, tvOS 15.4, *) {
+        } else {
+            switch effect.mode {
+            case .positionalFeedback: effect.mode = .feedback
+            case .positionalVibration: effect.mode = .vibration
+            case .slopeFeedback:
+                effect.startStrength = max(effect.startStrength, effect.endStrength)
+                effect.mode = .weapon
+            default: break
+            }
+        }
+
+        switch effect.mode {
+        case .off, .unsupported:
+            trigger.setModeOff()
+        case .feedback:
+            trigger.setModeFeedbackWithStartPosition(effect.startPosition, resistiveStrength: effect.startStrength)
+        case .weapon:
+            trigger.setModeWeaponWithStartPosition(effect.startPosition, endPosition: effect.endPosition,
+                                                   resistiveStrength: effect.startStrength)
+        case .vibration:
+            trigger.setModeVibrationWithStartPosition(effect.startPosition, amplitude: effect.startStrength,
+                                                      frequency: effect.frequency)
+        case .positionalFeedback:
+            if #available(iOS 15.4, tvOS 15.4, *) {
+                let values = GCDualSenseAdaptiveTrigger.PositionalResistiveStrengths(values: (
+                    effect.positionalStrength[0], effect.positionalStrength[1], effect.positionalStrength[2],
+                    effect.positionalStrength[3], effect.positionalStrength[4], effect.positionalStrength[5],
+                    effect.positionalStrength[6], effect.positionalStrength[7], effect.positionalStrength[8],
+                    effect.positionalStrength[9]
+                ))
+                trigger.setModeFeedback(resistiveStrengths: values)
+            }
+        case .positionalVibration:
+            if #available(iOS 15.4, tvOS 15.4, *) {
+                let values = GCDualSenseAdaptiveTrigger.PositionalAmplitudes(values: (
+                    effect.positionalStrength[0], effect.positionalStrength[1], effect.positionalStrength[2],
+                    effect.positionalStrength[3], effect.positionalStrength[4], effect.positionalStrength[5],
+                    effect.positionalStrength[6], effect.positionalStrength[7], effect.positionalStrength[8],
+                    effect.positionalStrength[9]
+                ))
+                trigger.setModeVibration(amplitudes: values, frequency: effect.frequency)
+            }
+        case .slopeFeedback:
+            if #available(iOS 15.4, tvOS 15.4, *) {
+                trigger.setModeSlopeFeedback(startPosition: effect.startPosition, endPosition: effect.endPosition,
+                                             startStrength: effect.startStrength, endStrength: effect.endStrength)
+            }
+        }
+    }
 
     // MARK: - input processing
 
@@ -1660,6 +1876,7 @@ private struct DualSenseHapticsEQView: View {
 }
 #endif
 
+#if !os(tvOS)
 // MARK: - realtime overlay
 
 @available(iOS 13.0, *)
@@ -1728,3 +1945,4 @@ final class GamepadOverlayStateCenter: NSObject, ObservableObject {
         shared.publish(snapshot: .idle)
     }
 }
+#endif

@@ -16,7 +16,6 @@
 
 #import "DataManager.h"
 #include "Limelight.h"
-#include <stdio.h>
 
 @import GameController;
 #if !TARGET_OS_TV
@@ -26,61 +25,6 @@
 
 static const double MOUSE_SPEED_DIVISOR = 1.25;
 static __weak ControllerSupport *VLSharedControllerSupport = nil;
-
-typedef struct _VL_ADAPTIVE_TRIGGER_EFFECT {
-    uint8_t type;
-    float parameter0;
-    float parameter1;
-    float parameter2;
-} VL_ADAPTIVE_TRIGGER_EFFECT;
-
-static VL_ADAPTIVE_TRIGGER_EFFECT DecodeAdaptiveTriggerEffect(uint8_t type, const uint8_t* payload)
-{
-    const float byteScale = 1.0f / 255.0f;
-    VL_ADAPTIVE_TRIGGER_EFFECT effect = {
-        .type = type,
-        .parameter0 = payload[0] * byteScale,
-        .parameter1 = payload[1] * byteScale,
-        .parameter2 = payload[2] * byteScale,
-    };
-    return effect;
-}
-
-static void ApplyAdaptiveTriggerEffect(GCDualSenseAdaptiveTrigger* trigger,
-                                       VL_ADAPTIVE_TRIGGER_EFFECT effect)
-    API_AVAILABLE(ios(14.5), tvos(14.5));
-
-static void ApplyAdaptiveTriggerEffect(GCDualSenseAdaptiveTrigger* trigger,
-                                       VL_ADAPTIVE_TRIGGER_EFFECT effect)
-{
-    switch (effect.type) {
-        case 0x00:
-            [trigger setModeOff];
-            break;
-        case 0x01:
-            [trigger setModeFeedbackWithStartPosition:effect.parameter0
-                                   resistiveStrength:effect.parameter1];
-            break;
-        case 0x02:
-            if (effect.parameter1 > effect.parameter0) {
-                [trigger setModeWeaponWithStartPosition:effect.parameter0
-                                            endPosition:effect.parameter1
-                                     resistiveStrength:effect.parameter2];
-            }
-            else {
-                // Log(LOG_W, @"Ignoring invalid adaptive weapon effect: start=%.3f end=%.3f", effect.parameter0, effect.parameter1);
-            }
-            break;
-        case 0x06:
-            [trigger setModeVibrationWithStartPosition:effect.parameter2
-                                             amplitude:effect.parameter1
-                                             frequency:effect.parameter0];
-            break;
-        default:
-            // Log(LOG_W, @"Ignoring unsupported adaptive trigger effect type: 0x%02X", effect.type);
-            break;
-    }
-}
 
 @interface ControllerSupport()
 
@@ -120,6 +64,7 @@ static void ApplyAdaptiveTriggerEffect(GCDualSenseAdaptiveTrigger* trigger,
     OSCProfilesManager* oscProfileMan;
 #if !TARGET_OS_TV
     GameSirG8MFiRumbler *_gameSirG8MFiRumbler;
+    KishiV3ProXLRumbler *_kishiRumbler;
 #endif
 
 #define EMULATING_SELECT     0x1
@@ -161,10 +106,15 @@ static void ApplyAdaptiveTriggerEffect(GCDualSenseAdaptiveTrigger* trigger,
 -(void) applyPhysicalControllerRumble:(VoidController*)controller lowFreqMotor:(unsigned short)lowFreqMotor highFreqMotor:(unsigned short)highFreqMotor
 {
 #if !TARGET_OS_TV
-    if (controller.hardware == ControllerHardwareG8PlusMFi) {
-        // NSLog(@"[G8Rumble] route native rumble low=%hu high=%hu", lowFreqMotor, highFreqMotor);
-        [_gameSirG8MFiRumbler setLowFrequencyMotor:lowFreqMotor highFrequencyMotor:highFreqMotor];
-        return;
+    switch (controller.hardware) {
+        case ControllerHardwareRazerKishi:
+            [_kishiRumbler setLowFrequencyMotor:lowFreqMotor highFrequencyMotor:highFreqMotor];
+            return;
+        case ControllerHardwareG8PlusMFi:
+            [_gameSirG8MFiRumbler setLowFrequencyMotor:lowFreqMotor highFrequencyMotor:highFreqMotor];
+            return;
+        default:
+            break;
     }
 #endif
 
@@ -300,7 +250,7 @@ static void ApplyAdaptiveTriggerEffect(GCDualSenseAdaptiveTrigger* trigger,
     if([ControllerUtil hasControllerAccelerometer:voidController.gamepad]) {
         [voidController.motionTypes addObject:@(LI_MOTION_TYPE_ACCEL)];
     }
-    if (@available(iOS 14.0, *)) if(voidController.gamepad.motion.hasRotationRate){
+    if (@available(iOS 14.0, tvOS 14.0, *)) if(voidController.gamepad.motion.hasRotationRate){
         [voidController.motionTypes addObject:@(LI_MOTION_TYPE_GYRO)];
     }
 
@@ -463,11 +413,11 @@ static void ApplyAdaptiveTriggerEffect(GCDualSenseAdaptiveTrigger* trigger,
                 }
             }
         }
-        
+        else
 #endif
-        else{
+        {
             // NSLog(@"controller obj timer update: controller timer ");
-            if (@available(iOS 14.0, *)) {
+            if (@available(iOS 14.0, tvOS 14.0, *)) {
                 switch (motionType) {
                     case LI_MOTION_TYPE_ACCEL:
                         [voidController.accelTimer invalidate];
@@ -620,7 +570,7 @@ static void ApplyAdaptiveTriggerEffect(GCDualSenseAdaptiveTrigger* trigger,
             // No LED control supported for this controller
             return;
         }
-        
+
         controller.gamepad.light.color = [[GCColor alloc] initWithRed:(r / 255.0f) green:(g / 255.0f) blue:(b / 255.0f)];
     }
 }
@@ -628,27 +578,18 @@ static void ApplyAdaptiveTriggerEffect(GCDualSenseAdaptiveTrigger* trigger,
 -(void) setAdaptiveTriggers:(uint16_t)controllerNumber eventFlags:(uint8_t)eventFlags
                     typeLeft:(uint8_t)typeLeft typeRight:(uint8_t)typeRight
                         left:(const uint8_t*)left right:(const uint8_t*)right {
-    char leftPayload[DS_EFFECT_PAYLOAD_SIZE * 3] = {0};
-    char rightPayload[DS_EFFECT_PAYLOAD_SIZE * 3] = {0};
-
-    for (int i = 0; i < DS_EFFECT_PAYLOAD_SIZE; i++) {
-        snprintf(leftPayload + (i * 3), sizeof(leftPayload) - (i * 3),
-                 i == DS_EFFECT_PAYLOAD_SIZE - 1 ? "%02X" : "%02X ", left[i]);
-        snprintf(rightPayload + (i * 3), sizeof(rightPayload) - (i * 3),
-                 i == DS_EFFECT_PAYLOAD_SIZE - 1 ? "%02X" : "%02X ", right[i]);
-    }
-
-
-    Log(LOG_I, @"Adaptive trigger: controller=%u flags=0x%02X "
-                "leftType=0x%02X left=[%s] rightType=0x%02X right=[%s]",
-        controllerNumber, eventFlags,
-        typeLeft, leftPayload, typeRight, rightPayload);
-
-
-    VL_ADAPTIVE_TRIGGER_EFFECT leftEffect = DecodeAdaptiveTriggerEffect(typeLeft, left);
-    VL_ADAPTIVE_TRIGGER_EFFECT rightEffect = DecodeAdaptiveTriggerEffect(typeRight, right);
+    // Only the flagged triggers are being programmed; the other side is stale.
     bool applyLeft = (eventFlags & DS_EFFECT_LEFT_TRIGGER) != 0;
     bool applyRight = (eventFlags & DS_EFFECT_RIGHT_TRIGGER) != 0;
+    if (!applyLeft && !applyRight) {
+        return;
+    }
+
+    // The callback-owned buffers are only valid for this call. Copy them before
+    // dispatching to the main queue; decoding in the async block would read stale
+    // data, especially for the right trigger.
+    NSData *leftPayload = applyLeft ? [NSData dataWithBytes:left length:DS_EFFECT_PAYLOAD_SIZE] : nil;
+    NSData *rightPayload = applyRight ? [NSData dataWithBytes:right length:DS_EFFECT_PAYLOAD_SIZE] : nil;
 
     dispatch_async(dispatch_get_main_queue(), ^{
         if (@available(iOS 14.5, tvOS 14.5, *)) {
@@ -665,10 +606,14 @@ static void ApplyAdaptiveTriggerEffect(GCDualSenseAdaptiveTrigger* trigger,
 
             GCDualSenseGamepad* dualSense = (GCDualSenseGamepad*)controller.gamepad.extendedGamepad;
             if (applyLeft) {
-                ApplyAdaptiveTriggerEffect(dualSense.leftTrigger, leftEffect);
+                [ControllerUtil applyAdaptiveTrigger:dualSense.leftTrigger
+                                                type:typeLeft
+                                             payload:leftPayload];
             }
             if (applyRight) {
-                ApplyAdaptiveTriggerEffect(dualSense.rightTrigger, rightEffect);
+                [ControllerUtil applyAdaptiveTrigger:dualSense.rightTrigger
+                                                type:typeRight
+                                             payload:rightPayload];
             }
         }
     });
@@ -1212,6 +1157,11 @@ static void ApplyAdaptiveTriggerEffect(GCDualSenseAdaptiveTrigger* trigger,
                 }
             }
                         
+#if !TARGET_OS_TV
+            if (voidController.hardware == ControllerHardwareRazerKishi) {
+                capabilities |= LI_CCAP_RUMBLE;
+            }
+#endif
             // Detect supported haptics localities
             if (controller.haptics) {
                 if ([controller.haptics.supportedLocalities containsObject:GCHapticsLocalityHandles]) {
@@ -1775,7 +1725,13 @@ double rc_expo(double x, double expo) {
     voidController.supportedEmulationFlags = EMULATING_SPECIAL | EMULATING_SELECT;
     voidController.gamepad = controller;
 #if !TARGET_OS_TV
-    voidController.hardware = [_gameSirG8MFiRumbler isTargetController:controller] ? ControllerHardwareG8PlusMFi : ControllerHardwareGeneric;
+    if ([GameSirG8MFiRumbler isTargetController:controller]) {
+        voidController.hardware = ControllerHardwareG8PlusMFi;
+    } else if ([_kishiRumbler isTargetController:controller]) {
+        voidController.hardware = ControllerHardwareRazerKishi;
+    } else {
+        voidController.hardware = ControllerHardwareGeneric;
+    }
 #else
     voidController.hardware = ControllerHardwareGeneric;
 #endif
@@ -2039,6 +1995,7 @@ double rc_expo(double x, double expo) {
     _controllerNumbers = 0;
 #if !TARGET_OS_TV
     _gameSirG8MFiRumbler = [[GameSirG8MFiRumbler alloc] init];
+    _kishiRumbler = [[KishiV3ProXLRumbler alloc] init];
 #endif
     
     _captureMouse = (streamConfig.localMousePointerMode == 0);
@@ -2100,7 +2057,10 @@ double rc_expo(double x, double expo) {
         VoidController* voidController = [self->_voidControllers objectForKey:[NSNumber numberWithInteger:controller.playerIndex]];
         if (voidController) {
 #if !TARGET_OS_TV
-            if ([self->_gameSirG8MFiRumbler isTargetController:controller]) {
+            if ([self->_kishiRumbler isTargetController:controller]) {
+                [self->_kishiRumbler stopAndClose];
+            }
+            if ([GameSirG8MFiRumbler isTargetController:controller]) {
                 [self->_gameSirG8MFiRumbler stopAndClose];
             }
 #endif
@@ -2309,6 +2269,7 @@ double rc_expo(double x, double expo) {
     [ControllerUtil stopAllDualSenseHaptics];
 #if !TARGET_OS_TV
     [_gameSirG8MFiRumbler invalidate];
+    [_kishiRumbler invalidate];
 #endif
 
     if (VLSharedControllerSupport == self) {
