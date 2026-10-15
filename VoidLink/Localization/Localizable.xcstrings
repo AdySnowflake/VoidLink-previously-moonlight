@@ -17867,6 +17867,64 @@
         }
       }
     },
+    "Voice Capture Mode" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice Capture Mode"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语音采集模式"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語音擷取模式"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語音擷取模式"
+          }
+        }
+      }
+    },
+    "firstTappingPushToTalkTip" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The system saves separate volume levels for voice capture and normal audio modes. You may need to manually adjust the volume in each mode to balance their perceived loudness."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语音采集与正常音频两种模式的音量由系统分开保存，您可能需要手动调整两种模式下的听感音量平衡"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語音擷取與一般音訊兩種模式的音量由系統分別儲存，您可能需要手動調整兩種模式下的聽感音量平衡"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語音擷取與一般音訊兩種模式的音量由系統分別儲存，您可能需要手動調整兩種模式下的聽感音量平衡"
+          }
+        }
+      }
+    },
     "pushToTalkTip" : {
       "extractionState" : "manual",
       "localizations" : {
