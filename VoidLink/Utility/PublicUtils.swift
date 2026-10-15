@@ -277,6 +277,14 @@ import AVFoundation
         return hasNoPresentedVC
     }
     
+    #if os(iOS)
+    @objc(getCurrentOrientationForWindow:)
+    public static func getCurrentOrientation(for window: UIWindow?) -> UIInterfaceOrientationMask {
+        let size = window?.bounds.size ?? .zero
+        return size.width > size.height ? .landscape : [.portrait, .portraitUpsideDown]
+    }
+    #endif
+
     public static func runOnMain(_ work: @escaping () -> Void) {
         if Thread.isMainThread {
             work()
