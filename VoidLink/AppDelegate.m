@@ -102,6 +102,7 @@ static NSString* DB_NAME = @"Limelight_iOS.sqlite";
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     [CommandManager presetDefaultCommands];
     [GenericUtils installSegmentedControlPreviousSelectionTracking];
+    [PublicUtils installTextFieldControllerUserInteractionTracking];
     [IAPManager shared];
 
     // tvOS mounts the settings view lazily when its reveal menu first opens.
