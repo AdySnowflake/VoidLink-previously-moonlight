@@ -10,6 +10,7 @@
 //
 
 #import "SettingsViewController.h"
+#import "SceneDelegate.h"
 #import "MainFrameViewController.h"
 #if !TARGET_OS_TV
 #import "CustomEdgeSlideGestureRecognizer.h"
@@ -528,9 +529,7 @@
 }
 
 - (BOOL)shouldUpdateFocusInContext:(UIFocusUpdateContext *)context {
-    NSLog(@"shouldUpdateFocusInContext .........");
-    return context.nextFocusedItem == nil ||
-        [NSStringFromClass([context.nextFocusedItem class]) containsString:@"VoidLinkFocusSinkView"];
+    return VoidLinkTvOSShouldUpdateFocus(context, self.view.window);
 }
 
 #endif
@@ -4305,7 +4304,14 @@ BOOL isCustomResolution(int resolutionSelected) {
 }
 
 - (void)redirectMicSwitchFlipped:(UISwitch* )sender{
-    if(sender.isOn) [self checkAndRequestMicPermission];
+    if(sender.isOn) {
+#if TARGET_OS_TV
+        [self checkAndRequestMicPermission];
+#else
+        if (settingsViewJustLoaded) [self checkAndRequestMicPermission];
+        else [GenericUtils handleRedirectMicEnabledTipIn:self];
+#endif
+    }
     [self setHidden:!sender.isOn forStack:_useBuiltinMicStack];
     [self setHidden:!sender.isOn forStack:_micVolumeStack];
 }

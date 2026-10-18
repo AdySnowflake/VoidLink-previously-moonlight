@@ -132,12 +132,6 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
     
     keysDown = [[NSMutableSet alloc] init];
     keyInputField = [[KeyboardInputField alloc] initWithFrame:CGRectZero];
-#if TARGET_OS_TV
-    __weak typeof(self) weakSelf = self;
-    keyInputField.backspaceHandler = ^{
-        [weakSelf sendTvOSRemoteBackspace];
-    };
-#endif
     [keyInputField setKeyboardType:UIKeyboardTypeDefault];
     [keyInputField setAutocorrectionType:UITextAutocorrectionTypeNo];
     [keyInputField setAutocapitalizationType:UITextAutocapitalizationTypeNone];
@@ -508,6 +502,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
         [GamepadNavigationIllustrationHud setTvOSSystemTextInputActive:YES];
         
         keyInputField.placeholder = [LocalizationHelper localizedStringForKey:@"tvOSRemoteTextInputPlaceholder"];
+        keyInputField.accessibilityIdentifier = @"streamRemoteTextField";
         keyInputField.inputView.hidden = true;
         if (!tvOSRemoteTextInputTip) {
             tvOSRemoteTextInputTip = [[UILabel alloc] init];
@@ -520,7 +515,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
             tvOSRemoteTextInputTip.clipsToBounds = YES;
             tvOSRemoteTextInputTip.translatesAutoresizingMaskIntoConstraints = NO;
         }
-        tvOSRemoteTextInputTip.text = keyInputField.placeholder;
+        tvOSRemoteTextInputTip.text = [LocalizationHelper localizedStringForKey:@"tvOSRemoteTextInputTip"];
         if (!tvOSRemoteTextInputTip.superview) {
             [self addSubview:tvOSRemoteTextInputTip];
             [NSLayoutConstraint activateConstraints:@[
@@ -537,7 +532,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
 - (void)restartTVOSTextInputSession {
     [self addSubview:keyInputField];
     keyInputField.delegate = self;
-    keyInputField.text = KeyboardInputSentinel;
+    keyInputField.text = @"";
     [keyInputField becomeFirstResponder];
     [keyInputField removeTarget:self action:@selector(onKeyboardPressed:) forControlEvents:UIControlEventEditingChanged];
     [keyInputField addTarget:self action:@selector(onKeyboardPressed:) forControlEvents:UIControlEventEditingChanged];
@@ -564,13 +559,6 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
     [tvOSRemoteTextInputTip removeFromSuperview];
 }
 
-- (void)sendTvOSRemoteBackspace {
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-        LiSendKeyboardEvent(0x08, KEY_ACTION_DOWN, 0);
-        usleep(50 * 1000);
-        LiSendKeyboardEvent(0x08, KEY_ACTION_UP, 0);
-    });
-}
 #endif
 
 
@@ -1070,6 +1058,21 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
     return 90 - MIN(90, altitudeDegs);
 }
 
+static CGFloat previousRollAngle = 0;
+- (uint16_t)getBarrelRollFromRollAngle:(CGFloat)rollAngle API_AVAILABLE(ios(17.5)) {
+    if(previousRollAngle == 0){
+        previousRollAngle = rollAngle;
+    }
+    else {
+        PencilHandler.barrelRollChanged = rollAngle != previousRollAngle;
+    }
+    
+    CGFloat degrees = rollAngle * (180.0 / M_PI);
+    CGFloat uiKitRoll = fmod(fmod(degrees, 360.0) + 360.0, 360.0);
+    CGFloat twist = fmod(360.0 - uiKitRoll, 360.0);
+    return ((uint16_t)lround(twist)) % 360;
+}
+
 - (BOOL)sendStylusEvent:(UITouch*)event {
     uint8_t type;
     
@@ -1101,11 +1104,17 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
     
     // CGFloat pressure = (event.force / event.maximumPossibleForce) / sin(event.altitudeAngle);
     
-    return LiSendPenEvent(type, LI_TOOL_TYPE_PEN, 0, location.x / videoSize.width, location.y / videoSize.height,
-                          (event.force / event.maximumPossibleForce) / sin(event.altitudeAngle),
-                          0.0f, 0.0f,
-                          [self getRotationFromAzimuthAngle:[event azimuthAngleInView:self]],
-                          [self getTiltFromAltitudeAngle:event.altitudeAngle]) != LI_ERR_UNSUPPORTED;
+    uint16_t barrelRoll = LI_BARREL_ROLL_UNKNOWN;
+    if (@available(iOS 17.5, *)) {
+        barrelRoll = [self getBarrelRollFromRollAngle:event.rollAngle];
+    }
+
+    return LiSendPenEventWithBarrelRoll(type, LI_TOOL_TYPE_PEN, 0, location.x / videoSize.width, location.y / videoSize.height,
+                                        (event.force / event.maximumPossibleForce) / sin(event.altitudeAngle),
+                                        0.0f, 0.0f,
+                                        [self getRotationFromAzimuthAngle:[event azimuthAngleInView:self]],
+                                        [self getTiltFromAltitudeAngle:event.altitudeAngle],
+                                        barrelRoll) != LI_ERR_UNSUPPORTED;
 }
 
 - (void)sendStylusHoverEvent:(UIHoverGestureRecognizer*)gesture API_AVAILABLE(ios(13.0)) {
@@ -1152,19 +1161,24 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
     
     uint16_t rotationAngle = LI_ROT_UNKNOWN;
     uint8_t tiltAngle = LI_TILT_UNKNOWN;
+    uint16_t barrelRoll = LI_BARREL_ROLL_UNKNOWN;
 #if defined(__IPHONE_16_4) || defined(__TVOS_16_4)
     if (@available(iOS 16.4, *)) {
         rotationAngle = [self getRotationFromAzimuthAngle:[gesture azimuthAngleInView:self]];
         tiltAngle = [self getTiltFromAltitudeAngle:gesture.altitudeAngle];
     }
 #endif
+
+    if (@available(iOS 17.5, *)) {
+        barrelRoll = [self getBarrelRollFromRollAngle:gesture.rollAngle];
+    }
     
     
     dispatch_after(0, dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE,0), ^{// Code to execute after the delay
         if(PencilHandler.isDrawing && PencilHandler.pencilAndHoverMode == pencilOnly && PencilHandler.pencilAndHoverMode == hoverDisabled) return;
         switch (PencilHandler.pencilAndHoverMode) {
             case pencilOnly:
-                LiSendPenEvent(type, LI_TOOL_TYPE_PEN, 0, location.x / videoSize.width, location.y / videoSize.height, distance, 0.0f, 0.0f, rotationAngle, tiltAngle);
+                LiSendPenEventWithBarrelRoll(type, LI_TOOL_TYPE_PEN, 0, location.x / videoSize.width, location.y / videoSize.height, distance, 0.0f, 0.0f, rotationAngle, tiltAngle, barrelRoll);
                 break;
             case pencilToMouse:
                 if(gesture.state != UIGestureRecognizerStateEnded) [self updateCursorLocation:originalLocation isMouse:NO];
@@ -1756,6 +1770,20 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
 }
 
 - (void)textFieldDidEndEditing:(UITextField *)textField {
+#if TARGET_OS_TV
+    if (textField == keyInputField) {
+        NSString *inputText = textField.text ?: @"";
+        NSString *textToSend = [inputText stringByReplacingOccurrencesOfString:KeyboardInputSentinel withString:@""];
+        textField.text = @"";
+
+        if (textToSend.length > 0) {
+            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+                const char *utf8String = textToSend.UTF8String;
+                LiSendUtf8TextEvent(utf8String, (int)strlen(utf8String));
+            });
+        }
+    }
+#endif
     for (NSNumber* keyCode in keysDown) {
         LiSendKeyboardEvent([keyCode shortValue], KEY_ACTION_UP, 0);
     }
@@ -1772,6 +1800,10 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
 - (void)onKeyboardPressed:(UITextField *)textField {
 
     if (textField.markedTextRange) return;
+
+#if TARGET_OS_TV
+    return;
+#else
 
     NSString* inputText = textField.text;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
@@ -1817,6 +1849,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
     // Move the insertion point back to the end of the text box
     UITextRange *textRange = [textField textRangeFromPosition:textField.endOfDocument toPosition:textField.endOfDocument];
     [textField setSelectedTextRange:textRange];
+#endif
 }
 
 - (void)specialCharPressed:(UIKeyCommand *)cmd {
