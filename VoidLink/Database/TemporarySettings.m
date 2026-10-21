@@ -97,7 +97,7 @@
     self.duckOtherApps = settings.duckOtherApps;
     self.muteInBackground = settings.muteInBackground;
     self.relativeTouchSlideThreshold = settings.relativeTouchSlideThreshold;
-    self.enablePinch = settings.enablePinch;
+    self.touchMousePinchGestureMode = settings.touchMousePinchGestureMode;
     self.scrollSensitivity = settings.scrollSensitivity;
     self.pinchSensitivity = settings.pinchSensitivity;
     self.leftClickDelayMs = settings.leftClickDelayMs;
@@ -197,7 +197,7 @@
     self.duckOtherApps = settings.duckOtherApps;
     self.muteInBackground = settings.muteInBackground;
     self.relativeTouchSlideThreshold = settings.relativeTouchSlideThreshold;
-    self.enablePinch = settings.enablePinch;
+    self.touchMousePinchGestureMode = settings.touchMousePinchGestureMode;
     self.scrollSensitivity = settings.scrollSensitivity;
     self.pinchSensitivity = settings.pinchSensitivity;
     self.leftClickDelayMs = settings.leftClickDelayMs;
@@ -223,11 +223,11 @@
 
 #endif
     
+    self.floatingKeyboardButton = settings.floatingKeyboardButton;
+
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-    self.pinchZoom = [defaults boolForKey:PinchZoomDefaultsKey];
     self.cursorInertia = [defaults boolForKey:CursorInertiaDefaultsKey];
     self.cursorInertiaDeceleration = [defaults objectForKey:CursorInertiaDecelerationDefaultsKey] ?: @(CursorInertiaDecelerationDefault);
-    self.floatingKeyboardButton = [defaults boolForKey:FloatingKeyboardButtonDefaultsKey];
     self.portraitStreamOffset = @([defaults floatForKey:PortraitStreamOffsetDefaultsKey]);
     
     return self;

@@ -11,7 +11,9 @@
 
 #import "StreamView.h"
 #include <Limelight.h>
-#import "DataManager.h"
+#import "AppDelegate.h"
+#import "TemporaryHost.h"
+#import "TemporaryApp.h"
 #import "TemporarySettings.h"
 #import "Plot.h"
 #import "ControllerSupport.h"
@@ -126,7 +128,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
     self->_interactionDelegate = interactionDelegate;
     self->streamAspectRatio = (float)streamConfig.width / (float)streamConfig.height;
     self.streamAspectRatio = self->streamAspectRatio;
-    _widgetSizeTransition = keepWidgetSize;
+    _widgetSizeTransition = WidgetSizeTransitionKeepWidgetSize;
     
     settings = [[[DataManager alloc] init] getSettings];
     
@@ -157,7 +159,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
     designatedSoftKeyboardHeight = settings.softKeyboardHeight * PublicUtils.screenHeight;
     keyboardHeightDesignatedForLandscape = designatedSoftKeyboardHeight != 0;
     
-    // if(touchMode == NativeTouchOnly) [self addGestureRecognizer:keyboardToggleRecognizer]; //keep legacy approach in pure native mode
+    // if(touchMode == TouchModeNativeOnly) [self addGestureRecognizer:keyboardToggleRecognizer]; //keep legacy approach in pure native mode
     // else [self->streamFrameTopLayerView addGestureRecognizer:keyboardToggleRecognizer]; //add to the superview in other modes
     
     // [self->streamFrameTopLayerView addGestureRecognizer:keyboardToggleRecognizer]; //add to the superview in other modes
@@ -177,13 +179,13 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
     // OnScreenControls.shared = _onScreenControls;
     /*
     // here we pass the tap recognizer to the onscreencontrols obj
-    if (touchMode == RelativeTouch){
+    if (touchMode == TouchModeRelative){
         RelativeTouchHandler* relativeTouchHandler = (RelativeTouchHandler*) touchHandler;
         onScreenControls.mouseRightClickTapRecognizer = relativeTouchHandler.mouseRightClickTapRecognizer;
     } */
     
     OnScreenControlsLevel level = (OnScreenControlsLevel)[settings.onscreenControls integerValue];
-    if (touchMode != RelativeTouch && touchMode != NativeTouch ) {
+    if (touchMode != TouchModeRelative && touchMode != TouchModeNative ) {
         Log(LOG_I, @"On-screen controls disabled in non-relative touch mode");
         [_onScreenControls setLevel:OnScreenControlsLevelOff];
         
@@ -191,7 +193,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
         [OnScreenControls.touchesCapturedByOnScreenControls removeAllObjects]; // reset the attribute to nil
         
         /*
-        if(touchMode == NativeTouch){
+        if(touchMode == TouchModeNative){
             NativeTouchHandler* nativeTouchHandler = (NativeTouchHandler* )touchHandler;
             nativeTouchHandler.touchesCapturedByOnScreenButtons = onScreenControls.touchesCapturedByOnScreenButtons;
             touchHandler = nativeTouchHandler;
@@ -252,32 +254,32 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
 
 - (void)updateTouchHandlerWithProfile:(OSCProfile* )profile{
 #if TARGET_OS_TV
-    touchMode = TouchDisabled;
+    touchMode = TouchModeDisabled;
     self->touchHandler = nil;
     sessionTouchHandler = nil;
     (void)profile;
 #else
     touchMode = profile.touchMode;
     switch (touchMode) {
-        case NativeTouch:
+        case TouchModeNative:
             keyboardToggleRecognizer.immediateTriggering = false;
             self->touchHandler = [[NativeTouchHandler alloc] initWithView:self settings:settings profile:profile];
             [(NativeTouchHandler* )touchHandler setAllowSingleTouchEnabled:!_streamFrameVC.singleTouchDisabled];
             break;
-        case NativeTouchOnly:
+        case TouchModeNativeOnly:
             keyboardToggleRecognizer.immediateTriggering = false;
             self->touchHandler = [[PureNativeTouchHandler alloc] initWithView:self settings:settings profile:profile];
             break;
-        case RelativeTouch:
+        case TouchModeRelative:
             self->touchHandler = [[RelativeTouchHandler alloc] initWithView:self andSettings:settings];
             keyboardToggleRecognizer.immediateTriggering = false;
             // if(settings.onscreenControls.intValue == OnScreenControlsLevelCustom) keyboardToggleRecognizer.numberOfTouchesRequired = 3; //deprecated: fixing keyboard taps to 3, in order to invoke OSC rebase in stream view by 4-finger tap.
             break;
-        case AbsoluteTouch:
+        case TouchModeAbsolute:
             self->touchHandler = [[AbsoluteTouchHandler alloc] initWithView:self andSettings:settings];
             keyboardToggleRecognizer.immediateTriggering = true; //triggers signal in touchesBegan callback stage
             break;
-        case TouchDisabled:
+        case TouchModeDisabled:
             self->touchHandler = nil;
             keyboardToggleRecognizer.immediateTriggering = false;
             break;
@@ -311,7 +313,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
 #if TARGET_OS_TV
     return NO;
 #else
-    return touchMode == RelativeTouch && settings.enablePinch && settings.pinchZoom
+    return touchMode == TouchModeRelative && settings.touchMousePinchGestureMode.integerValue == TouchMousePinchGestureModeZoomViewport
         && [self.superview isKindOfClass:[UIScrollView class]];
 #endif
 }
@@ -364,7 +366,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
         else if (occlusion > 0) occlusion += 8;
         occlusion = MIN(MAX(occlusion, 0), CGRectGetHeight(scrollFrame) * 0.85);
     }
-    [TouchpadZoomHandler updateKeyboardOcclusion:occlusion];
+    [TouchPadGestureHandler updateKeyboardOcclusion:occlusion];
 }
 #endif
 
@@ -523,7 +525,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
         // the stream view's frame was never moved in this mode; give the full viewport back to the zoom handler
         keyboardLiftedByCursorMode = NO;
         isInputingText = NO;
-        [TouchpadZoomHandler updateKeyboardOcclusion:0];
+        [TouchPadGestureHandler updateKeyboardOcclusion:0];
     }
     else if(isInputingText){
         self.frame = _originalFrame;
@@ -849,8 +851,8 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
 }
 
 - (WidgetSizeReference)getCurrentWidgetSizeReference{
-    if(_widgetSizeTransition == keepWidgetSize) return longSide;
-    else if(_widgetSizeTransition == transitionWithOrientation) return self.bounds.size.width > self.bounds.size.height ? longSide : shortSide;
+    if(_widgetSizeTransition == WidgetSizeTransitionKeepWidgetSize) return longSide;
+    else if(_widgetSizeTransition == WidgetSizeTransitionTransitionWithOrientation) return self.bounds.size.width > self.bounds.size.height ? longSide : shortSide;
     else return longSide;
 }
 
@@ -1320,11 +1322,11 @@ static CGFloat previousRollAngle = 0;
 #else
     // if (@available(iOS 13.4, *)) {
     // cancel restriction of native touch for iOS13.3 & lower
-    if (touchMode == NativeTouchOnly) {
+    if (touchMode == TouchModeNativeOnly) {
         [touchHandler touchesBegan:touches withEvent:event];
         return; //This is a native touch oriented fork, in pure native touch mode, this call back method deals with native touch only.
     }
-    // else if(touchMode == RelativeTouch && keyboardToggleRecognizer.numberOfTouchesRequired == 1) return;
+    // else if(touchMode == TouchModeRelative && keyboardToggleRecognizer.numberOfTouchesRequired == 1) return;
     
     NSMutableSet* pencilTouches = [NSMutableSet set];
     for (UITouch* touch in touches) {
@@ -1336,7 +1338,7 @@ static CGFloat previousRollAngle = 0;
     if(pencilTouches.count>0){
         [_pencilHandler touchesBegan:pencilTouches withEvent:event];
         GenericUtils.pencilInStreaming = true;
-        if(touchMode == AbsoluteTouch) [_streamFrameVC setMagnifierViewportInteractionEnabled:false];
+        if(touchMode == TouchModeAbsolute) [_streamFrameVC setMagnifierViewportInteractionEnabled:false];
         nonPencilTouches = [touches mutableCopy];
         [nonPencilTouches minusSet:pencilTouches];
     }
@@ -1354,7 +1356,7 @@ static CGFloat previousRollAngle = 0;
     [self startInteractionTimer];
     
     NSSet* targetTouches = nonPencilTouches ? nonPencilTouches : touches;
-    if(touchMode != AbsoluteTouch){
+    if(touchMode != TouchModeAbsolute){
         if([self isOnScreenWidgetEnabled]) [self->_onScreenControls handleTouchDownEvent:targetTouches];
         [self->touchHandler touchesBegan:targetTouches withEvent:event];
     }
@@ -1491,7 +1493,7 @@ static CGFloat previousRollAngle = 0;
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
 #if !TARGET_OS_TV
     
-    if (touchMode == NativeTouchOnly) {
+    if (touchMode == TouchModeNativeOnly) {
         [touchHandler touchesMoved:touches withEvent:event];
         return; //This is a native touch oriented fork, in pure native touch mode, this call back method deals with native touch only.
     }
@@ -1537,7 +1539,7 @@ static CGFloat previousRollAngle = 0;
         return;
     }
     
-    if(self->touchMode != AbsoluteTouch){
+    if(self->touchMode != TouchModeAbsolute){
         [self->touchHandler touchesMoved:targetTouches withEvent:event];
         if([self isOnScreenWidgetEnabled]) [self->_onScreenControls handleTouchMovedEvent:targetTouches];
     }
@@ -1661,7 +1663,7 @@ static CGFloat previousRollAngle = 0;
     return;
 #else
 
-    if (touchMode == NativeTouchOnly) {
+    if (touchMode == TouchModeNativeOnly) {
         [touchHandler touchesEnded:touches withEvent:event];
         return; //This is a native touch oriented fork, in pure native touch mode, this call back method deals with native touch only.
     }
@@ -1697,7 +1699,7 @@ static CGFloat previousRollAngle = 0;
         return;
     }
     
-    if(touchMode != AbsoluteTouch){
+    if(touchMode != TouchModeAbsolute){
         [self->touchHandler touchesEnded:targetTouches withEvent:event]; // when touches ended, must call the native touchhandler before onScreenControls, since the NSSet of touches captured by on screen button shall be updated later
         if([self isOnScreenWidgetEnabled]) [self->_onScreenControls handleTouchUpEvent:targetTouches];
     }
@@ -1708,7 +1710,7 @@ static CGFloat previousRollAngle = 0;
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
     [touchHandler touchesCancelled:touches withEvent:event];
 #if !TARGET_OS_TV
-    if (touchMode == NativeTouchOnly) return; //This is a native touch oriented fork, in pure native touch mode, this call back method deals with native touch only.
+    if (touchMode == TouchModeNativeOnly) return; //This is a native touch oriented fork, in pure native touch mode, this call back method deals with native touch only.
     for (UITouch* touch in touches) {
         if (touch.type == UITouchTypePencil) {
             [self touchesEnded:touches withEvent:event];

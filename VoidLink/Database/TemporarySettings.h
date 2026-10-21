@@ -13,11 +13,9 @@
 #define OSC_TOOL_FINGERS 4
 
 // Touchpad settings kept in NSUserDefaults instead of Core Data, so adding them doesn't change the database schema.
-static NSString * const PinchZoomDefaultsKey = @"touchpadPinchZoom";
 static NSString * const CursorInertiaDefaultsKey = @"touchpadCursorInertia";
 static NSString * const CursorInertiaDecelerationDefaultsKey = @"touchpadCursorInertiaDeceleration";
 static const float CursorInertiaDecelerationDefault = 5.0f;
-static NSString * const FloatingKeyboardButtonDefaultsKey = @"floatingKeyboardButton";
 static NSString * const PortraitStreamOffsetDefaultsKey = @"portraitStreamVerticalOffset";
 
 
@@ -103,7 +101,8 @@ static NSString * const PortraitStreamOffsetDefaultsKey = @"portraitStreamVertic
 @property (nonatomic) BOOL delayLeftClick;
 @property (nonatomic) BOOL duckOtherApps;
 @property (nonatomic) BOOL muteInBackground;
-@property (nonatomic) BOOL enablePinch;
+@property (nonatomic, retain) NSNumber * touchMousePinchGestureMode;
+@property (nonatomic) BOOL floatingKeyboardButton;
 @property (nonatomic) BOOL ctrlDownForPinch;
 @property (nonatomic) BOOL passthroughGestures;
 @property (nonatomic, retain) NSNumber * framePacingMode;
@@ -133,10 +132,8 @@ static NSString * const PortraitStreamOffsetDefaultsKey = @"portraitStreamVertic
 @property (nonatomic, retain) NSNumber * pencilTipOffsetY;
 
 // Touchpad settings (NSUserDefaults backed):
-@property (nonatomic) BOOL pinchZoom; // Pinch Gesture is "Zoom" when enablePinch && pinchZoom, "Ctrl +/-" when enablePinch && !pinchZoom
 @property (nonatomic) BOOL cursorInertia;
 @property (nonatomic, retain) NSNumber * cursorInertiaDeceleration;
-@property (nonatomic) BOOL floatingKeyboardButton;
 @property (nonatomic, retain) NSNumber * portraitStreamOffset; // -100...100 %: vertical stream position in portrait, + moves it up
 
 

@@ -68,20 +68,20 @@
     self->activePointerIds = [NSMutableSet set];
     self->blacklistedTouches = [NSMutableSet set];
         
-    self->asyncNativeTouch = settings.asyncNativeTouchPriority.intValue != AsyncNativeTouchOff;
+    self->asyncNativeTouch = settings.asyncNativeTouchPriority.intValue != TouchEventPriorityEnumAsyncNativeTouchOff;
     
     switch(settings.asyncNativeTouchPriority.intValue){
-        case TouchDownPriority: // deprecated by GUI
+        case TouchEventPriorityEnumTouchDownPriority: // deprecated by GUI
             touchDownQos = QOS_CLASS_USER_INTERACTIVE;
             touchMoveQos = QOS_CLASS_USER_INITIATED;
             touchEndQos = QOS_CLASS_USER_INITIATED;
             break;
-        case TouchMovePriority: // deprecated by GUI
+        case TouchEventPriorityEnumTouchMovePriority: // deprecated by GUI
             touchDownQos = QOS_CLASS_USER_INITIATED;
             touchMoveQos = QOS_CLASS_USER_INTERACTIVE;
             touchEndQos = QOS_CLASS_USER_INITIATED;
             break;
-        case EqualPriority: // equals to async touch is true now
+        case TouchEventPriorityEnumEqualPriority: // equals to async touch is true now
             touchDownQos = QOS_CLASS_USER_INTERACTIVE;
             touchMoveQos = QOS_CLASS_USER_INTERACTIVE;
             touchEndQos = QOS_CLASS_USER_INITIATED;

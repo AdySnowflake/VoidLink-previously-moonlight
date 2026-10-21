@@ -30,6 +30,7 @@ static int mouseButtonForCursorMove = BUTTON_LEFT;
 
 @implementation AbsoluteTouchHandler {
     __weak StreamView* streamView;
+    TouchPadGestureHandler* gestureHandler;
     
     bool multiTouchesDetected;
     bool passthroughGestures;
@@ -66,6 +67,7 @@ static int mouseButtonForCursorMove = BUTTON_LEFT;
 - (id)initWithView:(StreamView*)view andSettings:(TemporarySettings*)settings {
     self = [self init];
     self->streamView = view;
+    gestureHandler = [[TouchPadGestureHandler alloc] initWithStreamView:view touchMode:TouchModeAbsolute settings:settings];
     
     multiTouchesDetected = false;
     passthroughGestures = settings.passthroughGestures;
@@ -185,7 +187,7 @@ static int mouseButtonForCursorMove = BUTTON_LEFT;
     
     if(currentTouchesCount == 2){
         if(mouseButtonForCursorMove!=BUTTON_LEFT) LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, mouseButtonForCursorMove);
-        if(passthroughGestures) [TouchPadGestureHandler handleGestureIn:streamView with:event];
+        if(passthroughGestures) [gestureHandler handleGestureWith:event];
     }
      
     if(currentTouchesCount > 1) return;
@@ -215,7 +217,7 @@ static int mouseButtonForCursorMove = BUTTON_LEFT;
     [longPressTimer invalidate];
     longPressTimer = nil;
     
-    if(TouchPadGestureHandler.ctrlDown) LiSendKeyboardEvent(CommandManager.keyboardButtonMappings[@"CTRL"].shortValue,KEY_ACTION_UP,0);
+    [gestureHandler endGestureWithStartInertialScroll:NO];
     
     if(touchPointSpawnedAtUpperScreenEdge) return; // we're done here. this touch event will not be sent to the remote PC.
     

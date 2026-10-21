@@ -13,7 +13,9 @@
 #import "MainFrameViewController.h"
 #import "SceneDelegate.h"
 #import "VoidLink-Swift.h"
-#import "DataManager.h"
+#import "TemporaryHost.h"
+#import "TemporaryApp.h"
+#import "TemporarySettings.h"
 
 #if TARGET_OS_TV
 @interface AppDelegate ()

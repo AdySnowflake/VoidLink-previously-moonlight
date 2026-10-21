@@ -581,10 +581,8 @@ final class ControllerNavigator: NSObject {
             DispatchQueue.main.async {
                 ThemeManager.setUserInterfaceStyle(targetTheme)
 #if !os(tvOS)
-                if let mainFrameVC = radialMenuDelegate as? MainFrameViewController, let settingsViewVC = mainFrameVC.settingsViewController {
-                    settingsViewVC.appThemeSelector.selectedSegmentIndex = targetTheme.rawValue
-                }
-                // to be dealt with
+
+                // sync swiftUISettings selector for theme change: to be dealt with
 #endif
             }
             let dataMan = DataManager()
@@ -669,12 +667,12 @@ final class ControllerNavigator: NSObject {
                 RadialMenuOverlayView.menuSectors.append(RadialMenuSector(title: "Settings Menu".localized, subtitle: "", symbol: "sidebar.left", item: .settings))
                 
                 if mainFrameVC.settingsViewExpanded {
-                    if mainFrameVC.settingsViewController.currentSettingsMenuMode == .AllSettings {
+                    if mainFrameVC.settingsViewController.currentSettingsMenuMode == .all {
                         RadialMenuOverlayView.menuSectors.append(RadialMenuSector(title: "Favorite Settings".localized, subtitle: "", symbol: "bookmark", item: .favoriteSettings))
                         RadialMenuOverlayView.menuSectors.appendIfNotContains(gameProfileItem)
                         RadialMenuOverlayView.menuSectors.appendIfNotContains(navigationSettingsItem)
                     }
-                    if mainFrameVC.settingsViewController.currentSettingsMenuMode == .FavoriteSettings {
+                    if mainFrameVC.settingsViewController.currentSettingsMenuMode == .favorite {
                         RadialMenuOverlayView.menuSectors.append(RadialMenuSector(title: "All Settings".localized, subtitle: "", symbol: "circle.grid.3x3", item: .allSettings))
                     }
                 }
@@ -1189,7 +1187,7 @@ extension SettingsViewController: ControllerUINavigationDelegate {
         }
 
         if navigation.action == "holdToNavSection" {
-            ControllerNavigator.settingsSectionNavigationHoldActive = pressed && currentSettingsMenuMode == .AllSettings
+            ControllerNavigator.settingsSectionNavigationHoldActive = pressed && currentSettingsMenuMode == .all
             return
         }
         let isHighlightingUIStack = ControllerNavigator.controllerNavigationHighlightedView is UIStackView
@@ -1251,10 +1249,10 @@ extension SettingsViewController: ControllerUINavigationDelegate {
         }
         var elements: [ControllerNavigationElement] = []
         elements.append(ControllerNavigationElement(control:ControllerNavigator.radialMenuButtonPosition == .left ? .dpadDown : .y, action: "readTip"))
-        if self.currentSettingsMenuMode == .AllSettings {
+        if self.currentSettingsMenuMode == .all {
             elements.append(ControllerNavigationElement(control:ControllerNavigator.radialMenuButtonPosition == .left ? .dpadDown : .y, action: "doublePressToAddFavorite"))
         }
-        if self.currentSettingsMenuMode == .FavoriteSettings {
+        if self.currentSettingsMenuMode == .favorite {
             elements.append(ControllerNavigationElement(control: ControllerNavigator.radialMenuButtonPosition == .left ? .dpadDown : .y, action: "doublePressToDelete"))
             elements.append(ControllerNavigationElement(control: ControllerNavigator.radialMenuButtonPosition == .left ? .dpadUp : .a, action: "holdToReorder"))
         }
@@ -1263,7 +1261,7 @@ extension SettingsViewController: ControllerUINavigationDelegate {
         elements.append(ControllerNavigationElement(control:ControllerNavigator.radialMenuButtonPosition == .left ? .rightStickY : .leftStickY, action: "menuNavigation"))
         elements.append(ControllerNavigationElement(control:ControllerNavigator.radialMenuButtonPosition == .left ? .abxy : .dpad, action: "menuNavigation"))
         
-        if self.currentSettingsMenuMode == .AllSettings {
+        if self.currentSettingsMenuMode == .all {
             elements.append(ControllerNavigationElement(control:ControllerNavigator.radialMenuButtonPosition == .left ? .dpadUp : .a, action: "holdToNavSection"))
         }
 
@@ -1275,7 +1273,7 @@ extension SettingsViewController: ControllerUINavigationDelegate {
     func navigateByController(downward:Bool) {
         guard self.hasNoPresentedVC else {return}
         if let store = swiftUISettingsStore, store.isActive {
-            if store.menuMode == .FavoriteSettings,
+            if store.menuMode == .favorite,
                ControllerNavigator.settingsFavoriteReorderActive {
                 store.moveHighlightedFavorite(by: downward ? 1 : -1)
                 return
@@ -1283,7 +1281,7 @@ extension SettingsViewController: ControllerUINavigationDelegate {
             store.moveHighlight(by: downward ? 1 : -1)
             return
         }
-        if currentSettingsMenuMode == .FavoriteSettings,
+        if currentSettingsMenuMode == .favorite,
            ControllerNavigator.settingsFavoriteReorderActive {
             moveHighlightedFavoriteSettingStack(by: downward ? 1 : -1)
             return
@@ -1424,7 +1422,7 @@ extension SettingsViewController: ControllerUINavigationDelegate {
 
     private func controllerNavigationRestorableTargets() -> [UIView] {
         var targets: [UIView] = []
-        if currentSettingsMenuMode == .FavoriteSettings || currentSettingsMenuMode == .RemoveSettingItem,
+        if currentSettingsMenuMode == .favorite || currentSettingsMenuMode == .removeSettingItem,
            let parentStack = parentStack {
             targets.append(contentsOf: visibleFavoriteSettingStacks(in: parentStack))
         }
@@ -1465,7 +1463,7 @@ extension SettingsViewController: ControllerUINavigationDelegate {
     }
 
     func controllerNavigationPersistenceIdentifier(for view: UIView) -> String? {
-        if currentSettingsMenuMode == .FavoriteSettings || currentSettingsMenuMode == .RemoveSettingItem,
+        if currentSettingsMenuMode == .favorite || currentSettingsMenuMode == .removeSettingItem,
            let topLevelStack = topLevelFavoriteSettingStack(containing: view),
            let identifier = topLevelStack.accessibilityIdentifier,
            !identifier.isEmpty {
@@ -1495,7 +1493,7 @@ extension SettingsViewController: ControllerUINavigationDelegate {
 
     private func handleControllerNavigationReorderHold(pressed: Bool) {
         if let store = swiftUISettingsStore, store.isActive {
-            guard store.menuMode == .FavoriteSettings else {
+            guard store.menuMode == .favorite else {
                 ControllerNavigator.settingsFavoriteReorderActive = false
                 return
             }
@@ -1504,7 +1502,7 @@ extension SettingsViewController: ControllerUINavigationDelegate {
         }
         
 #if !os(tvOS)
-        guard currentSettingsMenuMode == .FavoriteSettings else {
+        guard currentSettingsMenuMode == .favorite else {
             ControllerNavigator.settingsFavoriteReorderActive = false
             return
         }
@@ -1516,7 +1514,6 @@ extension SettingsViewController: ControllerUINavigationDelegate {
 
         guard ControllerNavigator.settingsFavoriteReorderActive else { return }
         ControllerNavigator.settingsFavoriteReorderActive = false
-        saveFavoriteSettingStackIdentifiers()
 #endif
     }
 
@@ -1555,25 +1552,8 @@ extension SettingsViewController: ControllerUINavigationDelegate {
                 else {
 #if !os(tvOS)
                     switch self?.currentSettingsMenuMode {
-                    case .FavoriteSettings:
+                    case .favorite:
                         self?.removeHighlightedFavoriteSettingStack()
-                    case .AllSettings:
-                        if let highlitedStack = ControllerNavigator.controllerNavigationHighlightedView as? UIStackView {
-                            self?.addSetting(toFavorite: highlitedStack)
-                            DispatchQueue.main.async {
-                                if AlertControllerUtil.autoCompletion {return}
-                                AlertControllerUtil.autoCompletion = true
-                                AlertControllerUtil.showAlert(
-                                    in: self,
-                                    title: LocalizationHelper.localizedString(forKey: ""),
-                                    message: "Setting added to favorite".localized,
-                                    withCancel: false,
-                                    buttonTitle: "",
-                                    countdown: 1,
-                                    completion: {
-                                })
-                            }
-                        }
                     default:
                         break
                     }
@@ -1619,7 +1599,7 @@ extension SettingsViewController: ControllerUINavigationDelegate {
 
 #if !os(tvOS)
     private func removeHighlightedFavoriteSettingStack() {
-        guard currentSettingsMenuMode == .FavoriteSettings,
+        guard currentSettingsMenuMode == .favorite,
               let parentStack = parentStack,
               let highlightedView = ControllerNavigator.controllerNavigationHighlightedView,
               let stack = topLevelFavoriteSettingStack(containing: highlightedView) else {
@@ -1632,7 +1612,6 @@ extension SettingsViewController: ControllerUINavigationDelegate {
 
         parentStack.removeArrangedSubview(stack)
         stack.removeFromSuperview()
-        saveFavoriteSettingStackIdentifiers()
         parentStack.setNeedsLayout()
 
         UIView.animate(withDuration: 0.12) {
@@ -1663,7 +1642,7 @@ extension SettingsViewController: ControllerUINavigationDelegate {
     }
 
     private func moveHighlightedFavoriteSettingStackOnMain(by offset: Int) {
-        guard currentSettingsMenuMode == .FavoriteSettings,
+        guard currentSettingsMenuMode == .favorite,
               let parentStack = parentStack,
               let highlightedView = ControllerNavigator.controllerNavigationHighlightedView,
               let stack = topLevelFavoriteSettingStack(containing: highlightedView),
@@ -1714,7 +1693,7 @@ extension SettingsViewController: ControllerUINavigationDelegate {
     private func moveControllerNavigationSelection(by offset: Int) {
         let allTargets = controllerNavigationTargets(skippingDisabledStacks: false)
         if ControllerNavigator.settingsSectionNavigationHoldActive,
-           currentSettingsMenuMode == .AllSettings {
+           currentSettingsMenuMode == .all {
             let sectionHeaders = allTargets.filter(isControllerNavigationSectionHeader)
             guard !sectionHeaders.isEmpty else {
                 clearControllerNavigationHighlight()
@@ -1780,12 +1759,12 @@ extension SettingsViewController: ControllerUINavigationDelegate {
         guard let parentStack = parentStack else { return [] }
 
         switch currentSettingsMenuMode {
-        case .FavoriteSettings, .RemoveSettingItem:
+        case .favorite, .removeSettingItem:
             return favoriteSettingsControllerNavigationTargets(
                 in: parentStack,
                 skippingDisabledStacks: skippingDisabledStacks
             )
-        case .AllSettings:
+        case .all:
             break
         @unknown default:
             break
@@ -1817,7 +1796,7 @@ extension SettingsViewController: ControllerUINavigationDelegate {
     private func controllerNavigationTargetsIncludingUnavailable() -> [UIView] {
         guard let parentStack = parentStack else { return [] }
         
-        if currentSettingsMenuMode == .FavoriteSettings || currentSettingsMenuMode == .RemoveSettingItem {
+        if currentSettingsMenuMode == .favorite || currentSettingsMenuMode == .removeSettingItem {
             return parentStack.arrangedSubviews.compactMap { $0 as? UIStackView }
         }
         
@@ -1895,7 +1874,7 @@ extension SettingsViewController: ControllerUINavigationDelegate {
     }
 
     private func isControllerNavigationSelectableTarget(_ view: UIView) -> Bool {
-        if currentSettingsMenuMode == .FavoriteSettings || currentSettingsMenuMode == .RemoveSettingItem {
+        if currentSettingsMenuMode == .favorite || currentSettingsMenuMode == .removeSettingItem {
             return true
         }
 

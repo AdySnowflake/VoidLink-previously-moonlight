@@ -10,7 +10,7 @@
 #endif
 #if TARGET_OS_TV
 #import "MainFrameViewController.h"
-#import "SettingsViewController.h"
+#import "VoidLink-Swift.h"
 #import "SWRevealViewController.h"
 #endif
 

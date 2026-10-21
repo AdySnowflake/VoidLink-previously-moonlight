@@ -36,7 +36,7 @@ private enum PencilProInterruptedPurchaseReset {
     ) { _ in
         let dataManager = DataManager()
         if let settings = dataManager.retrieveSettings() {
-            settings.pencilTickMode = NSNumber(value: PencilTickMode.PencilTickDisabled.rawValue)
+            settings.pencilTickMode = NSNumber(value: PencilTickMode.disabled.rawValue)
             settings.pencilTipOffsetX = 0
             settings.pencilTipOffsetY = 0
             dataManager.saveData()
@@ -463,7 +463,7 @@ enum SettingsItemID: String, Hashable, Identifiable {
         case .ctrlDownForPinch: return "Ctrl Down for Pinch"
         case .scrollSensitivity: return "Scroll Sensitivity"
         case .pinchSensitivity: return "Pinch Sensitivity"
-        case .floatingKeyboardButton: return "Keyboard Button"
+        case .floatingKeyboardButton: return "Floating Keyboard Button"
         case .onScreenWidget: return "On-Screen Widgets"
         case .buttonVisualFeedback: return "Button Visual Feedback"
         case .trackTouchPoint: return "Touch Point Tracking"
@@ -1137,19 +1137,6 @@ private enum SettingsSoftKeyboardGesture: Int {
     case disabled = 20
 }
 
-/// Pinch Gesture picker. Persisted as `enablePinch` (Core Data) plus `pinchZoom` (NSUserDefaults),
-/// so existing installs with pinch enabled keep the Ctrl +/- behavior.
-private enum SettingsPinchGestureMode: Int {
-    case disabled = 0
-    case zoom = 1
-    case ctrlPlusMinus = 2
-
-    init(enablePinch: Bool, pinchZoom: Bool) {
-        if !enablePinch { self = .disabled }
-        else { self = pinchZoom ? .zoom : .ctrlPlusMinus }
-    }
-}
-
 /// UIKit persists the streaming-settings edge as a UIRectEdge bitmask.  The
 /// picker only offers the two single-edge cases used by the original UI.
 private enum GestureScreenEdge {
@@ -1242,7 +1229,7 @@ final class SettingsItemRegistry: ObservableObject {
     let passthroughGestures = SettingsItemModel<Bool>(id: .passthroughGestures, value: true)
     let cursorInertia = SettingsItemModel<Bool>(id: .cursorInertia, value: false)
     let cursorInertiaDeceleration = SettingsItemModel<Double>(id: .cursorInertiaDeceleration, value: Double(CursorInertiaDecelerationDefault))
-    let pinchGesture = SettingsItemModel<Int>(id: .pinchGesture, value: SettingsPinchGestureMode.ctrlPlusMinus.rawValue)
+    let pinchGesture = SettingsItemModel<Int>(id: .pinchGesture, value: TouchMousePinchGestureMode.ctrlAndScroll.rawValue)
     let ctrlDownForPinch = SettingsItemModel<Bool>(id: .ctrlDownForPinch, value: true)
     let scrollSensitivity = SettingsItemModel<Double>(id: .scrollSensitivity, value: 1)
     let pinchSensitivity = SettingsItemModel<Double>(id: .pinchSensitivity, value: 1)
@@ -1286,7 +1273,7 @@ final class SettingsItemRegistry: ObservableObject {
     
     // MARK: Drawing Toolkit
 
-    let pencilTick = SettingsItemModel<Int>(id: .pencilTick, value: PencilTickMode.PencilTickDisabled.rawValue)
+    let pencilTick = SettingsItemModel<Int>(id: .pencilTick, value: PencilTickMode.disabled.rawValue)
     let pencilTickInterval = SettingsItemModel<Double>(id: .pencilTickInterval, value: 1500)
     let pencilTipOffset = SettingsItemModel<Bool>(id: .pencilTipOffset, value: false)
     let pressureCurve = SettingsItemModel<Bool>(id: .pressureCurve, value: false)
@@ -1777,8 +1764,10 @@ fileprivate final class SettingsBlockInteractionState: ObservableObject {
 final class SettingsSession: NSObject, ObservableObject {
     @Published var isStreaming = false
     @Published private(set) var isGameProfileModified = false
+    @Published private(set) var isTouchMouseZoomViewportEnabled = false
     fileprivate let itemRegistry = SettingsItemRegistry()
     private var itemRegistryCancellable: AnyCancellable?
+    private var touchMouseZoomViewportCancellable: AnyCancellable?
 
     fileprivate let navigationState = SettingsNavigationState()
     var highlightedID: String? {
@@ -1907,7 +1896,7 @@ final class SettingsSession: NSObject, ObservableObject {
         )
         itemRegistry.delayLeftClick.value = snapshot.delayLeftClick
         itemRegistry.passthroughGestures.value = snapshot.passthroughGestures
-        itemRegistry.pinchGesture.value = SettingsPinchGestureMode(enablePinch: snapshot.enablePinch, pinchZoom: snapshot.pinchZoom).rawValue
+        itemRegistry.pinchGesture.value = snapshot.touchMousePinchGestureMode.intValue
         itemRegistry.cursorInertia.value = snapshot.cursorInertia
         itemRegistry.cursorInertiaDeceleration.value = min(10, max(1, snapshot.cursorInertiaDeceleration.doubleValue))
         itemRegistry.ctrlDownForPinch.value = snapshot.ctrlDownForPinch
@@ -1992,8 +1981,8 @@ final class SettingsSession: NSObject, ObservableObject {
         itemRegistry.enableGraphs.value = snapshot.enableGraphs
         itemRegistry.sendDummyEvent.value = snapshot.sendDummyEvent
 
-        let persistedMenuMode = SettingsMenuMode(rawValue: snapshot.settingsMenuMode.intValue) ?? .AllSettings
-        menuMode = persistedMenuMode == .RemoveSettingItem ? .FavoriteSettings : persistedMenuMode
+        let persistedMenuMode = SettingsMenuMode(rawValue: snapshot.settingsMenuMode.intValue) ?? .all
+        menuMode = persistedMenuMode == .removeSettingItem ? .favorite : persistedMenuMode
         let savedFavoriteIdentifiers = (UserDefaults.standard.array(forKey: settingsFavoriteIdentifiersKey) as? [String])
             ?? defaultFavoriteSettingIdentifiers
         favoriteSettingIdentifiers = migratedFavoriteSettingIdentifiers(savedFavoriteIdentifiers)
@@ -2059,7 +2048,7 @@ final class SettingsSession: NSObject, ObservableObject {
             ) { [weak self] _ in
                 guard let self else { return }
                 self.itemRegistry.onScreenWidget.value = OnScreenControlsLevel.custom.rawValue
-                self.itemRegistry.pencilTick.value = PencilTickMode.ManualTick.rawValue
+                self.itemRegistry.pencilTick.value = PencilTickMode.manualTick.rawValue
             }
         ]
         
@@ -2078,6 +2067,30 @@ final class SettingsSession: NSObject, ObservableObject {
         // Match UIKit's settingsViewJustLoaded behavior: establish the initial
         // hidden-state baseline without flashing rows restored from persistence.
         knownVisibleSettingIDs = conditionallyVisibleSettingIDs
+
+        isTouchMouseZoomViewportEnabled = itemRegistry.touchMode.value == TouchMode.relative.rawValue
+            && itemRegistry.pinchGesture.value == TouchMousePinchGestureMode.zoomViewport.rawValue
+        touchMouseZoomViewportCancellable = Publishers.CombineLatest(
+            itemRegistry.touchMode.$value,
+            itemRegistry.pinchGesture.$value
+        )
+        .map { touchMode, pinchMode -> Bool in
+            return touchMode == TouchMode.relative.rawValue
+                && pinchMode == TouchMousePinchGestureMode.zoomViewport.rawValue
+        }
+        .removeDuplicates()
+        .dropFirst() // Establish the initial state without resetting the stream viewport.
+        .sink { [weak self] enabled in
+            guard let self else { return }
+            self.isTouchMouseZoomViewportEnabled = enabled
+            if !enabled {
+                if let streamFrameVC = StreamFrameViewController.sharedInstance(),
+                   TouchPadGestureHandler.hasUsedZoomViewport(in: streamFrameVC.streamView) {
+                    streamFrameVC.resetMagnifierStreamViewWith(animated: true)
+                    streamFrameVC.streamView.saveStreamingGameProfileChanges()
+                }
+            }
+        }
     }
 
     deinit {
@@ -2088,8 +2101,8 @@ final class SettingsSession: NSObject, ObservableObject {
 
     var isActive: Bool { presentingController != nil }
     var usesMetal: Bool { itemRegistry.renderingBackend.value == SettingsRenderingBackend.metal.rawValue }
-    var isAllSettings: Bool { menuMode == .AllSettings }
-    var isRemovingFavorites: Bool { menuMode == .RemoveSettingItem }
+    var isAllSettings: Bool { menuMode == .all }
+    var isRemovingFavorites: Bool { menuMode == .removeSettingItem }
 
     /// Settings may remain mounted beneath ProfileSelector or an alert. Those
     /// controllers own ControllerNavigator at that time, so a SwiftUI rerender
@@ -2540,18 +2553,18 @@ final class SettingsSession: NSObject, ObservableObject {
 
     var touchModeOptions: [SettingsPickerOption<Int>] {
         [
-            .init(value: TouchMode.RelativeTouch.rawValue, title: "Touchpad".localized),
-            .init(value: TouchMode.NativeTouch.rawValue, title: "Native Touch".localized),
-            .init(value: TouchMode.AbsoluteTouch.rawValue, title: "Single Point".localized),
-            .init(value: TouchMode.TouchDisabled.rawValue, title: "Disabled".localized)
+            .init(value: TouchMode.relative.rawValue, title: "Touch Mouse".localized),
+            .init(value: TouchMode.native.rawValue, title: "Native Touch".localized),
+            .init(value: TouchMode.absolute.rawValue, title: "Single Point".localized),
+            .init(value: TouchMode.disabled.rawValue, title: "Disabled".localized)
         ]
     }
 
     var pinchGestureOptions: [SettingsPickerOption<Int>] {
         [
-            .init(value: SettingsPinchGestureMode.disabled.rawValue, title: "Disabled".localized),
-            .init(value: SettingsPinchGestureMode.zoom.rawValue, title: "Zoom".localized),
-            .init(value: SettingsPinchGestureMode.ctrlPlusMinus.rawValue, title: "Ctrl +/-")
+            .init(value: TouchMousePinchGestureMode.disabled.rawValue, title: "Disabled".localized),
+            .init(value: TouchMousePinchGestureMode.zoomViewport.rawValue, title: "Zoom Viewport".localized),
+            .init(value: TouchMousePinchGestureMode.ctrlAndScroll.rawValue, title: "Ctrl+Scroll".localized)
         ]
     }
 
@@ -2582,19 +2595,19 @@ final class SettingsSession: NSObject, ObservableObject {
                     let display = settingsVelocityDisplayPercent(for: model.value)
                     return "\(Int(display))%"
                 },
-                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.RelativeTouch.rawValue }
+                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.relative.rawValue }
             ),
             toggleItem(
-                \.cursorInertia,
-                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.RelativeTouch.rawValue }
+                \.passthroughGestures,
+                isVisible: {$0.itemRegistry.touchMode.value == TouchMode.absolute.rawValue}
             ),
             sliderItem(
-                \.cursorInertiaDeceleration,
-                range: 1...10,
-                clampedTo: 1...10,
-                valueText: { _, model in "\(Int(model.value.rounded()))" },
-                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.RelativeTouch.rawValue
-                             && $0.itemRegistry.cursorInertia.value }
+                \.scrollSensitivity,
+                range: 0...3,
+                clampedTo: 0...3,
+                valueText: { _, model in "\(Int((model.value * 100).rounded()))%" },
+                isVisible: {$0.itemRegistry.touchMode.value == TouchMode.relative.rawValue || ($0.itemRegistry.touchMode.value == TouchMode.absolute.rawValue
+                    && $0.itemRegistry.passthroughGestures.value)}
             ),
             sliderItem(
                 \.pointerVelocityDivider,
@@ -2604,7 +2617,7 @@ final class SettingsSession: NSObject, ObservableObject {
                     let divider = Int(model.value.rounded())
                     return "| \(divider)% | \(100 - divider)% |"
                 },
-                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.NativeTouch.rawValue },
+                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.native.rawValue },
                 hasInfo: true,
                 isGameProfileSetting: true,
                 continuousInteraction: SettingsContinuousInteractionDescriptor(
@@ -2624,7 +2637,7 @@ final class SettingsSession: NSObject, ObservableObject {
                     let display = settingsVelocityDisplayPercent(for: model.value)
                     return "\(Int(display))%"
                 },
-                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.NativeTouch.rawValue },
+                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.native.rawValue },
                 hasInfo: true,
                 isGameProfileSetting: true,
                 continuousInteraction: SettingsContinuousInteractionDescriptor(
@@ -2636,52 +2649,29 @@ final class SettingsSession: NSObject, ObservableObject {
                     }
                 )
             ),
-            toggleItem(
-                \.delayLeftClick,
-                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.AbsoluteTouch.rawValue },
-                hasInfo: true
-            ),
-            toggleItem(
-                \.passthroughGestures,
-                isVisible: {$0.itemRegistry.touchMode.value == TouchMode.AbsoluteTouch.rawValue}
-            ),
             pickerItem(
                 \.pinchGesture,
                 options: { $0.pinchGestureOptions },
                 distribution: .proportionalToContent,
-                // UIKit reveals this row with passthroughGesturesSwitchFlipped:
-                // derive the same relationship directly from the source item.
-                // Zoom only works in touchpad mode; with absolute touch passthrough it sends no pinch input.
-                isVisible: {$0.itemRegistry.touchMode.value == TouchMode.RelativeTouch.rawValue || ($0.itemRegistry.touchMode.value == TouchMode.AbsoluteTouch.rawValue
-                    && $0.itemRegistry.passthroughGestures.value)}
+                isVisible: {$0.itemRegistry.touchMode.value == TouchMode.relative.rawValue}
             ),
             toggleItem(
                 \.ctrlDownForPinch,
-                isVisible: {($0.itemRegistry.touchMode.value == TouchMode.RelativeTouch.rawValue
-                             && $0.itemRegistry.pinchGesture.value == SettingsPinchGestureMode.ctrlPlusMinus.rawValue)
-                            || ($0.itemRegistry.touchMode.value == TouchMode.AbsoluteTouch.rawValue
-                            && $0.itemRegistry.passthroughGestures.value
-                            && $0.itemRegistry.pinchGesture.value == SettingsPinchGestureMode.ctrlPlusMinus.rawValue)},
+                isVisible: {($0.itemRegistry.touchMode.value == TouchMode.relative.rawValue
+                             && $0.itemRegistry.pinchGesture.value == TouchMousePinchGestureMode.ctrlAndScroll.rawValue)
+                            || ($0.itemRegistry.touchMode.value == TouchMode.absolute.rawValue
+                            && $0.itemRegistry.passthroughGestures.value)},
                 hasInfo: true
-            ),
-            sliderItem(
-                \.scrollSensitivity,
-                range: 0...3,
-                clampedTo: 0...3,
-                valueText: { _, model in "\(Int((model.value * 100).rounded()))%" },
-                isVisible: {$0.itemRegistry.touchMode.value == TouchMode.RelativeTouch.rawValue || ($0.itemRegistry.touchMode.value == TouchMode.AbsoluteTouch.rawValue
-                    && $0.itemRegistry.passthroughGestures.value)}
             ),
             sliderItem(
                 \.pinchSensitivity,
                 range: 0...3,
                 clampedTo: 0...3,
                 valueText: { _, model in "\(Int((model.value * 100).rounded()))%" },
-                isVisible: {($0.itemRegistry.touchMode.value == TouchMode.RelativeTouch.rawValue
-                             && $0.itemRegistry.pinchGesture.value != SettingsPinchGestureMode.disabled.rawValue)
-                            || ($0.itemRegistry.touchMode.value == TouchMode.AbsoluteTouch.rawValue
-                            && $0.itemRegistry.passthroughGestures.value
-                            && $0.itemRegistry.pinchGesture.value == SettingsPinchGestureMode.ctrlPlusMinus.rawValue)},
+                isVisible: {($0.itemRegistry.touchMode.value == TouchMode.relative.rawValue
+                             && $0.itemRegistry.pinchGesture.value != TouchMousePinchGestureMode.disabled.rawValue)
+                            || ($0.itemRegistry.touchMode.value == TouchMode.absolute.rawValue
+                            && $0.itemRegistry.passthroughGestures.value)},
             ),
             pickerItem(
                 \.onScreenWidget,
@@ -2697,11 +2687,7 @@ final class SettingsSession: NSObject, ObservableObject {
                 \.buttonVisualFeedback,
                 isVisible: { _ in true }
             ),
-            toggleItem(\.trackTouchPoint),
-            toggleItem(
-                \.floatingKeyboardButton,
-                isAvailable: !PublicUtils.isTVOS
-            )
+            toggleItem(\.trackTouchPoint)
         ]
     }
 
@@ -2767,12 +2753,12 @@ final class SettingsSession: NSObject, ObservableObject {
 
     private var hapticEngineOptions: [SettingsPickerOption<Int>] {
         var options: [SettingsPickerOption<Int>] = [
-            .init(value: HapticEnginePreference.HapticEngineAuto.rawValue, title: "Auto".localized),
-            .init(value: HapticEnginePreference.LeftRightSwapped.rawValue, title: "L/R Swapped".localized),
-            .init(value: HapticEnginePreference.RumbleOff.rawValue, title: "Disabled".localized)
+            .init(value: HapticEnginePreference.auto.rawValue, title: "Auto".localized),
+            .init(value: HapticEnginePreference.leftRightSwapped.rawValue, title: "L/R Swapped".localized),
+            .init(value: HapticEnginePreference.rumbleOff.rawValue, title: "Disabled".localized)
         ]
         if PublicUtils.isIPhone {
-            options.insert(.init(value: HapticEnginePreference.RumbleDevice.rawValue, title: "Built-in".localized), at: 1)
+            options.insert(.init(value: HapticEnginePreference.rumbleDevice.rawValue, title: "Built-in".localized), at: 1)
         }
         return options
     }
@@ -2794,14 +2780,14 @@ final class SettingsSession: NSObject, ObservableObject {
             supportsControllerGyro = false
         }
         var options:[SettingsPickerOption<Int>] = [
-            .init(value: GyroMode.GyroModeOff.rawValue, title: "Off".localized),
-            .init(value: GyroMode.GyroModeAuto.rawValue, title: "Auto".localized, isEnabled: supportsControllerGyro),
-            .init(value: GyroMode.AlwaysController.rawValue, title: "Controller".localized, isEnabled: supportsControllerGyro)
+            .init(value: GyroMode.off.rawValue, title: "Off".localized),
+            .init(value: GyroMode.auto.rawValue, title: "Auto".localized, isEnabled: supportsControllerGyro),
+            .init(value: GyroMode.alwaysController.rawValue, title: "Controller".localized, isEnabled: supportsControllerGyro)
         ]
         
 #if !os(tvOS)
         if !PublicUtils.isTVOS && !PublicUtils.isRunningOnMacAsiPadApp {
-            options.insert(.init(value: GyroMode.AlwaysDevice.rawValue, title: "Built-in".localized, isEnabled: CMMotionManager().isGyroAvailable), at: 2)
+            options.insert(.init(value: GyroMode.alwaysDevice.rawValue, title: "Built-in".localized, isEnabled: CMMotionManager().isGyroAvailable), at: 2)
         }
 #endif
         
@@ -2917,7 +2903,7 @@ final class SettingsSession: NSObject, ObservableObject {
                 clampedTo: 0...300,
                 valueText: { _, model in "\(Int(model.value.rounded()))%" },
                 isVisible: { $0.itemRegistry.emulatedControllerType.value != Int(ControllerEmulation.xbox.rawValue)
-                    && $0.itemRegistry.gyroMode.value != GyroMode.GyroModeOff.rawValue }
+                    && $0.itemRegistry.gyroMode.value != GyroMode.off.rawValue }
             ),
             sliderItem(
                 \.leftStickMinOffset,
@@ -3091,8 +3077,8 @@ final class SettingsSession: NSObject, ObservableObject {
 
     private var pencilTickOptions: [SettingsPickerOption<Int>] {
         [
-            .init(value: PencilTickMode.PencilTickDisabled.rawValue, title: "Regular".localized),
-            .init(value: PencilTickMode.ManualTick.rawValue, title: "HD".localized)
+            .init(value: PencilTickMode.disabled.rawValue, title: "Regular".localized),
+            .init(value: PencilTickMode.manualTick.rawValue, title: "HD".localized)
         ]
     }
 
@@ -3119,7 +3105,7 @@ final class SettingsSession: NSObject, ObservableObject {
                 range: 1500...4000,
                 clampedTo: 1500...4000,
                 valueText: { _, model in "\(Int(model.value.rounded())) μs" },
-                isVisible: { $0.itemRegistry.pencilTick.value == PencilTickMode.ManualTick.rawValue }
+                isVisible: { $0.itemRegistry.pencilTick.value == PencilTickMode.manualTick.rawValue }
             ),
             toggleItem(
                 \.pencilTipOffset,
@@ -3530,6 +3516,10 @@ final class SettingsSession: NSObject, ObservableObject {
                  },
             ),
             toggleItem(
+                \.floatingKeyboardButton,
+                isAvailable: !PublicUtils.isTVOS
+            ),
+            toggleItem(
                 \.softKeyboardToolbar,
                 isAvailable: !PublicUtils.isTVOS
             ),
@@ -3619,12 +3609,24 @@ final class SettingsSession: NSObject, ObservableObject {
                     GenericUtils.handleTouchModeChangingTip(in: session.presentingController)
                 }
             ),
+            toggleItem(
+                \.cursorInertia,
+                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.relative.rawValue }
+            ),
+            sliderItem(
+                \.cursorInertiaDeceleration,
+                range: 1...10,
+                clampedTo: 1...10,
+                valueText: { _, model in "\(Int(model.value.rounded()))" },
+                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.relative.rawValue
+                             && $0.itemRegistry.cursorInertia.value }
+            ),
             sliderItem(
                 \.relativeTouchSlideThreshold,
                 range: 0...20,
                 clampedTo: 0...20,
                 valueText: { _, model in String(format: " %.1f ", model.value) },
-                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.RelativeTouch.rawValue },
+                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.relative.rawValue },
                 hasInfo: true
             ),
             sliderItem(
@@ -3632,14 +3634,19 @@ final class SettingsSession: NSObject, ObservableObject {
                 range: 0...5,
                 clampedTo: 0...5,
                 valueText: { _, model in String(format: "  %.1f  ", model.value) },
-                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.RelativeTouch.rawValue }
+                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.relative.rawValue }
+            ),
+            toggleItem(
+                \.delayLeftClick,
+                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.absolute.rawValue },
+                hasInfo: true
             ),
             sliderItem(
                 \.leftClickDelay,
                 range: 0...1000,
                 clampedTo: 0...1000,
                 valueText: { _, model in "  \(Int(model.value.rounded())) ms  " },
-                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.AbsoluteTouch.rawValue }
+                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.absolute.rawValue }
             ),
             pickerItem(
                 \.renderingBackend,
@@ -4274,7 +4281,7 @@ final class SettingsSession: NSObject, ObservableObject {
     }
     
     fileprivate func updateSectionHitTesting(for scrollView: UIScrollView, refresh: Bool = false) {
-        if menuMode == .FavoriteSettings {
+        if menuMode == .favorite {
             guard enablesSectionHitTestCulling, scrollView.window != nil else { return }
             let viewport = scrollView.convert(scrollView.bounds, to: nil)
             for id in favoriteSettingIDs {
@@ -4619,8 +4626,8 @@ final class SettingsSession: NSObject, ObservableObject {
     private func reloadGameProfileSettings() {
         let profile = OSCProfilesManager.sharedManager(CGRect.zero).getSelectedProfile()
         let storedTouchMode = Int(profile.touchMode)
-        let displayedTouchMode = storedTouchMode == TouchMode.NativeTouchOnly.rawValue
-            ? TouchMode.NativeTouch.rawValue
+        let displayedTouchMode = storedTouchMode == TouchMode.nativeOnly.rawValue
+            ? TouchMode.native.rawValue
             : storedTouchMode
 
         // MARK: Touch Control
@@ -4725,17 +4732,16 @@ final class SettingsSession: NSObject, ObservableObject {
         settings.touchPointerVelocityFactor = NSNumber(value: settingsVelocityFactor(for: itemRegistry.pointerVelocityFactor.value))
         settings.delayLeftClick = itemRegistry.delayLeftClick.value
         settings.passthroughGestures = itemRegistry.passthroughGestures.value
-        settings.enablePinch = itemRegistry.pinchGesture.value != SettingsPinchGestureMode.disabled.rawValue
+        settings.touchMousePinchGestureMode = NSNumber(value: itemRegistry.pinchGesture.value)
         settings.ctrlDownForPinch = itemRegistry.ctrlDownForPinch.value
         settings.scrollSensitivity = NSNumber(value: itemRegistry.scrollSensitivity.value)
         settings.pinchSensitivity = NSNumber(value: itemRegistry.pinchSensitivity.value)
         settings.onscreenControls = NSNumber(value: itemRegistry.onScreenWidget.value)
         settings.buttonVisualFeedback = itemRegistry.buttonVisualFeedback.value
         settings.touchPointTracking = itemRegistry.trackTouchPoint.value
-        UserDefaults.standard.set(itemRegistry.pinchGesture.value == SettingsPinchGestureMode.zoom.rawValue, forKey: PinchZoomDefaultsKey)
         UserDefaults.standard.set(itemRegistry.cursorInertia.value, forKey: CursorInertiaDefaultsKey)
         UserDefaults.standard.set(itemRegistry.cursorInertiaDeceleration.value.rounded(), forKey: CursorInertiaDecelerationDefaultsKey)
-        UserDefaults.standard.set(itemRegistry.floatingKeyboardButton.value, forKey: FloatingKeyboardButtonDefaultsKey)
+        settings.floatingKeyboardButton = itemRegistry.floatingKeyboardButton.value
         UserDefaults.standard.set(itemRegistry.portraitStreamOffset.value.rounded(), forKey: PortraitStreamOffsetDefaultsKey)
 
         // MARK: Controller
@@ -5177,9 +5183,9 @@ final class SettingsSession: NSObject, ObservableObject {
     }
 
     fileprivate func pencilTickChanged() {
-        guard itemRegistry.pencilTick.value == PencilTickMode.ManualTick.rawValue else { return }
+        guard itemRegistry.pencilTick.value == PencilTickMode.manualTick.rawValue else { return }
         requirePencilPro(rollback: { [weak self] in
-            self?.itemRegistry.pencilTick.value = PencilTickMode.PencilTickDisabled.rawValue
+            self?.itemRegistry.pencilTick.value = PencilTickMode.disabled.rawValue
         })
     }
 
@@ -5259,7 +5265,7 @@ final class SettingsSession: NSObject, ObservableObject {
     }
 
     private func resetPencilProItemsAfterInterruptedPurchase() {
-        itemRegistry.pencilTick.value = PencilTickMode.PencilTickDisabled.rawValue
+        itemRegistry.pencilTick.value = PencilTickMode.disabled.rawValue
         itemRegistry.pressureCurve.value = false
         itemRegistry.doubleTapShortcut.value = false
         itemRegistry.squeezeShortcut.value = false
@@ -5366,7 +5372,7 @@ final class SettingsSession: NSObject, ObservableObject {
         stopFavoriteAutoscroll()
         ControllerNavigator.settingsSectionNavigationHoldActive = false
         menuMode = newMode
-        if newMode != .RemoveSettingItem {
+        if newMode != .removeSettingItem {
             let dataManager = DataManager()
             if let settings = dataManager.retrieveSettings() {
                 settings.settingsMenuMode = NSNumber(value: newMode.rawValue)
@@ -5378,7 +5384,7 @@ final class SettingsSession: NSObject, ObservableObject {
     }
 
     func requestAddFavorite(for id: SettingsItemID, anchorRect: CGRect) {
-        guard menuMode == .AllSettings,
+        guard menuMode == .all,
               let identifier = favoriteIdentifier(for: id),
               let presentingController,
               presentingController.presentedViewController == nil else { return }
@@ -5424,9 +5430,9 @@ final class SettingsSession: NSObject, ObservableObject {
               let identifier = favoriteIdentifier(for: id) else { return }
 
         switch menuMode {
-        case .AllSettings:
+        case .all:
             addFavorite(identifier: identifier, showFeedback: true)
-        case .FavoriteSettings:
+        case .favorite:
             removeFavorite(identifier: identifier)
         default:
             break
@@ -5492,7 +5498,7 @@ final class SettingsSession: NSObject, ObservableObject {
             }
             return
         }
-        guard menuMode == .FavoriteSettings,
+        guard menuMode == .favorite,
               let highlightedID,
               let id = SettingsItemID.settingItem(rawValue: highlightedID),
               let identifier = favoriteIdentifier(for: id),
@@ -5541,7 +5547,7 @@ final class SettingsSession: NSObject, ObservableObject {
     }
 
     private func favoriteAutoscrollFrame(_ link: CADisplayLink) {
-        guard menuMode == .FavoriteSettings, draggedFavoriteID != nil,
+        guard menuMode == .favorite, draggedFavoriteID != nil,
               let scrollView = navigationScrollView else {
             stopFavoriteAutoscroll(reason: "frame: missing active drag/scrollView")
             return
@@ -5560,7 +5566,7 @@ final class SettingsSession: NSObject, ObservableObject {
     }
 
     fileprivate func favoriteDragTarget(at point: CGPoint, in view: UIView) -> (SettingsItemID, UIView)? {
-        guard menuMode == .FavoriteSettings else { return nil }
+        guard menuMode == .favorite else { return nil }
         for id in favoriteSettingIDs where isVisible(id) {
             guard let row = favoriteLongPressTargets[id]?.view, row.window != nil,
                   row.bounds.contains(view.convert(point, to: row)) else { continue }
@@ -5570,7 +5576,7 @@ final class SettingsSession: NSObject, ObservableObject {
     }
 
     fileprivate func updateFavoriteAutoscroll(locationInScrollView location: CGPoint) {
-        guard menuMode == .FavoriteSettings, draggedFavoriteID != nil,
+        guard menuMode == .favorite, draggedFavoriteID != nil,
               let scrollView = navigationScrollView else {
             stopFavoriteAutoscroll(reason: "missing drag/scrollView")
             return
@@ -5583,7 +5589,7 @@ final class SettingsSession: NSObject, ObservableObject {
     }
 
     func moveDraggedFavorite(over destination: SettingsItemID) {
-        guard menuMode == .FavoriteSettings,
+        guard menuMode == .favorite,
               let source = draggedFavoriteID,
               source != destination,
               let sourceIndex = favoriteSettingIdentifiers.firstIndex(of: source.rawValue),
@@ -5785,7 +5791,7 @@ final class SettingsSession: NSObject, ObservableObject {
     }
 
     private var visibleNavigationIDs: [String] {
-        guard menuMode != .AllSettings else { return allSettingsNavigationIDs }
+        guard menuMode != .all else { return allSettingsNavigationIDs }
         return favoriteSettingIDs.compactMap { id -> String? in
             guard isVisible(id), isEnabled(id) else { return nil }
             return id.rawValue
@@ -5793,14 +5799,14 @@ final class SettingsSession: NSObject, ObservableObject {
     }
 
     private var sectionHeaderNavigationIDs: [String] {
-        guard menuMode == .AllSettings else { return [] }
+        guard menuMode == .all else { return [] }
         return settingsCatalog.compactMap { descriptor in
             hasVisibleItems(descriptor) ? "sectionHeader-\(descriptor.id.rawValue)" : nil
         }
     }
 
     private var completeNavigationOrderForHighlightRestoration: [String] {
-        guard menuMode == .AllSettings else {
+        guard menuMode == .all else {
             return favoriteSettingIDs.map(\.rawValue)
         }
 
@@ -5824,12 +5830,12 @@ final class SettingsSession: NSObject, ObservableObject {
         showNavigationHighlightForControllerNavigation()
         schedulePendingHighlightMove(
             by: offset,
-            usingSectionHeadersOnly: ControllerNavigator.settingsSectionNavigationHoldActive && menuMode == .AllSettings
+            usingSectionHeadersOnly: ControllerNavigator.settingsSectionNavigationHoldActive && menuMode == .all
         )
     }
 
     func setSectionNavigationHoldActive(_ isActive: Bool) {
-        ControllerNavigator.settingsSectionNavigationHoldActive = isActive && menuMode == .AllSettings
+        ControllerNavigator.settingsSectionNavigationHoldActive = isActive && menuMode == .all
     }
 
     func cancelPendingHighlightMoves() {
@@ -5985,7 +5991,7 @@ final class SettingsSession: NSObject, ObservableObject {
         if isFavorite {
             favoriteItemControls[itemID] = control.map { SettingsWeakControl($0) }
             // Apply this favorite row's state, never its original section's state.
-            control?.isUserInteractionEnabled = (menuMode != .FavoriteSettings ||
+            control?.isUserInteractionEnabled = (menuMode != .favorite ||
                 favoriteItemInteractionState(for: itemID).allowsHitTesting) && isItemUserInteractionEnabled(itemID)
             return
         }
@@ -6127,7 +6133,7 @@ final class SettingsSession: NSObject, ObservableObject {
     func persistHighlight() {
         guard let highlightedID else { return }
         let persistedID: String
-        if menuMode != .AllSettings,
+        if menuMode != .all,
            let id = SettingsItemID.settingItem(rawValue: highlightedID),
            let favoriteID = favoriteIdentifier(for: id) {
             persistedID = favoriteID
@@ -6194,10 +6200,10 @@ final class SettingsSession: NSObject, ObservableObject {
         var elements = [
             ControllerNavigationElement(control:ControllerNavigator.radialMenuButtonPosition == .left ? .dpadDown : .y, action: "readTip")
         ]
-        if menuMode == .AllSettings {
+        if menuMode == .all {
             elements.append(ControllerNavigationElement(control:ControllerNavigator.radialMenuButtonPosition == .left ? .dpadDown : .y, action: "doublePressToAddFavorite"))
         }
-        if menuMode == .FavoriteSettings {
+        if menuMode == .favorite {
             elements.append(ControllerNavigationElement(control: ControllerNavigator.radialMenuButtonPosition == .left ? .dpadDown : .y, action: "doublePressToDelete"))
             elements.append(ControllerNavigationElement(control: ControllerNavigator.radialMenuButtonPosition == .left ? .dpadUp : .a, action: "holdToReorder"))
         }
@@ -6205,7 +6211,7 @@ final class SettingsSession: NSObject, ObservableObject {
         elements.append(ControllerNavigationElement(control: ControllerNavigator.radialMenuButtonPosition == .left ? .rightStickY : .leftStickY, action: "menuNavigation"))
         elements.append(ControllerNavigationElement(control: ControllerNavigator.radialMenuButtonPosition == .left ? .abxy : .dpad, action: "menuNavigation"))
         
-        if menuMode == .AllSettings {
+        if menuMode == .all {
             elements.append(ControllerNavigationElement(control:ControllerNavigator.radialMenuButtonPosition == .left ? .dpadUp : .a, action: "holdToNavSection"))
         }
         
@@ -6937,7 +6943,7 @@ private struct SettingsFavoriteItemsView: View {
         .modifier(SettingsFavoriteDragModifier(id: id, store: store, enabled: !store.isRemovingFavorites))
         .modifier(SettingsBlockInteractionModifier(
             state: store.favoriteItemInteractionState(for: id),
-            appliesViewportCulling: enablesSectionHitTestCulling && store.menuMode == .FavoriteSettings
+            appliesViewportCulling: enablesSectionHitTestCulling && store.menuMode == .favorite
         ))
     }
 }
@@ -7352,7 +7358,7 @@ private struct SettingsScrollViewResolver: UIViewRepresentable {
 
         func updateFavoriteDragSource() {
 #if !os(tvOS)
-            guard let scrollView = resolvedScrollView, store?.menuMode == .FavoriteSettings else {
+            guard let scrollView = resolvedScrollView, store?.menuMode == .favorite else {
                 if let source = favoriteDragSource {
                     source.interaction.view?.removeInteraction(source.interaction)
                     source.store?.stopFavoriteAutoscroll(reason: "drag source detached")
@@ -7403,7 +7409,7 @@ private struct SettingsScrollViewResolver: UIViewRepresentable {
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             originalScrollDelegate?.scrollViewDidScroll?(scrollView)
-            if store?.menuMode == .FavoriteSettings {
+            if store?.menuMode == .favorite {
                 // Native drag autoscroll changes offset through UIScrollView;
                 // update the newly visible drop rows immediately.
                 store?.updateSectionHitTesting(for: scrollView)
@@ -7848,16 +7854,16 @@ extension SettingsViewController {
     @objc func setSwiftUISettingsMenuMode(_ rawValue: Int) {
         guard let mode = SettingsMenuMode(rawValue: rawValue) else { return }
         swiftUISettingsStore?.setMenuMode(mode)
-        if mode == .AllSettings {
+        if mode == .all {
             swiftUISettingsStore?.refreshSectionHitTesting()
         }
-        if mode == .FavoriteSettings {
+        if mode == .favorite {
             self.swiftUISettingsStore?.warmUpFavoriteHitTestStateForCurrentScrollPosition()
         }
     }
 
     @objc func swiftUISettingsMenuModeRawValue() -> Int {
-        swiftUISettingsStore?.menuMode.rawValue ?? SettingsMenuMode.AllSettings.rawValue
+        swiftUISettingsStore?.menuMode.rawValue ?? SettingsMenuMode.all.rawValue
     }
     
     @objc func expandSection(identifier: String) {

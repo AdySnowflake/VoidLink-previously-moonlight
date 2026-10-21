@@ -14,7 +14,10 @@
 #import "VoidController.h"
 #import "VoidLink-Swift.h"
 
-#import "DataManager.h"
+#import "AppDelegate.h"
+#import "TemporaryHost.h"
+#import "TemporaryApp.h"
+#import "TemporarySettings.h"
 #include "Limelight.h"
 
 @import GameController;
@@ -130,7 +133,7 @@ static __weak ControllerSupport *VLSharedControllerSupport = nil;
         
     if (voidController == nil && controllerNumber == 0 && _oscEnabled) {
         // no physical controller connected:
-        if(preference != RumbleOff){
+        if(preference != HapticEnginePreferenceRumbleOff){
             [_oscController.lowFreqMotor setMotorAmplitude:lowFreqMotor];
             [_oscController.highFreqMotor setMotorAmplitude:highFreqMotor];
         }
@@ -152,19 +155,19 @@ static __weak ControllerSupport *VLSharedControllerSupport = nil;
     
     // physical controller connected:
     switch (preference) {
-        case HapticEngineAuto:
+        case HapticEnginePreferenceAuto:
             // if controller has no haptic profile, it already falled bakc to device engine
             [self applyPhysicalControllerRumble:voidController lowFreqMotor:lowFreqMotor highFreqMotor:highFreqMotor];
             break;
-        case RumbleDevice:
+        case HapticEnginePreferenceRumbleDevice:
             [self applyPhysicalControllerRumble:voidController lowFreqMotor:0 highFreqMotor:0];
             [_oscController.lowFreqMotor setMotorAmplitude:lowFreqMotor];
             [_oscController.highFreqMotor setMotorAmplitude:highFreqMotor];
             break;
-        case LeftRightSwapped:
+        case HapticEnginePreferenceLeftRightSwapped:
             [self applyPhysicalControllerRumble:voidController lowFreqMotor:highFreqMotor highFreqMotor:lowFreqMotor];
             break;
-        case RumbleOff:
+        case HapticEnginePreferenceRumbleOff:
             [self applyPhysicalControllerRumble:voidController lowFreqMotor:0 highFreqMotor:0];
             break;
         default:
@@ -529,7 +532,7 @@ static __weak ControllerSupport *VLSharedControllerSupport = nil;
         
         VoidController* voidController = [_voidControllers objectForKey:[NSNumber numberWithInteger:controllerNumber]];
         //using device motion
-        if (voidController == nil || _gyroMode == AlwaysDevice) {
+        if (voidController == nil || _gyroMode == GyroModeAlwaysDevice) {
             // No connected controller for this player, use the _oscController instead
             voidController = _oscController;
             if(!voidController.motionTypes){
@@ -1202,7 +1205,7 @@ static __weak ControllerSupport *VLSharedControllerSupport = nil;
             
             bool controllerLacksGyro = (capabilities & LI_CCAP_GYRO) == 0;
             if((_streamConfig.emulatedControllerType == ControllerEmulationPs || _streamConfig.emulatedControllerType == ControllerEmulationPsEnhancedHaptic)
-               && (_gyroMode == AlwaysDevice || (_gyroMode == GyroModeAuto && controllerLacksGyro)))
+               && (_gyroMode == GyroModeAlwaysDevice || (_gyroMode == GyroModeAuto && controllerLacksGyro)))
             {
                 type = LI_CTYPE_PS;
                 capabilities |= LI_CCAP_GYRO | LI_CCAP_ACCEL;
@@ -1302,7 +1305,7 @@ double rc_expo(double x, double expo) {
 
 - (bool)useMotionHandler{
     return tempSettings.gyroMode.intValue == GyroModeOff
-    || tempSettings.gyroMode.intValue == AlwaysDevice;
+    || tempSettings.gyroMode.intValue == GyroModeAlwaysDevice;
 }
 
 - (void)switchMotionControlOnOffByControllerButton{
@@ -1878,7 +1881,7 @@ double rc_expo(double x, double expo) {
     // Even if no gamepads are present, we will always count one if OSC is enabled,
     // or it's set to auto and no keyboard or mouse is present. Absolute touch mode
     // disables the OSC.
-    if (level != OnScreenControlsLevelOff && (![ControllerSupport hasKeyboardOrMouse] || level != OnScreenControlsLevelAuto) && (settings.touchMode.intValue == RelativeTouch)) {
+    if (level != OnScreenControlsLevelOff && (![ControllerSupport hasKeyboardOrMouse] || level != OnScreenControlsLevelAuto) && (settings.touchMode.intValue == TouchModeRelative)) {
         mask |= 0x1;
     }
     
@@ -1927,7 +1930,7 @@ double rc_expo(double x, double expo) {
         [ControllerNavigator configureControllerMouseWith:tempSettings];
     }
     
-    _controllerGyroSwitchEnabled = oscProfile.controllerGyroSwitchMode != ControllerGyroSwitchDisabled;
+    _controllerGyroSwitchEnabled = oscProfile.controllerGyroSwitchMode != ControllerGyroSwitchModeDisabled;
     _gyroSwitchMode = oscProfile.controllerGyroSwitchMode;
     // _gyroSwitchMode = ControllerGyroSwitchHoldDownToActivate;
     _controllerGyroSwitchToggle = oscProfile.controllerGyroSwitchToggle;
@@ -1940,7 +1943,7 @@ double rc_expo(double x, double expo) {
     _leftStickMinOffset = oscProfile.physicalLeftStickMinOffset;
     _rightStickMinOffset = oscProfile.physicalRightStickMinOffset;
 
-    // if(oscProfile.controllerGyroSwitchMode == ControllerGyroSwitchDisabled && ![self useMotionHandler]) _gyroEnabledFlag = false;
+    // if(oscProfile.controllerGyroSwitchMode == ControllerGyroSwitchModeDisabled && ![self useMotionHandler]) _gyroEnabledFlag = false;
     _gyroEnabledFlag = false;
     
     // if(![self useMotionHandler]) [self->motionHandler stopMotionUpdateWithInterruptNoneGyroInput:false];
@@ -2032,7 +2035,7 @@ double rc_expo(double x, double expo) {
             
             // Re-evaluate the on-screen control mode
             //[self updateAutoOnScreenControlMode];
-            if((self->_gyroMode == GyroModeAuto && [self externalControllersHaveGyro]) || self->_gyroMode == AlwaysController){
+            if((self->_gyroMode == GyroModeAuto && [self externalControllersHaveGyro]) || self->_gyroMode == GyroModeAlwaysController){
                 [self stopTimerForController:self->_oscController];
                 [self updateTimerStateForController:voidController];
             }
@@ -2153,7 +2156,7 @@ double rc_expo(double x, double expo) {
     
     _oscController = [[VoidController alloc] init];
     [self initializeControllerHaptics:_oscController];
-    _gyroMode = AlwaysDevice;
+    _gyroMode = GyroModeAlwaysDevice;
 
     // _controllerMouseEnabledFlag = false;
     
@@ -2235,7 +2238,7 @@ double rc_expo(double x, double expo) {
 
     _gyroEnabledFlag = [self psGyroEnabledInSetting];
     switch(_gyroMode) {
-        case AlwaysController:
+        case GyroModeAlwaysController:
             // Activate timers only for physical controllers.
             for (VoidController* voidController in _voidControllers.allValues) {
                 if(voidController == _oscController) break;
@@ -2255,7 +2258,7 @@ double rc_expo(double x, double expo) {
             }
             break;
 
-        case AlwaysDevice:
+        case GyroModeAlwaysDevice:
             // Always start the device gyro in this mode.
             [self updateTimerStateForController:self->_oscController];
             break;

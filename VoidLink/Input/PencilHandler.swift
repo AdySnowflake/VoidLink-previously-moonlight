@@ -68,8 +68,8 @@ import UIKit
         self.streamView = streamView
         streamAspectRatio = settings.width.floatValue/settings.height.floatValue
         tickInterval = TimeInterval(settings.pencilTickIntervalUs.floatValue/1000000)
-        manualTick = settings.pencilTickMode.intValue == PencilTickMode.ManualTick.rawValue
-        pencilTickEnabled = settings.pencilTickMode.intValue != PencilTickMode.PencilTickDisabled.rawValue
+        manualTick = settings.pencilTickMode.intValue == PencilTickMode.manualTick.rawValue
+        pencilTickEnabled = settings.pencilTickMode.intValue != PencilTickMode.disabled.rawValue
         pencilTipOffset = CGPoint(x: CGFloat(settings.pencilTipOffsetX?.floatValue ?? 0),
                                   y: CGFloat(settings.pencilTipOffsetY?.floatValue ?? 0))
         // initialMoveEventIndexLimit = UIScreen.main.maximumFramesPerSecond > 60 ? 4 : 2

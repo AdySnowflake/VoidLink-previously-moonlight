@@ -7407,6 +7407,29 @@
         }
       }
     },
+    "Ctrl+Scroll" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ctrl+滚轮"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ctrl+滾輪"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ctrl+滾輪"
+          }
+        }
+      }
+    },
     "ctrlDownForPinchStackTip" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7455,6 +7478,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "目前設定檔"
+          }
+        }
+      }
+    },
+    "Cursor Inertia" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指针惯性"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指標慣性"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指標慣性"
           }
         }
       }
@@ -7691,6 +7737,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "深色"
+          }
+        }
+      }
+    },
+    "Deceleration" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "减速力度"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "減速力度"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "減速力度"
           }
         }
       }
@@ -10359,6 +10428,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "語音擷取與一般音訊兩種模式的音量由系統分別儲存，您可能需要手動調整兩種模式下的聽感音量平衡"
+          }
+        }
+      }
+    },
+    "Floating Keyboard Button" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "软键盘悬浮按钮"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "軟鍵盤懸浮按鈕"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "軟鍵盤懸浮按鈕"
           }
         }
       }
@@ -22585,25 +22677,25 @@
         }
       }
     },
-    "Touchpad" : {
+    "Touch Mouse" : {
       "extractionState" : "manual",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "触控板"
+            "value" : "触控鼠标"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "觸控板"
+            "value" : "觸控滑鼠"
           }
         },
         "zh-HK" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "觸控板"
+            "value" : "觸控滑鼠"
           }
         }
       }
@@ -24135,6 +24227,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "啟用 YUV 4:4:4 時，建議同時啟用「SDR 效能優化路徑」。"
+          }
+        }
+      }
+    },
+    "Zoom Viewport" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "视图缩放"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "視圖縮放"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "視圖縮放"
           }
         }
       }

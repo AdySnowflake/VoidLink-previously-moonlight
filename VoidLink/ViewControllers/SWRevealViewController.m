@@ -907,7 +907,7 @@ const int FrontViewPositionNone = 0xff;
     
     _contentView.rearNavView.hidden = _frontViewPosition == FrontViewPositionLeft;
     
-    if(_frontViewPosition == FrontViewPositionLeft && currentMenuMode == RemoveSettingItem){
+    if(_frontViewPosition == FrontViewPositionLeft && currentMenuMode == SettingsMenuModeRemoveSettingItem){
         [self doneRemoveSettingItemSelected];
     }
 
@@ -1165,10 +1165,10 @@ const int FrontViewPositionNone = 0xff;
 
         // 创建菜单
         switch ([self getSettingsMenuMode]) {
-            case AllSettings:
+            case SettingsMenuModeAll:
                 menu = [UIMenu menuWithTitle:@"" children:@[[self getFavoriteMenuAction]]];
                 break;
-            case FavoriteSettings:
+            case SettingsMenuModeFavorite:
                 menu = [UIMenu menuWithTitle:@"" children:@[action1, action2]];
                 break;
             default:
@@ -1208,12 +1208,12 @@ const int FrontViewPositionNone = 0xff;
     }];
     
     switch ([self getSettingsMenuMode]) {
-        case AllSettings:
+        case SettingsMenuModeAll:
             [actionSheet addAction:favoritesAction];break;
-        case FavoriteSettings:
+        case SettingsMenuModeFavorite:
             [actionSheet addAction:allSettingsAction];
             [actionSheet addAction:enterRemoveItemsAction];break;
-        case RemoveSettingItem:
+        case SettingsMenuModeRemoveSettingItem:
             [actionSheet addAction:doneRemoveItemsAction];break;
         default:
             break;
@@ -1230,7 +1230,7 @@ const int FrontViewPositionNone = 0xff;
     if ([self.navBarMenuDelegate respondsToSelector:@selector(getSettingsMenuMode)]) {
         return [self.navBarMenuDelegate getSettingsMenuMode];
 
-    } else return AllSettings;
+    } else return SettingsMenuModeAll;
 }
 
 - (void)favoriteSettingSelected {
@@ -1268,9 +1268,9 @@ const int FrontViewPositionNone = 0xff;
 
 - (void)disconnectRemoteSession{
     //先不要运行foldRearView, 以确保在断开时可以捕获 hiddenStacks （在串流中展开时已被设置了setHidden）,执行临时hidden = false,并重新计算heightContraint, 因此可确保substacks发生转移前恢复原有高度。以下切换all/favorite的方法内置了layoutSettingsView方法，该方法会在新的superView根据额外维护的清单隐藏stack，从而避免stack以hidden状态发生superView转移。
-    if([self getSettingsMenuMode] == RemoveSettingItem) [self doneRemoveSettingItemSelected];
-    if([self getSettingsMenuMode] == AllSettings) [self allSettingSelected];
-    if([self getSettingsMenuMode] == FavoriteSettings) [self favoriteSettingSelected];
+    if([self getSettingsMenuMode] == SettingsMenuModeRemoveSettingItem) [self doneRemoveSettingItemSelected];
+    if([self getSettingsMenuMode] == SettingsMenuModeAll) [self allSettingSelected];
+    if([self getSettingsMenuMode] == SettingsMenuModeFavorite) [self favoriteSettingSelected];
     
     // foldRearView此时, 收起时先通过mainFrame委托方法触发setHidden:false(hidden=false, 并更新清单) 再由内部willMoveToPosition运行layoutSettingsView，根据清单执行隐藏, 确保经过setHidden:false的stack可以恢复显示。
     [self foldRearView];

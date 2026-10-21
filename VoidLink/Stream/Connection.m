@@ -12,7 +12,11 @@
 #import "Connection.h"
 #import "Plot.h"
 #import "Utils.h"
-#import "DataManager.h"
+#import "AppDelegate.h"
+#import "TemporaryHost.h"
+#import "TemporaryApp.h"
+#import "TemporarySettings.h"
+#import "VoidLink-Swift.h"
 
 #import <VideoToolbox/VideoToolbox.h>
 
@@ -993,7 +997,7 @@ void ClDs5HapticsIrV2(const LI_DS5_HAPTICS_IR_FRAME_V2* frame)
     _clCallbacks.setControllerLED = ClSetControllerLED;
     _clCallbacks.setAdaptiveTriggers = ClSetAdaptiveTriggers;
     useDualSenseAuthoredPCM = (config.emulatedControllerType == ControllerEmulationPsEnhancedHaptic
-                               && ControllerUtil.hasDualSenseController) || config.hapticEngine == RumbleDevice;
+                               && ControllerUtil.hasDualSenseController) || config.hapticEngine == HapticEnginePreferenceRumbleDevice;
     if (useDualSenseAuthoredPCM) {
         _clCallbacks.ds5HapticsPcm = ClDs5HapticsPcm;
         // _clCallbacks.ds5HapticsIrV2 = ClDs5HapticsIrV2;

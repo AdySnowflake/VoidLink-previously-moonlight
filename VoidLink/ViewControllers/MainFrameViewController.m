@@ -17,14 +17,15 @@
 #import "Connection.h"
 #import "StreamManager.h"
 #import "Utils.h"
-#import "DataManager.h"
+#import "AppDelegate.h"
+#import "TemporaryHost.h"
+#import "TemporaryApp.h"
 #import "TemporarySettings.h"
 #import "WakeOnLanManager.h"
 #import "AppListResponse.h"
 #import "ServerInfoResponse.h"
 #import "StreamFrameViewController.h"
 #import "LoadingFrameViewController.h"
-#import "TemporaryApp.h"
 #import "IdManager.h"
 #import "ConnectionHelper.h"
 #import "LocalizationHelper.h"
@@ -32,12 +33,9 @@
 #if !TARGET_OS_TV
 #import "CustomEdgeSlideGestureRecognizer.h"
 #endif
-#import "DataManager.h"
 #import "VoidLink-Swift.h"
 
-#if !TARGET_OS_TV
-#import "SettingsViewController.h"
-#else
+#if TARGET_OS_TV
 #import <sys/utsname.h>
 #endif
 
@@ -1413,79 +1411,6 @@ static NSMutableSet* hostList;
             return;
         }
     }
-#if !TARGET_OS_TV
-    [self.settingsViewController setHidden:_settingsExpandedInStreamView forStack:self.settingsViewController.resolutionStack];
-    [self.settingsViewController setHidden:_settingsExpandedInStreamView forStack:self.settingsViewController.fpsStack];
-    // [self.settingsViewController widget:self.settingsViewController.bitrateSlider setEnabled:!self.settingsExpandedInStreamView];
-    [self.settingsViewController setHidden:_settingsExpandedInStreamView forStack:self.settingsViewController.optimizeGamesStack];
-    [self.settingsViewController setHidden:_settingsExpandedInStreamView forStack:self.settingsViewController.audioOnPcStack];
-    [self.settingsViewController setHidden:_settingsExpandedInStreamView forStack:self.settingsViewController.sdrPerformanceWorkaroundStack];
-    // [self.settingsViewController.touchModeSelector1 setEnabled:!_settingsExpandedInStreamView || !(self.settingsViewController.touchModeSelector1.selectedSegmentIndex == AbsoluteTouch && !self.settingsViewController.passthroughGesturesSwitch.isOn)];
-    // [self.settingsViewController.touchModeSelector2 setEnabled:self.settingsViewController.touchModeSelector1.enabled];
-    
-    [self.settingsViewController.codecSelector setEnabled:!_settingsExpandedInStreamView];
-    if(_settingsExpandedInStreamView){
-        [self.settingsViewController.yuv444Switch setEnabled:NO];
-        [self.settingsViewController.fullColorRangeSwitch setEnabled:NO];
-        [self.settingsViewController.hdrSwitch setEnabled:NO];
-    }
-    else [self.settingsViewController updateCodecDependentSwitches];
-    
-    [self.settingsViewController.gyroModeSelector setEnabled:!_settingsExpandedInStreamView || ![streamFrameViewController shallDisableGyroHotSwitch]];
-    [self.settingsViewController.emulatedControllerTypeSelector setEnabled:!_settingsExpandedInStreamView];
-    [self.settingsViewController setHidden:_settingsExpandedInStreamView forStack:self.settingsViewController.citrixX1MouseStack];
-    [self.settingsViewController setHidden:_settingsExpandedInStreamView forStack:self.settingsViewController.externalDisplayModeStack];
-    
-    if(self.settingsViewController.audioConfigSelector.numberOfSegments>2){
-        if(_settingsExpandedInStreamView){
-            if(self.settingsViewController.audioConfigSelector.selectedSegmentIndex>=2){
-                [self.settingsViewController.audioConfigSelector setEnabled:false];
-            }
-            else {
-                [self.settingsViewController.audioConfigSelector setEnabled:false forSegmentAtIndex:2];
-                [self.settingsViewController.audioConfigSelector setEnabled:false forSegmentAtIndex:3];
-            }
-        }
-        else{
-            [self.settingsViewController.audioConfigSelector setEnabled:true];
-            [self.settingsViewController.audioConfigSelector setEnabled:true forSegmentAtIndex:2];
-            [self.settingsViewController.audioConfigSelector setEnabled:true forSegmentAtIndex:3];
-        }
-    }
-    
-    [self.settingsViewController setHidden:_settingsExpandedInStreamView forStack:self.settingsViewController.duckOtherAppStack];
-    [self.settingsViewController setHidden:_settingsExpandedInStreamView forStack:self.settingsViewController.pipStack];
-    [self.settingsViewController setHidden:_settingsExpandedInStreamView forStack:self.settingsViewController.appThemeStack];
-    [self.settingsViewController.renderingBackendSelector setEnabled:!_settingsExpandedInStreamView];
-    // Enable frame pacing mode selector only if not in stream view AND not in performance mode
-    BOOL shouldEnableFrameQueueSettings = !_settingsExpandedInStreamView && (self.settingsViewController.renderingBackendSelector.selectedSegmentIndex != RENDER_METAL);
-    // [self.settingsViewController.framePacingModeSelector setEnabled:shouldEnableFrameQueueSettings];
-    
-    if(self.settingsViewController.framePacingModeSelector.selectedSegmentIndex != FramePacingModeOff
-       && self.settingsViewController.framePacingModeSelector.selectedSegmentIndex != FramePacingModeLegacy) {
-        [self.settingsViewController.framePacingModeSelector setEnabled:!_settingsExpandedInStreamView forSegmentAtIndex:FramePacingModeOff];
-        [self.settingsViewController.framePacingModeSelector setEnabled:!_settingsExpandedInStreamView forSegmentAtIndex:FramePacingModeLegacy];
-    }
-    else [self.settingsViewController.framePacingModeSelector setEnabled:!_settingsExpandedInStreamView];
-    
-    if(FrameInterpolator.deviceSupportsInterpolation){
-        [self.settingsViewController.framePacingModeSelector setEnabled:_settingsViewController.framerateSelector.selectedSegmentIndex != _settingsViewController.framerateSelector.numberOfSegments-1
-         || !self.isStreaming forSegmentAtIndex:FramePacingModeInterpolation];
-    }
-
-    // [self.settingsViewController.frameTimebaseSwitch setEnabled:shouldEnableFramePacing];
-    [self.settingsViewController.asyncFrameDequeueSwitch setEnabled:shouldEnableFrameQueueSettings];
-    [self.settingsViewController setHidden:_settingsExpandedInStreamView || !(shouldEnableFrameQueueSettings && self.settingsViewController.framePacingModeSelector.selectedSegmentIndex == FramePacingModeQueue) forStack:self.settingsViewController.frameQueueSizeStack];
-    [self.settingsViewController setHidden:!(self.settingsViewController.framePacingModeSelector.selectedSegmentIndex == FramePacingModeInterpolation) forStack:self.settingsViewController.interpolationLevelStack];
-    [self.settingsViewController setHidden:_settingsExpandedInStreamView || !(self.settingsViewController.framePacingModeSelector.selectedSegmentIndex == FramePacingModeInterpolation) forStack:self.settingsViewController.streamDimensionScaleStack];
-
-    // Disable mic switch if sunshine does not support mic redirection
-    [self.settingsViewController.redirectMicSwitch setEnabled:!_settingsExpandedInStreamView||streamFrameViewController.micStreamInitialized];
-    if(_settingsExpandedInStreamView && !streamFrameViewController.micStreamInitialized) [self.settingsViewController.redirectMicSwitch setOn:false];
-    [self.settingsViewController setHidden:!self.settingsViewController.redirectMicSwitch.isOn forStack:self.settingsViewController.useBuiltinMicStack];
-    [self.settingsViewController.useBuiltinMicSwitch setEnabled:!_settingsExpandedInStreamView];
-    // [self.settingsViewController.passthroughGesturesSwitch setEnabled:!_settingsExpandedInStreamView];
-#endif
 }
 
 - (void)revealController:(SWRevealViewController *)revealController didMoveToPosition:(FrontViewPosition)position {
@@ -2852,17 +2777,7 @@ static NSMutableSet* hostList;
         [dataMan saveData];
 
 
-        if (@available(iOS 14.0, *)) {
-            if (self.settingsViewController.usesSwiftUISettings) return;
-        }
-        
-#if !TARGET_OS_TV
-        double delayInSeconds = 0.02;
-        dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
-        dispatch_after(popTime, dispatch_get_main_queue(), ^{
-            [self.settingsViewController hideDynamicLabelsWhenOverlapped:self.settingsViewController.parentStack];
-        });
-#endif
+
     }
 }
 

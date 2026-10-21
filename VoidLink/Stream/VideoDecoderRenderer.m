@@ -13,7 +13,9 @@
 @import AVFoundation;
 @import VideoToolbox;
 
-#import "DataManager.h"
+#import "AppDelegate.h"
+#import "TemporaryHost.h"
+#import "TemporaryApp.h"
 #import "TemporarySettings.h"
 #import "VideoDecoderRenderer.h"
 #import "FrameQueue.h"

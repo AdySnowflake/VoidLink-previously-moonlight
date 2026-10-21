@@ -10,7 +10,7 @@
 //
 
 #import "StreamView.h"
-#import "DataManager.h"
+#import "TemporarySettings.h"
 #import "CustomTapGestureRecognizer.h"
 
 #define RIGHTCLICK_TAP_DOWN_TIME_THRESHOLD_S 0.1

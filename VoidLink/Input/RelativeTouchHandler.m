@@ -7,7 +7,10 @@
 //
 
 #import "RelativeTouchHandler.h"
-#import "DataManager.h"
+#import "AppDelegate.h"
+#import "TemporaryHost.h"
+#import "TemporaryApp.h"
+#import "TemporarySettings.h"
 #import "VoidLink-Swift.h"
 
 #include <Limelight.h>
@@ -38,7 +41,7 @@ static const float QUICK_TAP_TIME_INTERVAL = 0.2;
     
     CADisplayLink *displayLink;
     
-    TouchpadZoomHandler* zoomHandler;
+    TouchPadGestureHandler* gestureHandler;
     CursorInertia* cursorInertia; // nil when Cursor Inertia is disabled
     
 #if TARGET_OS_TV
@@ -73,12 +76,11 @@ static const float QUICK_TAP_TIME_INTERVAL = 0.2;
     screenWidthWithThreshold = CGRectGetWidth([[UIScreen mainScreen] bounds]) - _edgeTolerance;
     self->touchPointSpawnedAtUpperScreenEdge = false;
     
-    zoomHandler = [[TouchpadZoomHandler alloc] initWithStreamView:view];
-    zoomHandler.pinchZoomEnabled = settings.enablePinch && settings.pinchZoom;
+    gestureHandler = [[TouchPadGestureHandler alloc] initWithStreamView:view touchMode:TouchModeRelative settings:settings];
     if(settings.cursorInertia){
-        __weak TouchpadZoomHandler* weakZoomHandler = zoomHandler;
+        __weak TouchPadGestureHandler* weakGestureHandler = gestureHandler;
         cursorInertia = [[CursorInertia alloc] initWithDeceleration:settings.cursorInertiaDeceleration.floatValue handler:^(CGVector delta) {
-            [weakZoomHandler moveCursorBy:delta];
+            [weakGestureHandler moveCursorBy:delta];
         }];
     }
     
@@ -195,7 +197,7 @@ static const float QUICK_TAP_TIME_INTERVAL = 0.2;
         
     NSSet* currentTouches = [UITouchUtil touchesIn:streamView from:event];
         
-    if(![self isOnScreenControllerBeingPressed:currentTouches]) [TouchPadGestureHandler handleGestureIn:streamView with:event zoomHandler:zoomHandler];
+    if(![self isOnScreenControllerBeingPressed:currentTouches]) [gestureHandler handleGestureWith:event];
          
     if(multiTouchesDetected) return;
     
@@ -211,9 +213,7 @@ static const float QUICK_TAP_TIME_INTERVAL = 0.2;
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
     
-    if(TouchPadGestureHandler.ctrlDown) LiSendKeyboardEvent(CommandManager.keyboardButtonMappings[@"CTRL"].shortValue,KEY_ACTION_UP,0);
-    
-    [TouchPadGestureHandler startInertialScroll];
+    [gestureHandler endGestureWithStartInertialScroll:YES];
     
     if(multiTouchesDetected){
         if([UITouchUtil touchesIn:streamView from:event].count == touches.count){
@@ -255,7 +255,7 @@ static const float QUICK_TAP_TIME_INTERVAL = 0.2;
     touchPointSpawnedAtUpperScreenEdge = false;
 }
 
-// Runs on the main thread: TouchpadZoomHandler may need to pan the zoomed stream view.
+// Runs on the main thread: TouchPadGestureHandler may need to pan the zoomed stream view.
 // It converts the delta into relative mouse movement, or absolute cursor positions while zoomed.
 - (void)sendMouseMoveEvent:(CGPoint)currentLocation timestamp:(NSTimeInterval)timestamp{
     bool isAdjacentPoints = [self isAdjacentPoints:initialMousePointerLocation from:currentLocation tolerance:currentSettings.relativeTouchSlideThreshold.floatValue];
@@ -273,7 +273,7 @@ static const float QUICK_TAP_TIME_INTERVAL = 0.2;
     if(touchPointSpawnedAtUpperScreenEdge) return; // we're done here. this touch event will not be sent to the remote PC.
     if(!firstTouchMoved || (delta.dx == 0 && delta.dy == 0)) return;
     
-    [zoomHandler moveCursorBy:delta];
+    [gestureHandler moveCursorBy:delta];
     [cursorInertia recordMove:delta timestamp:timestamp];
 }
 

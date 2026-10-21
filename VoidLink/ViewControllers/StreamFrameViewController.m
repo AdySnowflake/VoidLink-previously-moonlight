@@ -16,7 +16,10 @@
 #import "StreamManager.h"
 #import "SceneDelegate.h"
 #import "ControllerSupport.h"
-#import "DataManager.h"
+#import "AppDelegate.h"
+#import "TemporaryHost.h"
+#import "TemporaryApp.h"
+#import "TemporarySettings.h"
 #import "PaddedLabel.h"
 #import "ImGuiRenderer.h"
 #import "MetalVideoRenderer.h"
@@ -122,7 +125,6 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
     UILabel *_stageLabel;
     UILabel *_tipLabel;
     UIActivityIndicatorView *_spinner;
-    StreamView *_streamView;
     BOOL _magnifierViewportInteractionActive;
     BOOL _userIsInteracting;
     bool viewIsBeingResized;
@@ -392,7 +394,7 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
         _oscLayoutTapRecoginizer.tapDownTimeThreshold = 0.2;
         _oscLayoutTapRecoginizer.delaysTouchesBegan = NO;
         _oscLayoutTapRecoginizer.delaysTouchesEnded = NO;
-        if(_settings.touchMode.intValue == AbsoluteTouch) _oscLayoutTapRecoginizer.immediateTriggering = true; // make immediate triggering on for absolute touch mode
+        if(_settings.touchMode.intValue == TouchModeAbsolute) _oscLayoutTapRecoginizer.immediateTriggering = true; // make immediate triggering on for absolute touch mode
         [self.view addGestureRecognizer:_oscLayoutTapRecoginizer];
         _oscLayoutTapRecoginizer.touchCapturingView = _streamView;
     }
@@ -589,7 +591,7 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
 - (void)handleScrollPan:(UIPanGestureRecognizer *)gesture {
     switch (gesture.state){
         case UIGestureRecognizerStateEnded:
-            if(_oscProfile.touchMode == AbsoluteTouch && _scrollView.zoomScale < 1.0) [self resetMagnifierStreamViewWithAnimated:true];
+            if(_oscProfile.touchMode == TouchModeAbsolute && _scrollView.zoomScale < 1.0) [self resetMagnifierStreamViewWithAnimated:true];
             break;
         default:
             break;
@@ -775,14 +777,8 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
     _motionHandler.controllerGyroBiasY = _settings.controllerGyroBiasY.doubleValue;
     _motionHandler.controllerGyroBiasZ = _settings.controllerGyroBiasZ.doubleValue;
 
-    TouchPadGestureHandler.enablePinch = _settings.enablePinch;
-    TouchPadGestureHandler.ctrlDownForPinch = _settings.ctrlDownForPinch;
-    TouchPadGestureHandler.pinchZoom = _settings.pinchZoom;
-    TouchPadGestureHandler.scrollSensitivity = _settings.scrollSensitivity.floatValue;
-    TouchPadGestureHandler.pinchSensitivity = _settings.pinchSensitivity.floatValue;
-    TouchPadGestureHandler.displayLinkRate = _settings.framerate.intValue;
     
-    [self setMagnifierViewportInteractionEnabled:_oscProfile.touchMode == AbsoluteTouch && !_settings.passthroughGestures];
+    [self setMagnifierViewportInteractionEnabled:_oscProfile.touchMode == TouchModeAbsolute && !_settings.passthroughGestures];
     
     GenericUtils.globeAsEscape = _settings.globeAsEscape;
     
@@ -1193,7 +1189,7 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
 }
 
 #if !TARGET_OS_TV
-// Optional on-screen keyboard button (Others > Keyboard Button), independent of custom on-screen widgets.
+// Optional on-screen keyboard button (Others > Floating Keyboard Button), independent of custom on-screen widgets.
 - (void)updateFloatingKeyboardButton {
     if (!_settings.floatingKeyboardButton) {
         [_floatingKeyboardButton removeFromSuperview];
@@ -1281,7 +1277,7 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
 }
 
 - (void)setMagnifierViewportInteractionEnabled:(BOOL)enabled {
-    _magnifierViewportInteractionActive = enabled || (_oscProfile.touchMode == AbsoluteTouch && !_settings.passthroughGestures && !GenericUtils.pencilInStreaming);
+    _magnifierViewportInteractionActive = enabled || (_oscProfile.touchMode == TouchModeAbsolute && !_settings.passthroughGestures && !GenericUtils.pencilInStreaming);
     [self updateScrollViewInteractionState];
 }
 
@@ -1303,7 +1299,7 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
             streamViewOffset = self->_appliedRestingOffset;
         }
         [self restoreMagnifierStreamViewWithOffset:streamViewOffset scale:profile.streamViewScale animated:YES];
-        [self setMagnifierViewportInteractionEnabled:profile.touchMode == AbsoluteTouch && !self->_settings.passthroughGestures];
+        [self setMagnifierViewportInteractionEnabled:profile.touchMode == TouchModeAbsolute && !self->_settings.passthroughGestures];
     });
 }
 
@@ -1386,7 +1382,7 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
     if (scrollView == _scrollView) {
 #if !TARGET_OS_TV
-        [TouchpadZoomHandler scrollViewDidScroll:scrollView];
+        [TouchPadGestureHandler scrollViewDidScroll:scrollView];
 #endif
         [self syncMagnifierStateFromScrollView];
     }
