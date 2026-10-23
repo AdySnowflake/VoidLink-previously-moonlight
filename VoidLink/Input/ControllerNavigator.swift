@@ -500,12 +500,32 @@ final class ControllerNavigator: NSObject {
     
     private static func navigateContinuously(downward: Bool) {
         navigationTimer?.clean()
-        uiNavigationDelegate?.navigateByController(downward: downward)
+        let move: () -> Void
+        if let settings = uiNavigationDelegate as? SettingsViewController,
+           let store = settings.swiftUISettingsStore, store.isActive {
+            // Capture before either main-queue hop; centering invalidates this generation.
+            let generation = store.currentHighlightMoveGeneration
+            move = { [weak settings, weak store] in
+                PublicUtils.runOnMain {
+                    guard let settings, let store, store.isActive, settings.hasNoPresentedVC,
+                          uiNavigationDelegate === settings,
+                          generation == store.currentHighlightMoveGeneration else { return }
+                    if store.menuMode == .favorite, settingsFavoriteReorderActive {
+                        store.moveHighlightedFavorite(by: downward ? 1 : -1)
+                    } else {
+                        store.moveHighlight(by: downward ? 1 : -1, cancellationGeneration: generation)
+                    }
+                }
+            }
+        } else {
+            move = { uiNavigationDelegate?.navigateByController(downward: downward) }
+        }
+        move()
         navigationTimer = SafeTimer(
             interval: navigationContinuousRepeatInterval,
             delay: navigationInitialRepeatDelay
         ) {
-            uiNavigationDelegate?.navigateByController(downward: downward)
+            move()
         }
         navigationTimer?.restart(minimumRunCount: 0)
     }
@@ -781,6 +801,12 @@ final class ControllerNavigator: NSObject {
             let verticalNavigationAxis: ControllerElement = ControllerNavigator.radialMenuButtonPosition == .right ? .leftStickY : .rightStickY
             ControllerUtil.listenPrimaryControllerStickAxis(verticalNavigationAxis, threshold: 0.6) {state in
                 GamepadNavigationIllustrationHud.updateActionState(for: verticalNavigationAxis, isInAction: state != .orderedSame)
+                // Invalidate queued repeats even if an overlay now blocks navigation.
+                if state == .orderedSame {
+                    navigationTimer?.clean()
+                    (uiNavigationDelegate as? SettingsViewController)?.swiftUISettingsStore?.cancelPendingHighlightMoves()
+                    return
+                }
                 guard radialMenuView == nil else {return}
                 if ControllerNavigator.shouldBlockAppControllerNavigator {return}
                 switch state {
@@ -803,12 +829,7 @@ final class ControllerNavigator: NSObject {
                         }
                     }
                 case .orderedSame:
-                    navigationTimer?.clean()
-                    if let settingsViewController = uiNavigationDelegate as? SettingsViewController,
-                       let store = settingsViewController.swiftUISettingsStore,
-                       store.isActive {
-                        store.cancelPendingHighlightMoves()
-                    }
+                    break // Centering is handled before the overlay/blocking guards.
                 }
             }
             ControllerUtil.listenPrimaryControllerButton(upNavButton) {pressed in 

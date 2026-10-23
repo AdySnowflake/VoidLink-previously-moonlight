@@ -1844,6 +1844,7 @@ final class SettingsSession: NSObject, ObservableObject {
     private var pendingHighlightMoveOffset: Int?
     private var pendingHighlightMoveUsesSectionHeadersOnly: Bool?
     private var pendingHighlightMoveScheduled = false
+    private var highlightMoveCancellationGeneration: UInt64 = 0
 
     init(presentingController: UIViewController) {
 #if os(tvOS)
@@ -5883,17 +5884,25 @@ final class SettingsSession: NSObject, ObservableObject {
         }
     }
 
-    func moveHighlight(by offset: Int) {
+    var currentHighlightMoveGeneration: UInt64 {
+        pendingHighlightMoveLock.lock()
+        defer { pendingHighlightMoveLock.unlock() }
+        return highlightMoveCancellationGeneration
+    }
+
+    func moveHighlight(by offset: Int, cancellationGeneration: UInt64? = nil) {
+        if let cancellationGeneration, cancellationGeneration != currentHighlightMoveGeneration { return }
         guard Thread.isMainThread else {
             DispatchQueue.main.async { [weak self] in
-                self?.moveHighlight(by: offset)
+                self?.moveHighlight(by: offset, cancellationGeneration: cancellationGeneration)
             }
             return
         }
         showNavigationHighlightForControllerNavigation()
         schedulePendingHighlightMove(
             by: offset,
-            usingSectionHeadersOnly: ControllerNavigator.settingsSectionNavigationHoldActive && menuMode == .all
+            usingSectionHeadersOnly: ControllerNavigator.settingsSectionNavigationHoldActive && menuMode == .all,
+            cancellationGeneration: cancellationGeneration
         )
     }
 
@@ -5903,14 +5912,19 @@ final class SettingsSession: NSObject, ObservableObject {
 
     func cancelPendingHighlightMoves() {
         pendingHighlightMoveLock.lock()
+        highlightMoveCancellationGeneration &+= 1
         pendingHighlightMoveOffset = nil
         pendingHighlightMoveUsesSectionHeadersOnly = nil
         pendingHighlightMoveScheduled = false
         pendingHighlightMoveLock.unlock()
     }
 
-    private func schedulePendingHighlightMove(by offset: Int, usingSectionHeadersOnly: Bool) {
+    private func schedulePendingHighlightMove(by offset: Int, usingSectionHeadersOnly: Bool, cancellationGeneration: UInt64?) {
         pendingHighlightMoveLock.lock()
+        if let cancellationGeneration, cancellationGeneration != highlightMoveCancellationGeneration {
+            pendingHighlightMoveLock.unlock()
+            return
+        }
         pendingHighlightMoveOffset = offset
         pendingHighlightMoveUsesSectionHeadersOnly = usingSectionHeadersOnly
         guard !pendingHighlightMoveScheduled else {
@@ -5918,15 +5932,21 @@ final class SettingsSession: NSObject, ObservableObject {
             return
         }
         pendingHighlightMoveScheduled = true
+        let generation = highlightMoveCancellationGeneration
         pendingHighlightMoveLock.unlock()
 
         DispatchQueue.main.async { [weak self] in
-            self?.performPendingHighlightMove()
+            self?.performPendingHighlightMove(generation: generation)
         }
     }
 
-    private func performPendingHighlightMove() {
+    private func performPendingHighlightMove(generation: UInt64) {
         pendingHighlightMoveLock.lock()
+        // A cancelled drain must not consume a newer gesture's pending move.
+        guard generation == highlightMoveCancellationGeneration else {
+            pendingHighlightMoveLock.unlock()
+            return
+        }
         let offset = pendingHighlightMoveOffset
         let usesSectionHeadersOnly = pendingHighlightMoveUsesSectionHeadersOnly
         pendingHighlightMoveOffset = nil
@@ -5934,7 +5954,8 @@ final class SettingsSession: NSObject, ObservableObject {
         pendingHighlightMoveScheduled = false
         pendingHighlightMoveLock.unlock()
 
-        guard let offset, let usesSectionHeadersOnly, isActive else { return }
+        guard let offset, let usesSectionHeadersOnly, isActive,
+              generation == currentHighlightMoveGeneration else { return }
         performHighlightMove(by: offset, usingSectionHeadersOnly: usesSectionHeadersOnly)
     }
 
