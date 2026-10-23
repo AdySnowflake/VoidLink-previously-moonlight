@@ -134,7 +134,7 @@ public struct AboutView: View {
                                 .background(Color.blue.opacity(1))
                                 .foregroundColor(.white)
                                 .frame(height: 46)
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 .padding(.top, 10)
                             }
                         }
@@ -147,7 +147,7 @@ public struct AboutView: View {
                         .background(Color.blue)
                         .foregroundColor(.white)
                         .frame(height: 46)
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .padding(.top, 10)
                     }
                     
@@ -163,7 +163,7 @@ public struct AboutView: View {
                         .padding()
                         .background(Color.blue)
                         .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .frame(height: 33)
                         .frame(minWidth: 100)
                         /*
@@ -182,7 +182,7 @@ public struct AboutView: View {
                         .padding()
                         .background(Color.blue)
                         .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .frame(height: 33)
                     }
                     .padding(.top, 10)
