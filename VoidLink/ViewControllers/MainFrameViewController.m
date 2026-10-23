@@ -72,6 +72,7 @@ static NSArray<UIBarButtonItem *> *VLBarButtonItems(UIBarButtonItem *first, UIBa
     UIBarButtonItem* _addHostButton;
     UIBarButtonItem* _helpButton;
     UIBarButtonItem* _upButton;
+    BOOL _profilesButtonUsesCompactSymbol;
 
     UILabel* hostViewTitleLabel;
     //CGFloat recordedScreenWidth;
@@ -1835,6 +1836,8 @@ static NSMutableSet* hostList;
             [_profilesButton setImage:image];
             _profilesButton.imageInsets = UIEdgeInsetsMake(-1.5, 0, -1.5, 0);
             _profilesButton.tintColor = ThemeManager.appPrimaryColor;
+            _profilesButtonUsesCompactSymbol = NO;
+            [self updateLegacyCompactProfilesNavigationIcon];
         }
         
     } else {
@@ -1921,6 +1924,25 @@ static NSMutableSet* hostList;
             }
         }
     }
+}
+
+- (void)updateLegacyCompactProfilesNavigationIcon {
+    if (PublicUtils.iOS18Available || !_profilesButton) return;
+    BOOL compact = [PublicUtils isCompactNavigationBar:self.navigationController.navigationBar];
+    if (_profilesButtonUsesCompactSymbol == compact) return;
+    _profilesButtonUsesCompactSymbol = compact;
+
+    UIImage *image;
+    if (compact) {
+        UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration
+            configurationWithPointSize:18 weight:UIImageSymbolWeightRegular];
+        image = [UIImage systemImageNamed:@"gamecontroller.fill" withConfiguration:config];
+        _profilesButton.imageInsets = UIEdgeInsetsZero;
+    } else {
+        image = [UIImage imageNamed:@"gamecontroller.circle.regular"];
+        _profilesButton.imageInsets = UIEdgeInsetsMake(-1.5, 0, -1.5, 0);
+    }
+    _profilesButton.image = [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
 }
 
 // Called when the system's theme (light/dark mode) changes
@@ -2150,6 +2172,7 @@ static NSMutableSet* hostList;
 
 -(void)viewDidLayoutSubviews{
     [super viewDidLayoutSubviews];
+    [self updateLegacyCompactProfilesNavigationIcon];
     [self updateHosts];
     // if (@available(iOS 13.0, *)) [GamepadNavigationIllustrationHud showInKeyWindow];
 }

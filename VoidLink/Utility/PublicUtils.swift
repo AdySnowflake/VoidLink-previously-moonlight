@@ -49,6 +49,14 @@ import GameController
     @objc public static var isIPad: Bool = {
         return UIDevice.current.userInterfaceIdiom == .pad
     }()
+
+    /// Query after layout: compact size classes alone do not imply a short bar.
+    @objc(isCompactNavigationBar:)
+    public static func isCompactNavigationBar(_ navigationBar: UINavigationBar?) -> Bool {
+        guard isIPhone, let navigationBar else { return false }
+        let height = navigationBar.bounds.height
+        return height > 0 && height < 43
+    }
     
     @objc public static var isRunningOnMacAsiPadApp: Bool = {
         if #available(iOS 14.0, *) {
