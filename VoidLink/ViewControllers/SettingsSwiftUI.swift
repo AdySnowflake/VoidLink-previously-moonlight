@@ -4267,7 +4267,9 @@ final class SettingsSession: NSObject, ObservableObject {
         setSectionHitTestingEnabled(true, for: identifier)
         UserDefaults.standard.set(nextValue, forKey: identifier)
         normalizeHighlight()
-        refreshSectionHitTesting()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            self.refreshSectionHitTesting()
+        }
     }
 
     func isSectionExpanded(_ identifier: String) -> Bool {
@@ -6772,7 +6774,7 @@ private struct SettingsCatalogItemView: View {
                     Text(item.id.titleKey.localized)
                         .font(.system(size: layout.itemMainLabelFontSize))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.5)
+                        // .minimumScaleFactor(0.5)
                 }
                 SettingsPicker(
                     selection: Binding(get: { value(store) }, set: { newValue in
@@ -6816,7 +6818,7 @@ private struct SettingsCatalogItemView: View {
                     Text(item.id.titleKey.localized)
                         .font(.system(size: layout.itemMainLabelFontSize))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.5)
+                        // .minimumScaleFactor(0.5)
                 }
                 SettingsSlider(
                     value: Binding(get: { value(store) }, set: { newValue in

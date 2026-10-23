@@ -257,6 +257,8 @@ final class SettingsViewController: UIViewController, RearNavigationBarMenuDeleg
             assertionFailure("Expected LayoutOnScreenControlsViewController, got \(type(of: controller))")
             return nil
         }
+        // Storyboard outlets are connected only after the controller's view loads.
+        layout.loadViewIfNeeded()
         layout.toolbarStackView.isHidden = false
         layout.toolbarRootView.isHidden = false
         return layout
