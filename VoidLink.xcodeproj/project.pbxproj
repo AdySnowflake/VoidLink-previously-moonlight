@@ -20,7 +20,7 @@
 		1888C1922E24C33100108730 /* AboutViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1888C1912E24C33100108730 /* AboutViewController.swift */; };
 		1888C1932E24C41000108730 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1888C1902E24C2C800108730 /* AboutView.swift */; };
 		188973D32E386A670025E48C /* widgetTemplatesIPhone.bin in Resources */ = {isa = PBXBuildFile; fileRef = 188973D22E386A670025E48C /* widgetTemplatesIPhone.bin */; };
-		18951D1D2EBB6D2300A86E12 /* TouchPadGestureHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18951D1C2EBB6D2300A86E12 /* TouchPadGestureHandler.swift */; };
+		18951D1D2EBB6D2300A86E12 /* RelativeTouchGestureHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18951D1C2EBB6D2300A86E12 /* RelativeTouchGestureHandler.swift */; };
 		189AD29A2DE7446000E24B88 /* HostCollectionViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 189AD2992DE7446000E24B88 /* HostCollectionViewController.swift */; };
 		18A0EE252EFB9B5A00BA853A /* SVGKit in Frameworks */ = {isa = PBXBuildFile; productRef = 18A0EE242EFB9B5A00BA853A /* SVGKit */; };
 		18A0EE272EFB9B5A00BA853A /* SVGKitSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 18A0EE262EFB9B5A00BA853A /* SVGKitSwift */; };
@@ -120,7 +120,7 @@
 		A70100000000000000000005 /* KeyboardSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = FB1A674C2131E65900507771 /* KeyboardSupport.m */; };
 		A70100000000000000000006 /* Frame.m in Sources */ = {isa = PBXBuildFile; fileRef = 97E20DD92E2164A9000D5DCA /* Frame.m */; };
 		A70100000000000000000007 /* FrameQueue.m in Sources */ = {isa = PBXBuildFile; fileRef = 97E20DDB2E2164A9000D5DCA /* FrameQueue.m */; };
-		A70100000000000000000008 /* TouchPadGestureHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18951D1C2EBB6D2300A86E12 /* TouchPadGestureHandler.swift */; };
+		A70100000000000000000008 /* RelativeTouchGestureHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18951D1C2EBB6D2300A86E12 /* RelativeTouchGestureHandler.swift */; };
 		A70100000000000000000009 /* FloatBuffer.m in Sources */ = {isa = PBXBuildFile; fileRef = 97E20DD72E2164A9000D5DCA /* FloatBuffer.m */; };
 		A7010000000000000000000A /* PaddedLabel.m in Sources */ = {isa = PBXBuildFile; fileRef = 97E20DDD2E2164A9000D5DCA /* PaddedLabel.m */; };
 		A7010000000000000000000B /* BandwidthTracker.m in Sources */ = {isa = PBXBuildFile; fileRef = 97E20DD52E2164A9000D5DCA /* BandwidthTracker.m */; };
@@ -248,6 +248,7 @@
 		A703000000000000000012 /* GameController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9865DC3B2132922E0005B9B9 /* GameController.framework */; };
 		A76B00032FFCC00100000003 /* GameSirG8MFiRumbler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A76B00022FFCC00100000002 /* GameSirG8MFiRumbler.swift */; };
 		A76B00052FFCC00100000005 /* ExternalAccessory.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A76B00042FFCC00100000004 /* ExternalAccessory.framework */; };
+		A7EC06010000000000000001 /* TrackpadTouchHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7EC06010000000000000002 /* TrackpadTouchHandler.swift */; platformFilter = ios; };
 		B76B00032FFCC00100000003 /* KishiV3ProXLRumbler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B76B00022FFCC00100000002 /* KishiV3ProXLRumbler.swift */; };
 		C0DE5A1E2F80000100000012 /* CursorInertia.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE5A1E2F80000100000011 /* CursorInertia.swift */; };
 		C0DE5A1E2F80000100000013 /* CursorInertia.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE5A1E2F80000100000011 /* CursorInertia.swift */; };
@@ -349,7 +350,7 @@
 		1888C1902E24C2C800108730 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		1888C1912E24C33100108730 /* AboutViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutViewController.swift; sourceTree = "<group>"; };
 		188973D22E386A670025E48C /* widgetTemplatesIPhone.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = widgetTemplatesIPhone.bin; path = PresetConfigs/widgetTemplatesIPhone.bin; sourceTree = "<group>"; };
-		18951D1C2EBB6D2300A86E12 /* TouchPadGestureHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchPadGestureHandler.swift; sourceTree = "<group>"; };
+		18951D1C2EBB6D2300A86E12 /* RelativeTouchGestureHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelativeTouchGestureHandler.swift; sourceTree = "<group>"; };
 		189AD2992DE7446000E24B88 /* HostCollectionViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostCollectionViewController.swift; sourceTree = "<group>"; };
 		18A0EE2B2EFBCCFD00BA853A /* GraphicUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphicUtils.swift; sourceTree = "<group>"; };
 		18A765BC2ECD51FB004784AA /* ControllerUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControllerUtil.swift; sourceTree = "<group>"; };
@@ -486,6 +487,7 @@
 		A7000000000000000002 /* VoidLink TV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "VoidLink TV.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A76B00022FFCC00100000002 /* GameSirG8MFiRumbler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameSirG8MFiRumbler.swift; sourceTree = "<group>"; };
 		A76B00042FFCC00100000004 /* ExternalAccessory.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ExternalAccessory.framework; path = System/Library/Frameworks/ExternalAccessory.framework; sourceTree = SDKROOT; };
+		A7EC06010000000000000002 /* TrackpadTouchHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackpadTouchHandler.swift; sourceTree = "<group>"; };
 		B76B00022FFCC00100000002 /* KishiV3ProXLRumbler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = KishiV3ProXLRumbler.swift; sourceTree = "<group>"; };
 		C0DE5A1E2F80000100000011 /* CursorInertia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorInertia.swift; sourceTree = "<group>"; };
 		C0DE5A1E2F80000100000021 /* FloatingKeyboardButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingKeyboardButton.swift; sourceTree = "<group>"; };
@@ -963,6 +965,7 @@
 				844CD0EA2C7F8500004861A7 /* PureNativeTouchHandler.m */,
 				843CC7F42C1E778000BBC475 /* NativeTouchHandler.h */,
 				843CC7F52C1E7A1700BBC475 /* NativeTouchHandler.m */,
+				A7EC06010000000000000002 /* TrackpadTouchHandler.swift */,
 				9819CC12254F107A008A7C8E /* RelativeTouchHandler.h */,
 				9819CC13254F107A008A7C8E /* RelativeTouchHandler.m */,
 				9819CC20254F180F008A7C8E /* AbsoluteTouchHandler.h */,
@@ -974,7 +977,7 @@
 				18FCADAE2ECAC23200787A96 /* PencilHandler.swift */,
 				18416EA32EBB3DCE00AE0124 /* UITouchUtil.swift */,
 				18B317022EE67A39009B62C2 /* InertialScroller.swift */,
-				18951D1C2EBB6D2300A86E12 /* TouchPadGestureHandler.swift */,
+				18951D1C2EBB6D2300A86E12 /* RelativeTouchGestureHandler.swift */,
 				C0DE5A1E2F80000100000021 /* FloatingKeyboardButton.swift */,
 				C0DE5A1E2F80000100000011 /* CursorInertia.swift */,
 				18A765BC2ECD51FB004784AA /* ControllerUtil.swift */,
@@ -1386,7 +1389,7 @@
 				A70100000000000000000005 /* KeyboardSupport.m in Sources */,
 				A70100000000000000000006 /* Frame.m in Sources */,
 				A70100000000000000000007 /* FrameQueue.m in Sources */,
-				A70100000000000000000008 /* TouchPadGestureHandler.swift in Sources */,
+				A70100000000000000000008 /* RelativeTouchGestureHandler.swift in Sources */,
 				C0DE5A1E2F80000100000013 /* CursorInertia.swift in Sources */,
 				A70100000000000000000009 /* FloatBuffer.m in Sources */,
 				A7010000000000000000000A /* PaddedLabel.m in Sources */,
@@ -1506,7 +1509,7 @@
 				FB1A674D2131E65900507771 /* KeyboardSupport.m in Sources */,
 				97E20DDF2E2164A9000D5DCA /* Frame.m in Sources */,
 				97E20DE02E2164A9000D5DCA /* FrameQueue.m in Sources */,
-				18951D1D2EBB6D2300A86E12 /* TouchPadGestureHandler.swift in Sources */,
+				18951D1D2EBB6D2300A86E12 /* RelativeTouchGestureHandler.swift in Sources */,
 				C0DE5A1E2F80000100000022 /* FloatingKeyboardButton.swift in Sources */,
 				C0DE5A1E2F80000100000012 /* CursorInertia.swift in Sources */,
 				97E20DE12E2164A9000D5DCA /* FloatBuffer.m in Sources */,
@@ -1515,6 +1518,7 @@
 				97E20DE32E2164A9000D5DCA /* BandwidthTracker.m in Sources */,
 				84591A512BE1625E006AAB10 /* CustomEdgeSlideGestureRecognizer.m in Sources */,
 				843CC7F62C1E7A1700BBC475 /* NativeTouchHandler.m in Sources */,
+				A7EC06010000000000000001 /* TrackpadTouchHandler.swift in Sources */,
 				97E20DEE2E2165A5000D5DCA /* ImGuiPlots.mm in Sources */,
 				FB89463219F646E200339C8A /* VideoDecoderRenderer.m in Sources */,
 				A1F100012FFB000100000001 /* FrameInterpolator.swift in Sources */,

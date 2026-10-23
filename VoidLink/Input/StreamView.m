@@ -259,6 +259,9 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
     sessionTouchHandler = nil;
     (void)profile;
 #else
+    if ([sessionTouchHandler isKindOfClass:[RelativeTouchHandler class]]) {
+        [(RelativeTouchHandler*)sessionTouchHandler reset];
+    }
     touchMode = profile.touchMode;
     switch (touchMode) {
         case TouchModeNative:
@@ -313,7 +316,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
 #if TARGET_OS_TV
     return NO;
 #else
-    return touchMode == TouchModeRelative && settings.touchMousePinchGestureMode.integerValue == TouchMousePinchGestureModeZoomViewport
+    return touchMode == TouchModeRelative && settings.trackpadGestureMode.integerValue == TrackpadGestureModeZoomViewport
         && [self.superview isKindOfClass:[UIScrollView class]];
 #endif
 }
@@ -366,7 +369,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
         else if (occlusion > 0) occlusion += 8;
         occlusion = MIN(MAX(occlusion, 0), CGRectGetHeight(scrollFrame) * 0.85);
     }
-    [TouchPadGestureHandler updateKeyboardOcclusion:occlusion];
+    [RelativeTouchGestureHandler updateKeyboardOcclusion:occlusion];
 }
 #endif
 
@@ -525,7 +528,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
         // the stream view's frame was never moved in this mode; give the full viewport back to the zoom handler
         keyboardLiftedByCursorMode = NO;
         isInputingText = NO;
-        [TouchPadGestureHandler updateKeyboardOcclusion:0];
+        [RelativeTouchGestureHandler updateKeyboardOcclusion:0];
     }
     else if(isInputingText){
         self.frame = _originalFrame;
@@ -2125,6 +2128,9 @@ static CGFloat previousRollAngle = 0;
 }
 
 - (void)toggleTouchDisabled:(bool)disabled{
+    if (disabled && [sessionTouchHandler isKindOfClass:[RelativeTouchHandler class]]) {
+        [(RelativeTouchHandler*)sessionTouchHandler reset];
+    }
     touchHandler = disabled ? nil : sessionTouchHandler;
 }
 
@@ -2140,6 +2146,11 @@ static CGFloat previousRollAngle = 0;
     [GamepadNavigationIllustrationHud setTvOSSystemTextInputActive:NO];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:VoidLinkTvOSRemoteMenuTappedNotification object:nil];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:VoidLinkTvOSRemotePlayPauseTappedNotification object:nil];
+#endif
+#if !TARGET_OS_TV
+    if ([sessionTouchHandler isKindOfClass:[RelativeTouchHandler class]]) {
+        [(RelativeTouchHandler*)sessionTouchHandler reset];
+    }
 #endif
     [keyInputField resignFirstResponder];
     keyInputField.backspaceHandler = nil;

@@ -101,7 +101,7 @@ static NSString * const PortraitStreamOffsetDefaultsKey = @"portraitStreamVertic
 @property (nonatomic) BOOL delayLeftClick;
 @property (nonatomic) BOOL duckOtherApps;
 @property (nonatomic) BOOL muteInBackground;
-@property (nonatomic, retain) NSNumber * touchMousePinchGestureMode;
+@property (nonatomic, retain) NSNumber * trackpadGestureMode;
 @property (nonatomic) BOOL floatingKeyboardButton;
 @property (nonatomic) BOOL ctrlDownForPinch;
 @property (nonatomic) BOOL passthroughGestures;
@@ -109,6 +109,7 @@ static NSString * const PortraitStreamOffsetDefaultsKey = @"portraitStreamVertic
 @property (nonatomic, retain) NSNumber * interpolationMaximumDimension;
 @property (nonatomic, retain) NSNumber * interpolationMaximumPixelCount;
 @property (nonatomic, retain) NSNumber * streamDimensionScale;
+@property (nonatomic, retain) NSNumber * trackpadGestureSensitivity;
 @property (nonatomic, retain) NSNumber * scrollSensitivity;
 @property (nonatomic, retain) NSNumber * pinchSensitivity;
 @property (nonatomic, retain) NSNumber * relativeTouchSlideThreshold;

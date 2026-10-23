@@ -22,16 +22,17 @@ import UIKit
 }
 
 @objc enum TouchMode: Int {
-    case relative
-    case native
-    case absolute
-    case disabled
-    case nativeOnly
+    case relative = 0
+    case native = 1
+    case absolute = 2
+    case disabled = 3
+    case nativeOnly = 4
 }
 
-@objc enum TouchMousePinchGestureMode: Int {
-    case disabled
+@objc enum TrackpadGestureMode: Int {
+    case pinchDisabled
     case zoomViewport
+    case nativeTrackpad
     case ctrlAndScroll
 }
 

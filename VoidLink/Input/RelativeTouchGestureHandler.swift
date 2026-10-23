@@ -1,4 +1,4 @@
-//  TouchPadGestureHandler.swift
+//  RelativeTouchGestureHandler.swift
 //  VoidLink
 //
 //  Created by True砖家 on 2025/11/5.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-@objc class TouchPadGestureHandler: NSObject {
+@objc class RelativeTouchGestureHandler: NSObject {
     // Survives handler rebuilds, but does not carry over to a different stream view.
     private static weak var zoomViewportUsedInStreamView: StreamView?
 
@@ -18,7 +18,7 @@ import UIKit
     }
 
     private let touchMode: TouchMode
-    private let pinchGestureMode: TouchMousePinchGestureMode
+    private let pinchGestureMode: TrackpadGestureMode
     private let ctrlDownForPinch: Bool
     private let scrollSensitivity: CGFloat
     private let pinchSensitivity: CGFloat
@@ -34,7 +34,7 @@ import UIKit
         self.touchMode = touchMode
         // Absolute touch is gated by passthroughGestures in its owner; the picker only configures touchpad mode.
         pinchGestureMode = touchMode == .absolute ? .ctrlAndScroll
-            : TouchMousePinchGestureMode(rawValue: settings.touchMousePinchGestureMode.intValue) ?? .ctrlAndScroll
+            : TrackpadGestureMode(rawValue: settings.trackpadGestureMode.intValue) ?? .ctrlAndScroll
         ctrlDownForPinch = settings.ctrlDownForPinch
         scrollSensitivity = CGFloat(settings.scrollSensitivity.doubleValue)
         pinchSensitivity = CGFloat(settings.pinchSensitivity.doubleValue)
@@ -211,7 +211,7 @@ import UIKit
     /// Height of the stream area covered by the soft keyboard (including its accessory bar), 0 when closed.
     private static var keyboardOcclusion: CGFloat = 0
     /// The handler of the current touchpad session, which receives keyboard occlusion changes.
-    private static weak var active: TouchPadGestureHandler?
+    private static weak var active: RelativeTouchGestureHandler?
 
     private weak var streamView: StreamView?
 
@@ -234,8 +234,8 @@ import UIKit
     /// Zooming in or opening the keyboard uses it as the initial anchor.
     private static var sharedEstimatedCursorLocation: CGPoint?
     private var estimatedCursorLocation: CGPoint? {
-        get { TouchPadGestureHandler.sharedEstimatedCursorLocation }
-        set { TouchPadGestureHandler.sharedEstimatedCursorLocation = newValue }
+        get { RelativeTouchGestureHandler.sharedEstimatedCursorLocation }
+        set { RelativeTouchGestureHandler.sharedEstimatedCursorLocation = newValue }
     }
 
     /// Sub-unit remainder carried between relative mouse move events.
@@ -313,8 +313,8 @@ import UIKit
             let rect = videoRect
             if rect.width > 0, rect.height > 0 {
                 let referenceScale = 32766.0 / max(rect.width, rect.height)
-                absoluteRemainder.dx += streamDelta.dx * 2 * referenceScale
-                absoluteRemainder.dy += streamDelta.dy * 2 * referenceScale
+                absoluteRemainder.dx += streamDelta.dx * 2.5 * referenceScale
+                absoluteRemainder.dy += streamDelta.dy * 2.5 * referenceScale
                 let deltaX = Int16(clamping: Int(absoluteRemainder.dx.rounded(.towardZero)))
                 let deltaY = Int16(clamping: Int(absoluteRemainder.dy.rounded(.towardZero)))
                 if deltaX != 0 || deltaY != 0 {
@@ -372,7 +372,7 @@ import UIKit
         let insets = viewportInsets
         let viewport = usableViewport
         let baseInsetScale = PublicUtils.isIPhone ? 0.1 : 0.1
-        let insetScale = baseInsetScale + (0.5-baseInsetScale) * (scrollView.zoomScale-1)/(TouchPadGestureHandler.maximumZoomScale - 1)
+        let insetScale = baseInsetScale + (0.5-baseInsetScale) * (scrollView.zoomScale-1)/(RelativeTouchGestureHandler.maximumZoomScale - 1)
         let followRegion = viewport.insetBy(dx: viewport.width * insetScale, dy: viewport.height * insetScale)
         let cursorInContent = streamView.convert(target, to: scrollView)
         let videoInContent = streamView.convert(videoRect, to: scrollView)
@@ -420,7 +420,7 @@ import UIKit
 
         let oldScale = currentZoomScale
         let sensitivity = max(pinchSensitivity, 0.05)
-        let maxScale = min(TouchPadGestureHandler.maximumZoomScale, scrollView.maximumZoomScale)
+        let maxScale = min(RelativeTouchGestureHandler.maximumZoomScale, scrollView.maximumZoomScale)
         var newScale = oldScale * pow(ratio, sensitivity)
         newScale = min(max(newScale, 1.0), maxScale)
         guard abs(newScale - oldScale) > 0.0001 else { return }
@@ -471,7 +471,7 @@ import UIKit
 
     /// Returns the viewport to 1x. Cursor output continues to follow the selected pinch mode.
     @objc func endZoom() {
-        let keyboardOpen = TouchPadGestureHandler.keyboardOcclusion > 0
+        let keyboardOpen = RelativeTouchGestureHandler.keyboardOcclusion > 0
         if !keyboardOpen {
             if cursorLocationInitialized { estimatedCursorLocation = cursorLocation }
             cursorLocationInitialized = false
@@ -505,7 +505,7 @@ import UIKit
     private func keyboardOcclusionChanged(to newHeight: CGFloat) {
         // Measured before the viewport shrinks, so it's what the user was looking at.
         let anchor = cursorLocationInitialized ? cursorLocation : (estimatedCursorLocation ?? visibleCenter)
-        TouchPadGestureHandler.keyboardOcclusion = newHeight
+        RelativeTouchGestureHandler.keyboardOcclusion = newHeight
         guard canZoomViewport, scrollView != nil else { return }
 
         if newHeight > 0 {

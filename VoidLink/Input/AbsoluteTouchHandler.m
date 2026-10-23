@@ -30,7 +30,7 @@ static int mouseButtonForCursorMove = BUTTON_LEFT;
 
 @implementation AbsoluteTouchHandler {
     __weak StreamView* streamView;
-    TouchPadGestureHandler* gestureHandler;
+    RelativeTouchGestureHandler* gestureHandler;
     
     bool multiTouchesDetected;
     bool passthroughGestures;
@@ -67,7 +67,7 @@ static int mouseButtonForCursorMove = BUTTON_LEFT;
 - (id)initWithView:(StreamView*)view andSettings:(TemporarySettings*)settings {
     self = [self init];
     self->streamView = view;
-    gestureHandler = [[TouchPadGestureHandler alloc] initWithStreamView:view touchMode:TouchModeAbsolute settings:settings];
+    gestureHandler = [[RelativeTouchGestureHandler alloc] initWithStreamView:view touchMode:TouchModeAbsolute settings:settings];
     
     multiTouchesDetected = false;
     passthroughGestures = settings.passthroughGestures;

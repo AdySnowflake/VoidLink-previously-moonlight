@@ -323,13 +323,14 @@ enum SettingsItemID: String, Hashable, Identifiable {
 
     case touchMode = "touchModeStack"
     case mousePointerVelocity = "mousePointerVelocityStack"
+    case trackpadGestureSensitivity = "trackpadGestureSensitivityStack"
     case cursorInertia = "cursorInertiaStack"
     case cursorInertiaDeceleration = "cursorInertiaDecelerationStack"
     case pointerVelocityDivider = "pointerVelocityDividerStack"
     case pointerVelocityFactor = "pointerVelocityFactorStack"
     case delayLeftClick = "delayLeftClickStack"
     case passthroughGestures = "passthroughGesturesStack"
-    case pinchGesture = "pinchGestureStack"
+    case trackpadGestures = "pinchGestureStack"
     case ctrlDownForPinch = "ctrlDownForPinchStack"
     case scrollSensitivity = "scrollSensitivityStack"
     case pinchSensitivity = "pinchSensitivityStack"
@@ -452,14 +453,15 @@ enum SettingsItemID: String, Hashable, Identifiable {
         case .asyncFrameDequeue: return "Async Frame Dequeue"
         case .pictureInPicture: return "Enable PiP"
         case .touchMode: return "Touch Mode"
-        case .mousePointerVelocity: return "Mouse Pointer Velocity"
+        case .mousePointerVelocity: return "Cursor Velocity"
+        case .trackpadGestureSensitivity: return "Gesture Sensitivity"
         case .cursorInertia: return "Cursor Inertia"
         case .cursorInertiaDeceleration: return "Deceleration"
         case .pointerVelocityDivider: return "Divider Position"
         case .pointerVelocityFactor: return "Touch Pointer Velocity"
         case .delayLeftClick: return "Delay Left Click"
         case .passthroughGestures: return "Passthrough Gestures"
-        case .pinchGesture: return "Pinch Gesture"
+        case .trackpadGestures: return "Touchpad Gestures"
         case .ctrlDownForPinch: return "Ctrl Down for Pinch"
         case .scrollSensitivity: return "Scroll Sensitivity"
         case .pinchSensitivity: return "Pinch Sensitivity"
@@ -1223,13 +1225,14 @@ final class SettingsItemRegistry: ObservableObject {
 
     let touchMode = SettingsItemModel<Int>(id: .touchMode, value: 1)
     let mousePointerVelocity = SettingsItemModel<Double>(id: .mousePointerVelocity, value: 100)
+    let trackpadGestureSensitivity = SettingsItemModel<Double>(id: .trackpadGestureSensitivity, value: 1)
     let pointerVelocityDivider = SettingsItemModel<Double>(id: .pointerVelocityDivider, value: 100)
     let pointerVelocityFactor = SettingsItemModel<Double>(id: .pointerVelocityFactor, value: 100)
     let delayLeftClick = SettingsItemModel<Bool>(id: .delayLeftClick, value: true)
     let passthroughGestures = SettingsItemModel<Bool>(id: .passthroughGestures, value: true)
     let cursorInertia = SettingsItemModel<Bool>(id: .cursorInertia, value: false)
     let cursorInertiaDeceleration = SettingsItemModel<Double>(id: .cursorInertiaDeceleration, value: Double(CursorInertiaDecelerationDefault))
-    let pinchGesture = SettingsItemModel<Int>(id: .pinchGesture, value: TouchMousePinchGestureMode.ctrlAndScroll.rawValue)
+    let trackpadGestures = SettingsItemModel<Int>(id: .trackpadGestures, value: TrackpadGestureMode.ctrlAndScroll.rawValue)
     let ctrlDownForPinch = SettingsItemModel<Bool>(id: .ctrlDownForPinch, value: true)
     let scrollSensitivity = SettingsItemModel<Double>(id: .scrollSensitivity, value: 1)
     let pinchSensitivity = SettingsItemModel<Double>(id: .pinchSensitivity, value: 1)
@@ -1357,13 +1360,14 @@ final class SettingsItemRegistry: ObservableObject {
             // Touch Control
             touchMode.objectWillChange,
             mousePointerVelocity.objectWillChange,
+            trackpadGestureSensitivity.objectWillChange,
             pointerVelocityDivider.objectWillChange,
             pointerVelocityFactor.objectWillChange,
             delayLeftClick.objectWillChange,
             passthroughGestures.objectWillChange,
             cursorInertia.objectWillChange,
             cursorInertiaDeceleration.objectWillChange,
-            pinchGesture.objectWillChange,
+            trackpadGestures.objectWillChange,
             ctrlDownForPinch.objectWillChange,
             scrollSensitivity.objectWillChange,
             pinchSensitivity.objectWillChange,
@@ -1890,13 +1894,14 @@ final class SettingsSession: NSObject, ObservableObject {
         itemRegistry.mousePointerVelocity.value = settingsVelocitySliderPosition(
             for: CGFloat(snapshot.mousePointerVelocityFactor.doubleValue)
         )
+        itemRegistry.trackpadGestureSensitivity.value = min(3, max(0.05, snapshot.trackpadGestureSensitivity.doubleValue))
         itemRegistry.pointerVelocityDivider.value = snapshot.pointerVelocityModeDivider.doubleValue * 100
         itemRegistry.pointerVelocityFactor.value = settingsVelocitySliderPosition(
             for: CGFloat(snapshot.touchPointerVelocityFactor.doubleValue)
         )
         itemRegistry.delayLeftClick.value = snapshot.delayLeftClick
         itemRegistry.passthroughGestures.value = snapshot.passthroughGestures
-        itemRegistry.pinchGesture.value = snapshot.touchMousePinchGestureMode.intValue
+        itemRegistry.trackpadGestures.value = snapshot.trackpadGestureMode.intValue
         itemRegistry.cursorInertia.value = snapshot.cursorInertia
         itemRegistry.cursorInertiaDeceleration.value = min(10, max(1, snapshot.cursorInertiaDeceleration.doubleValue))
         itemRegistry.ctrlDownForPinch.value = snapshot.ctrlDownForPinch
@@ -2069,14 +2074,14 @@ final class SettingsSession: NSObject, ObservableObject {
         knownVisibleSettingIDs = conditionallyVisibleSettingIDs
 
         isTouchMouseZoomViewportEnabled = itemRegistry.touchMode.value == TouchMode.relative.rawValue
-            && itemRegistry.pinchGesture.value == TouchMousePinchGestureMode.zoomViewport.rawValue
+            && itemRegistry.trackpadGestures.value == TrackpadGestureMode.zoomViewport.rawValue
         touchMouseZoomViewportCancellable = Publishers.CombineLatest(
             itemRegistry.touchMode.$value,
-            itemRegistry.pinchGesture.$value
+            itemRegistry.trackpadGestures.$value
         )
         .map { touchMode, pinchMode -> Bool in
             return touchMode == TouchMode.relative.rawValue
-                && pinchMode == TouchMousePinchGestureMode.zoomViewport.rawValue
+                && pinchMode == TrackpadGestureMode.zoomViewport.rawValue
         }
         .removeDuplicates()
         .dropFirst() // Establish the initial state without resetting the stream viewport.
@@ -2085,7 +2090,7 @@ final class SettingsSession: NSObject, ObservableObject {
             self.isTouchMouseZoomViewportEnabled = enabled
             if !enabled {
                 if let streamFrameVC = StreamFrameViewController.sharedInstance(),
-                   TouchPadGestureHandler.hasUsedZoomViewport(in: streamFrameVC.streamView) {
+                   RelativeTouchGestureHandler.hasUsedZoomViewport(in: streamFrameVC.streamView) {
                     streamFrameVC.resetMagnifierStreamViewWith(animated: true)
                     streamFrameVC.streamView.saveStreamingGameProfileChanges()
                 }
@@ -2553,18 +2558,19 @@ final class SettingsSession: NSObject, ObservableObject {
 
     var touchModeOptions: [SettingsPickerOption<Int>] {
         [
-            .init(value: TouchMode.relative.rawValue, title: "Touch Mouse".localized),
+            .init(value: TouchMode.relative.rawValue, title: "Touchpad".localized),
             .init(value: TouchMode.native.rawValue, title: "Native Touch".localized),
             .init(value: TouchMode.absolute.rawValue, title: "Single Point".localized),
             .init(value: TouchMode.disabled.rawValue, title: "Disabled".localized)
         ]
     }
 
-    var pinchGestureOptions: [SettingsPickerOption<Int>] {
+    var trackpadGestureOptions: [SettingsPickerOption<Int>] {
         [
-            .init(value: TouchMousePinchGestureMode.disabled.rawValue, title: "Disabled".localized),
-            .init(value: TouchMousePinchGestureMode.zoomViewport.rawValue, title: "Zoom Viewport".localized),
-            .init(value: TouchMousePinchGestureMode.ctrlAndScroll.rawValue, title: "Ctrl+Scroll".localized)
+            .init(value: TrackpadGestureMode.pinchDisabled.rawValue, title: "No Pinch".localized),
+            .init(value: TrackpadGestureMode.zoomViewport.rawValue, title: "View Zoom".localized),
+            .init(value: TrackpadGestureMode.nativeTrackpad.rawValue, title: "Native Mode".localized),
+            .init(value: TrackpadGestureMode.ctrlAndScroll.rawValue, title: "Ctrl+Scroll".localized)
         ]
     }
 
@@ -2587,6 +2593,18 @@ final class SettingsSession: NSObject, ObservableObject {
                     GenericUtils.handleTouchModeChangingTip(in: session.presentingController)
                 }
             ),
+            pickerItem(
+                \.trackpadGestures,
+                 setValue: { session, model, newValue in
+                     model.value = newValue
+                     if newValue == TrackpadGestureMode.nativeTrackpad.rawValue {
+                         GenericUtils.handleFirstSettingNativeTrackpad(in: session.presentingController)
+                     }
+                 },
+                options: { $0.trackpadGestureOptions },
+                distribution: .proportionalToContent,
+                isVisible: {$0.itemRegistry.touchMode.value == TouchMode.relative.rawValue},
+            ),
             sliderItem(
                 \.mousePointerVelocity,
                 range: 0...300,
@@ -2597,6 +2615,13 @@ final class SettingsSession: NSObject, ObservableObject {
                 },
                 isVisible: { $0.itemRegistry.touchMode.value == TouchMode.relative.rawValue }
             ),
+            sliderItem(
+                \.trackpadGestureSensitivity,
+                range: 0.05...3,
+                clampedTo: 0.05...3,
+                valueText: { _, model in "\(Int((model.value * 100).rounded()))%" },
+                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.relative.rawValue && $0.itemRegistry.trackpadGestures.value == TrackpadGestureMode.nativeTrackpad.rawValue }
+            ),
             toggleItem(
                 \.passthroughGestures,
                 isVisible: {$0.itemRegistry.touchMode.value == TouchMode.absolute.rawValue}
@@ -2606,8 +2631,8 @@ final class SettingsSession: NSObject, ObservableObject {
                 range: 0...3,
                 clampedTo: 0...3,
                 valueText: { _, model in "\(Int((model.value * 100).rounded()))%" },
-                isVisible: {$0.itemRegistry.touchMode.value == TouchMode.relative.rawValue || ($0.itemRegistry.touchMode.value == TouchMode.absolute.rawValue
-                    && $0.itemRegistry.passthroughGestures.value)}
+                 isVisible: { ($0.itemRegistry.touchMode.value == TouchMode.relative.rawValue && $0.itemRegistry.trackpadGestures.value != TrackpadGestureMode.nativeTrackpad.rawValue)
+                    || ($0.itemRegistry.touchMode.value == TouchMode.absolute.rawValue && $0.itemRegistry.passthroughGestures.value)}
             ),
             sliderItem(
                 \.pointerVelocityDivider,
@@ -2649,16 +2674,10 @@ final class SettingsSession: NSObject, ObservableObject {
                     }
                 )
             ),
-            pickerItem(
-                \.pinchGesture,
-                options: { $0.pinchGestureOptions },
-                distribution: .proportionalToContent,
-                isVisible: {$0.itemRegistry.touchMode.value == TouchMode.relative.rawValue}
-            ),
             toggleItem(
                 \.ctrlDownForPinch,
                 isVisible: {($0.itemRegistry.touchMode.value == TouchMode.relative.rawValue
-                             && $0.itemRegistry.pinchGesture.value == TouchMousePinchGestureMode.ctrlAndScroll.rawValue)
+                             && $0.itemRegistry.trackpadGestures.value == TrackpadGestureMode.ctrlAndScroll.rawValue)
                             || ($0.itemRegistry.touchMode.value == TouchMode.absolute.rawValue
                             && $0.itemRegistry.passthroughGestures.value)},
                 hasInfo: true
@@ -2669,7 +2688,8 @@ final class SettingsSession: NSObject, ObservableObject {
                 clampedTo: 0...3,
                 valueText: { _, model in "\(Int((model.value * 100).rounded()))%" },
                 isVisible: {($0.itemRegistry.touchMode.value == TouchMode.relative.rawValue
-                             && $0.itemRegistry.pinchGesture.value != TouchMousePinchGestureMode.disabled.rawValue)
+                             && ($0.itemRegistry.trackpadGestures.value == TrackpadGestureMode.zoomViewport.rawValue
+                                || $0.itemRegistry.trackpadGestures.value == TrackpadGestureMode.ctrlAndScroll.rawValue))
                             || ($0.itemRegistry.touchMode.value == TouchMode.absolute.rawValue
                             && $0.itemRegistry.passthroughGestures.value)},
             ),
@@ -4468,6 +4488,23 @@ final class SettingsSession: NSObject, ObservableObject {
         return nil
     }
 
+    /// Only the slider thumb owns the touch; the rest of its row can still
+    /// offer favorite actions. Use UISlider's geometry rather than UIKit subviews.
+    fileprivate func isFavoriteSliderThumb(at point: CGPoint, in coordinateView: UIView) -> Bool {
+#if !os(tvOS)
+        var current = coordinateView.hitTest(point, with: nil)
+        while let candidate = current {
+            if let slider = candidate as? UISlider {
+                let track = slider.trackRect(forBounds: slider.bounds)
+                let thumb = slider.thumbRect(forBounds: slider.bounds, trackRect: track, value: slider.value)
+                return thumb.contains(coordinateView.convert(point, to: slider))
+            }
+            current = candidate.superview
+        }
+#endif
+        return false
+    }
+
     fileprivate func isExcludedFavoriteControlTouch(_ view: UIView?) -> Bool {
         var current = view
         while let candidate = current {
@@ -4728,11 +4765,12 @@ final class SettingsSession: NSObject, ObservableObject {
 
         settings.touchMode = NSNumber(value: itemRegistry.touchMode.value)
         settings.mousePointerVelocityFactor = NSNumber(value: settingsVelocityFactor(for: itemRegistry.mousePointerVelocity.value))
+        settings.trackpadGestureSensitivity = NSNumber(value: itemRegistry.trackpadGestureSensitivity.value)
         settings.pointerVelocityModeDivider = NSNumber(value: itemRegistry.pointerVelocityDivider.value / 100)
         settings.touchPointerVelocityFactor = NSNumber(value: settingsVelocityFactor(for: itemRegistry.pointerVelocityFactor.value))
         settings.delayLeftClick = itemRegistry.delayLeftClick.value
         settings.passthroughGestures = itemRegistry.passthroughGestures.value
-        settings.touchMousePinchGestureMode = NSNumber(value: itemRegistry.pinchGesture.value)
+        settings.trackpadGestureMode = NSNumber(value: itemRegistry.trackpadGestures.value)
         settings.ctrlDownForPinch = itemRegistry.ctrlDownForPinch.value
         settings.scrollSensitivity = NSNumber(value: itemRegistry.scrollSensitivity.value)
         settings.pinchSensitivity = NSNumber(value: itemRegistry.pinchSensitivity.value)
@@ -5566,7 +5604,8 @@ final class SettingsSession: NSObject, ObservableObject {
     }
 
     fileprivate func favoriteDragTarget(at point: CGPoint, in view: UIView) -> (SettingsItemID, UIView)? {
-        guard menuMode == .favorite else { return nil }
+        guard menuMode == .favorite,
+              !isFavoriteSliderThumb(at: point, in: view) else { return nil }
         for id in favoriteSettingIDs where isVisible(id) {
             guard let row = favoriteLongPressTargets[id]?.view, row.window != nil,
                   row.bounds.contains(view.convert(point, to: row)) else { continue }
@@ -7483,7 +7522,9 @@ private struct SettingsScrollViewResolver: UIViewRepresentable {
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
             guard gestureRecognizer === favoriteLongPressRecognizer,
                   store?.isAllSettings == true,
-                  store?.isExcludedFavoriteControlTouch(touch.view) == false else {
+                  store?.isExcludedFavoriteControlTouch(touch.view) == false,
+                  let coordinateView = gestureRecognizer.view,
+                  store?.isFavoriteSliderThumb(at: touch.location(in: coordinateView), in: coordinateView) == false else {
                 activeFavoriteLongPressID = nil
                 return false
             }

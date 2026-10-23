@@ -14,6 +14,7 @@
 #import "Connection.h"
 #import "ControllerSupport.h"
 #import "OnScreenControls.h"
+#import "NativeTouchPointer.h"
 #import "OnScreenButtonState.h"
 #import "AppDelegate.h"
 #import "TemporaryHost.h"

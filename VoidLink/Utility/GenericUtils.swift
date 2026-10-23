@@ -634,6 +634,31 @@ import UIKit
             )
         }
     }
+    
+    @objc public static func handleFirstSettingNativeTrackpad(in vc: UIViewController?) {
+        DispatchQueue.main.async {
+            let key = "isFirstSettingNativeTrackpad"
+            guard !UserDefaults.standard.bool(forKey: key) else {
+                return
+            }
+            UserDefaults.standard.set(true, forKey: key)
+
+            AlertControllerUtil.showAlert(
+                in: vc,
+                title: LocalizationHelper.localizedString(forKey: "Tips"),
+                message: LocalizationHelper.localizedString(forKey: "nativeTrackpadTip"),
+                withCancel: true,
+                buttonTitle: LocalizationHelper.localizedString(forKey: "Go for Sunshine-Foundation"),
+                countdown: 0,
+                completion: {
+                    if !AlertControllerUtil.actionCancelled {
+                        PublicUtils.openUrl("https://github.com/AlkaidLab/foundation-sunshine")
+                    }
+                }
+            )
+        }
+    }
+
 
     @objc public static func isFirstOpeningNewToolbox() -> Bool {
         let key = "isFirstOpeningNewToolbox6"

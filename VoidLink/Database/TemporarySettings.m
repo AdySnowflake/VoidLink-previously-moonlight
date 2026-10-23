@@ -97,7 +97,8 @@
     self.duckOtherApps = settings.duckOtherApps;
     self.muteInBackground = settings.muteInBackground;
     self.relativeTouchSlideThreshold = settings.relativeTouchSlideThreshold;
-    self.touchMousePinchGestureMode = settings.touchMousePinchGestureMode;
+    self.trackpadMultiTouchMode = settings.trackpadGestureMode;
+    self.trackpadGestureSensitivity = settings.trackpadGestureSensitivity ?: @(1);
     self.scrollSensitivity = settings.scrollSensitivity;
     self.pinchSensitivity = settings.pinchSensitivity;
     self.leftClickDelayMs = settings.leftClickDelayMs;
@@ -197,7 +198,8 @@
     self.duckOtherApps = settings.duckOtherApps;
     self.muteInBackground = settings.muteInBackground;
     self.relativeTouchSlideThreshold = settings.relativeTouchSlideThreshold;
-    self.touchMousePinchGestureMode = settings.touchMousePinchGestureMode;
+    self.trackpadGestureMode = settings.trackpadGestureMode;
+    self.trackpadGestureSensitivity = settings.trackpadGestureSensitivity ?: @(1);
     self.scrollSensitivity = settings.scrollSensitivity;
     self.pinchSensitivity = settings.pinchSensitivity;
     self.leftClickDelayMs = settings.leftClickDelayMs;

@@ -1382,7 +1382,7 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
     if (scrollView == _scrollView) {
 #if !TARGET_OS_TV
-        [TouchPadGestureHandler scrollViewDidScroll:scrollView];
+        [RelativeTouchGestureHandler scrollViewDidScroll:scrollView];
 #endif
         [self syncMagnifierStateFromScrollView];
     }
