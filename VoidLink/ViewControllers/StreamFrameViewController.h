@@ -69,6 +69,7 @@
 - (void)setMagnifierViewportInteractionEnabled:(BOOL)enabled;
 - (void)resetMagnifierStreamViewWithAnimated:(BOOL)animated;
 - (CGPoint)restingStreamViewOffset;
+- (void)updatePortraitStreamOffsetPercent:(CGFloat)percent NS_SWIFT_NAME(updatePortraitStreamOffset(percent:));
 - (CGFloat)portraitStreamOffsetPercent;
 - (CGPoint)persistableMagnifierContentOffset;
 - (void)bringFloatingKeyboardButtonToFront;

@@ -522,6 +522,15 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
 #endif
 }
 
+- (void)updatePortraitStreamOffsetPercent:(CGFloat)percent {
+    _settings.portraitStreamOffset = @(MIN(MAX(percent, -100.0f), 100.0f));
+    if (!self.isViewLoaded || self.view.bounds.size.height <= self.view.bounds.size.width) return;
+    if (!_scrollView || fabs(_scrollView.zoomScale - 1.0f) > 0.001f) return;
+    _appliedRestingOffset = [self restingStreamViewOffset];
+    _scrollView.contentOffset = _appliedRestingOffset;
+    [self syncMagnifierStateFromScrollView];
+}
+
 - (BOOL)isStreamViewAtRest {
     if (!_scrollView || fabs(_scrollView.zoomScale - 1.0f) > 0.001f) return NO;
     CGPoint offset = _scrollView.contentOffset;

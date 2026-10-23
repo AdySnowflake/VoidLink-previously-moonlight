@@ -230,14 +230,6 @@ import UIKit
     /// Last content offset set by followCursor; restored if UIKit scrolls the view while the keyboard is open.
     private var appliedContentOffset: CGPoint?
 
-    /// Last tracked position, retained across handler recreation when settings change.
-    /// Zooming in or opening the keyboard uses it as the initial anchor.
-    private static var sharedEstimatedCursorLocation: CGPoint?
-    private var estimatedCursorLocation: CGPoint? {
-        get { RelativeTouchGestureHandler.sharedEstimatedCursorLocation }
-        set { RelativeTouchGestureHandler.sharedEstimatedCursorLocation = newValue }
-    }
-
     /// Sub-unit remainder carried between relative mouse move events.
     private var relativeRemainder: CGVector = .zero
     /// Fractional input on the absolute reference plane, not a second cursor position.
@@ -340,9 +332,10 @@ import UIKit
         LiSendMouseMoveEvent(Int16(clamping: Int(deltaX)), Int16(clamping: Int(deltaY)))
     }
 
-    /// Seeds the library cursor from the last estimate or the visible area.
+    /// Keep the library's normalized cursor when entering zoom or rebuilding after rotation.
+    /// The visible center may lie outside the video when the portrait stream position is offset.
     private func beginAbsoluteCursor() {
-        let location = clampToVideoRect(keyboardAnchor ?? estimatedCursorLocation ?? visibleCenter)
+        let location = clampToVideoRect(keyboardAnchor ?? cursorLocation)
         keyboardAnchor = nil
         cursorLocationInitialized = true
         absoluteRemainder = .zero
@@ -436,6 +429,7 @@ import UIKit
         }
 
         let anchor = cursorLocation
+        let previousOffset = scrollView.contentOffset
         let before = streamView.convert(anchor, to: scrollView)
         let positionInViewport = CGPoint(x: before.x - scrollView.bounds.minX,
                                         y: before.y - scrollView.bounds.minY)
@@ -443,27 +437,19 @@ import UIKit
         let after = streamView.convert(anchor, to: scrollView)
         var offset = CGPoint(x: after.x - positionInViewport.x,
                              y: after.y - positionInViewport.y)
+        if newScale < oldScale && Self.keyboardOcclusion == 0 {
+            // Return continuously to the configured 1x position. Clamping to the video edges here
+            // can jump on the first shrinking step, since zooming in preserves the cursor anchor.
+            let restingOffset = StreamFrameViewController.sharedInstance()?.restingStreamViewOffset() ?? .zero
+            let remainingZoom = (newScale - 1) / (oldScale - 1)
+            offset = CGPoint(x: restingOffset.x + (previousOffset.x - restingOffset.x) * remainingZoom,
+                             y: restingOffset.y + (previousOffset.y - restingOffset.y) * remainingZoom)
+        }
         let insets = scrollView.contentInset
         offset.x = min(max(offset.x, -insets.left),
                        max(scrollView.contentSize.width - scrollView.bounds.width + insets.right, -insets.left))
         offset.y = min(max(offset.y, -insets.top),
                        max(scrollView.contentSize.height - scrollView.bounds.height + insets.bottom, -insets.top))
-        if newScale < oldScale {
-            let video = streamView.convert(videoRect, to: scrollView)
-            let viewport = usableViewport
-            let viewportInsets = self.viewportInsets
-            func clampToVideo(_ candidate: CGFloat, minEdge: CGFloat, maxEdge: CGFloat,
-                              viewportLength: CGFloat, leadingInset: CGFloat) -> CGFloat {
-                let leading = minEdge - leadingInset
-                let trailing = maxEdge - viewportLength - leadingInset
-                // Larger video covers the viewport; smaller video stays fully visible.
-                return min(max(candidate, min(leading, trailing)), max(leading, trailing))
-            }
-            offset.x = clampToVideo(offset.x, minEdge: video.minX, maxEdge: video.maxX,
-                                    viewportLength: viewport.width, leadingInset: viewportInsets.left)
-            offset.y = clampToVideo(offset.y, minEdge: video.minY, maxEdge: video.maxY,
-                                    viewportLength: viewport.height, leadingInset: viewportInsets.top)
-        }
         // Update this first so keyboard scroll protection accepts the anchored offset.
         appliedContentOffset = offset
         scrollView.contentOffset = offset
@@ -473,7 +459,6 @@ import UIKit
     @objc func endZoom() {
         let keyboardOpen = RelativeTouchGestureHandler.keyboardOcclusion > 0
         if !keyboardOpen {
-            if cursorLocationInitialized { estimatedCursorLocation = cursorLocation }
             cursorLocationInitialized = false
             keyboardAnchor = nil
             relativeRemainder = .zero
@@ -504,7 +489,7 @@ import UIKit
 
     private func keyboardOcclusionChanged(to newHeight: CGFloat) {
         // Measured before the viewport shrinks, so it's what the user was looking at.
-        let anchor = cursorLocationInitialized ? cursorLocation : (estimatedCursorLocation ?? visibleCenter)
+        let anchor = cursorLocation
         RelativeTouchGestureHandler.keyboardOcclusion = newHeight
         guard canZoomViewport, scrollView != nil else { return }
 

@@ -6474,6 +6474,29 @@
         }
       }
     },
+    "Centered" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "居中"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "居中"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "居中"
+          }
+        }
+      }
+    },
     "Centered (PlayStation)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -17353,6 +17376,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "與電腦的連線品質不佳"
+          }
+        }
+      }
+    },
+    "Portrait Stream Position" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "竖屏画面位置"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直向畫面位置"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直向畫面位置"
           }
         }
       }

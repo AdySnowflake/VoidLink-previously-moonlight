@@ -1829,6 +1829,7 @@ final class SettingsSession: NSObject, ObservableObject {
     private var cachedDisplaySizes: [Int: CGSize] = [:]
     private var cachedSafeAreaSizes: [Int: CGSize] = [:]
     private var isPersistingSettings = false
+    private var portraitStreamOffsetChangedInMenu = false
     private var screenConnectionNotificationTokens: [NSObjectProtocol] = []
     private var controllerNavigationSetupCoordinator: ControllerNavigationSetupCoordinator?
     private weak var capturedGyroSwitchController: GCController?
@@ -3488,7 +3489,7 @@ final class SettingsSession: NSObject, ObservableObject {
                 \.unlockDisplayOrientation,
                 options: { $0.unlockDisplayOrientationOptions },
                 distribution: .equal,
-                isAvailable: !PublicUtils.isTVOS,
+                isAvailable: !PublicUtils.isTVOS && PublicUtils.isIPhone,
                 isEnabled: { $0.unlockDisplayOrientationSelectorEnabled }
             ),
             sliderItem(
@@ -3501,7 +3502,17 @@ final class SettingsSession: NSObject, ObservableObject {
                     if percent == 0 { return "Centered".localized }
                     return percent > 0 ? "+\(percent)%" : "\(percent)%"
                 },
-                isAvailable: !PublicUtils.isTVOS
+                isAvailable: !PublicUtils.isTVOS && !PublicUtils.isRunningOnMacAsiPadApp,
+                isVisible: {
+                    $0.itemRegistry.unlockDisplayOrientation.value == 1 || PublicUtils.isIPad
+                },
+                onValueChanged: { session in
+                    guard session.isStreaming else { return }
+                    session.portraitStreamOffsetChangedInMenu = true
+                    StreamFrameViewController.sharedInstance()?.updatePortraitStreamOffset(
+                        percent: CGFloat(session.itemRegistry.portraitStreamOffset.value.rounded())
+                    )
+                }
             ),
             sliderItem(
                 \.backgroundSessionTimer,
@@ -4534,6 +4545,7 @@ final class SettingsSession: NSObject, ObservableObject {
             // session. The previous session was already persisted when the
             // menu was dismissed.
             isGameProfileModified = false
+            portraitStreamOffsetChangedInMenu = false
         }
         updateConditionalVisibility(suppressEmerging: menuIsOpening) {
             isStreaming = streaming
@@ -4731,6 +4743,16 @@ final class SettingsSession: NSObject, ObservableObject {
         let dataManager = DataManager()
 
         persistGameProfileSettingsIfNeeded()
+        if isStreaming && portraitStreamOffsetChangedInMenu {
+            let profileManager = OSCProfilesManager.sharedManager(CGRect.zero)
+            let profile = profileManager.getSelectedProfile()
+            if profile.normalizedStreamViewOffset != .zero || profile.streamViewScale != 1 {
+                profile.normalizedStreamViewOffset = .zero
+                profile.streamViewScale = 1
+                profileManager.replaceSelectedProfile(with: profile, overwriteDefault: true)
+            }
+            portraitStreamOffsetChangedInMenu = false
+        }
         guard let settings = dataManager.retrieveSettings() else { return }
         let interpolationConfiguration = self.interpolationConfiguration
         let backgroundSessionTimerValue = itemRegistry.backgroundSessionTimer.value >= 61
