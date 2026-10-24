@@ -408,6 +408,8 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
         
         var hasLegacyWidget = false
         for case let encoded as Data in oscProfile.buttonStatesEncoded {
+            if PublicUtils.isSimulator {continue}
+
             guard let buttonState = self.profilesManager?.unarchiveButtonStateEncoded(encoded) else { continue }
             
             if folder != nil {

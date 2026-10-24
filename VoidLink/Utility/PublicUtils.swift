@@ -22,6 +22,15 @@ import GameController
         ].contains(Bundle.main.bundleIdentifier)
     }()
 
+    /// True when running in an Apple platform simulator.
+    @objc public static let isSimulator: Bool = {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return false
+        #endif
+    }()
+
     /// True when this build runs on Apple TV (tvOS), rather than iOS/iPadOS.
     @objc public static let isTVOS: Bool = {
         #if os(tvOS)
@@ -49,6 +58,126 @@ import GameController
     @objc public static var isIPad: Bool = {
         return UIDevice.current.userInterfaceIdiom == .pad
     }()
+
+    @objc public static let isFoldableIPhoneUserDefaultsKey = "isFoldableIPhone"
+
+    /// Do not register a default for this key: nil means detection is still needed.
+    @MainActor private static var cachedFoldableIPhone: Bool? {
+        UserDefaults.standard.object(forKey: isFoldableIPhoneUserDefaultsKey) as? Bool
+    }
+
+    /// Loaded from persistent storage, or detected before the main interface is built.
+    /// Read on the main thread. Hardware capability remains cached as poses change.
+    @MainActor @objc public private(set) static var isFoldableIPhone: Bool = {
+        return cachedFoldableIPhone ?? false
+    }()
+
+    /// Mirrors UIKit's hinge states without requiring availability checks at readers.
+    @objc(VLHingeStatus) public enum HingeStatus: Int {
+        case unknown = 0
+        case closed = 1
+        case partiallyOpen = 2
+        case fullyOpen = 3
+    }
+
+    /// Updated on the main thread before hingeStatusDidChangeNotification is posted.
+    @MainActor @objc public private(set) static var hingeStatus: HingeStatus = .unknown
+    @objc public static let hingeStatusDidChangeNotification = Notification.Name("VoidLinkHingeStatusDidChange")
+
+    @MainActor private static var foldableIPhoneDetectionStarted = false
+    @MainActor private static var foldableIPhoneDetectionFinished = cachedFoldableIPhone != nil
+    @MainActor private static var foldableIPhoneDetectionCallbacks: [() -> Void] = []
+    @MainActor private static var hingeInteractionAssociationKey: UInt8 = 0
+    @MainActor private static var foldableIPhoneDetectionTimeout: DispatchWorkItem?
+
+    /// Call once from window setup, before constructing any business UI.
+    /// UIKit needs a visible window to report its initial hinge state. While
+    /// waiting, show the same background as the launch screen without blocking
+    /// the main thread. A stored true or false bypasses this startup wait entirely.
+    @MainActor @objc(prepareFoldableIPhoneDetectionInWindow:completion:)
+    public static func prepareFoldableIPhoneDetection(in window: UIWindow, completion: @escaping () -> Void) {
+        if foldableIPhoneDetectionFinished {
+            completion()
+            // Foldable devices still observe live poses without gating startup.
+            if isFoldableIPhone { installHingeStatusObservation(in: window) }
+            return
+        }
+        foldableIPhoneDetectionCallbacks.append(completion)
+        guard !foldableIPhoneDetectionStarted else { return }
+        foldableIPhoneDetectionStarted = true
+        #if os(iOS) && compiler(>=6.4)
+        if #available(iOS 27.1, *), UIDevice.current.userInterfaceIdiom == .phone {
+            let launchController = UIViewController()
+            launchController.view.backgroundColor = .systemBackground
+            window.rootViewController = launchController
+            let timeout = DispatchWorkItem {
+                // Cache the timeout fallback so ordinary iPhones only wait once.
+                NSLog("Foldable iPhone detection timed out; caching false")
+                finishFoldableIPhoneDetection(false)
+            }
+            foldableIPhoneDetectionTimeout = timeout
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: timeout)
+            window.makeKeyAndVisible()
+            installHingeStatusObservation(in: window)
+            return
+        }
+        #endif
+        #if compiler(>=6.4)
+        finishFoldableIPhoneDetection(false)
+        #else
+        // Xcode 26.6 lacks the hinge API; do not persist a hardware conclusion.
+        finishFoldableIPhoneDetection(nil)
+        #endif
+    }
+
+    /// Each application window owns its listener for its entire lifetime.
+    @MainActor private static func installHingeStatusObservation(in window: UIWindow) {
+        #if os(iOS) && compiler(>=6.4)
+        if #available(iOS 27.1, *), UIDevice.current.userInterfaceIdiom == .phone {
+            guard window.windowScene?.session.role == .windowApplication,
+                  objc_getAssociatedObject(window, &hingeInteractionAssociationKey) == nil else { return }
+            let interaction = UIHingeInteraction { interaction, update in
+                guard let window = interaction.view as? UIWindow,
+                      window.windowScene != nil, !window.isHidden else { return }
+                guard let hinge = update.hinge else {
+                    // Losing a hinge hierarchy is not a change in the physical pose.
+                    // Keep the last known status after startup has completed.
+                    if !foldableIPhoneDetectionFinished {
+                        finishFoldableIPhoneDetection(false)
+                    }
+                    return
+                }
+                let nextStatus = HingeStatus(rawValue: hinge.status.rawValue) ?? .unknown
+                let didChange = hingeStatus != nextStatus
+                hingeStatus = nextStatus
+                finishFoldableIPhoneDetection(true)
+                // Angle updates within the same state do not require UI rebuilds.
+                if didChange {
+                    NotificationCenter.default.post(name: hingeStatusDidChangeNotification, object: nil)
+                }
+            }
+            objc_setAssociatedObject(window, &hingeInteractionAssociationKey, interaction, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+            window.addInteraction(interaction)
+        }
+        #endif
+    }
+
+    @MainActor private static func finishFoldableIPhoneDetection(_ result: Bool?) {
+        // A late positive sample after a timeout is still a confirmed capability.
+        if let result {
+            isFoldableIPhone = result
+            if cachedFoldableIPhone != result {
+                UserDefaults.standard.set(result, forKey: isFoldableIPhoneUserDefaultsKey)
+            }
+        }
+        guard !foldableIPhoneDetectionFinished else { return }
+        foldableIPhoneDetectionFinished = true
+        foldableIPhoneDetectionTimeout?.cancel()
+        foldableIPhoneDetectionTimeout = nil
+        let callbacks = foldableIPhoneDetectionCallbacks
+        foldableIPhoneDetectionCallbacks.removeAll()
+        callbacks.forEach { $0() }
+    }
 
     /// Query after layout: compact size classes alone do not imply a short bar.
     @objc(isCompactNavigationBar:)
@@ -115,6 +244,11 @@ import GameController
     
     @objc public static var iOS27_2Available: Bool = {
         if #available(iOS 27.2, *) {return true}
+        else {return false}
+    }()
+    
+    @objc public static var iOS27_1Available: Bool = {
+        if #available(iOS 27.1, *) {return true}
         else {return false}
     }()
     

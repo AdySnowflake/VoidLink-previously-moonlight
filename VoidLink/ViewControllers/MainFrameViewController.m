@@ -72,6 +72,12 @@ static NSArray<UIBarButtonItem *> *VLBarButtonItems(UIBarButtonItem *first, UIBa
     UIBarButtonItem* _addHostButton;
     UIBarButtonItem* _helpButton;
     UIBarButtonItem* _upButton;
+    NSArray<NSLayoutConstraint *> *_appCollectionSafeAreaConstraints;
+    UIViewAutoresizing _appCollectionOriginalAutoresizingMask;
+    BOOL _appCollectionOriginalTranslatesAutoresizingMask;
+#if DEBUG
+    NSMutableDictionary<NSString *, NSString *> *_appCollectionLayoutDiagnosticStates;
+#endif
     BOOL _profilesButtonUsesCompactSymbol;
 
     UILabel* hostViewTitleLabel;
@@ -433,10 +439,10 @@ static NSMutableSet* hostList;
     // [self disableNavigation];
     [self updateTitle];
     [self alreadyPaired];
+    [self refreshAppCollectionLayout];
     // self.navigationController.navigationBar.backgroundColor = [ThemeManager appBackgroundColor];
     // self.navigationController.navigationBar.translucent = NO;
     //[self applyNavBarAppearance:navBarAppearance];
-    
     
     dispatch_time_t delayTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC));
     dispatch_after(delayTime, dispatch_get_main_queue(), ^{
@@ -560,6 +566,7 @@ static NSMutableSet* hostList;
     [self.collectionView setCollectionViewLayout:self.collectionViewLayout];
     [self.collectionView reloadData]; //for new scroll host view reloading mechanism
     [self.view addSubview:self.collectionView]; //for new scroll host view reloading mechanism
+    [self constrainIPhoneAppViewToSafeArea];
     
     // 若未在线或未配对, 有以下:
     
@@ -1460,10 +1467,162 @@ static NSMutableSet* hostList;
 
 - (void)adjustScrollViewForSafeArea:(UIScrollView*)view {
     if (@available(iOS 11.0, *)) {
-        if (self.view.safeAreaInsets.left >= 20 || self.view.safeAreaInsets.right >= 20) {
-            view.contentInset = UIEdgeInsetsMake(0, 20, 0, 20);
+        BOOL needsHorizontalInset = self.view.safeAreaInsets.left >= 20 || self.view.safeAreaInsets.right >= 20;
+#if !TARGET_OS_TV
+        if ((PublicUtils.isIPhone && !PublicUtils.isFoldableIPhone) ||
+            UIInterfaceOrientationIsPortrait([self appViewInterfaceOrientation])) {
+            // Make the compact portrait layout explicit, including on first entry.
+            needsHorizontalInset = YES;
+        }
+#endif
+        UIEdgeInsets insets = view.contentInset;
+        insets.left = insets.right = needsHorizontalInset ? 20 : 0;
+        if (!UIEdgeInsetsEqualToEdgeInsets(view.contentInset, insets)) {
+            view.contentInset = insets;
         }
     }
+}
+
+- (UIInterfaceOrientation)appViewInterfaceOrientation {
+#if !TARGET_OS_TV
+    if (@available(iOS 26.0, *)) {
+        return self.view.window.windowScene.effectiveGeometry.interfaceOrientation;
+    } else if (@available(iOS 13.0, *)) {
+        return self.view.window.windowScene.interfaceOrientation;
+    } else {
+        return UIApplication.sharedApplication.statusBarOrientation;
+    }
+#else
+    return UIInterfaceOrientationUnknown;
+#endif
+}
+
+- (void)constrainIPhoneAppViewToSafeArea {
+    /*
+    if(!PublicUtils.isIPhone) {
+        [self logAppCollectionLayout:@"skip-not-iphone"];
+        return;
+    }
+    if (self.collectionView == self.view || self.collectionView.superview != self.view) {
+        [self logAppCollectionLayout:@"skip-hierarchy"];
+        return;
+    } */
+    CGFloat horizontalInset = 0;
+    if (!PublicUtils.isFoldableIPhone) {
+#if !TARGET_OS_TV
+        UIInterfaceOrientation orientation = [self appViewInterfaceOrientation];
+        if (PublicUtils.isIPhone && UIInterfaceOrientationIsPortrait(orientation)) {
+            horizontalInset = [self appCollectionCellSize].width / 4.6;
+        } else
+#endif
+        {
+            // Ordinary iPhones return to their original full-width layout in landscape.
+            if (_appCollectionSafeAreaConstraints.count > 0) {
+                [NSLayoutConstraint deactivateConstraints:_appCollectionSafeAreaConstraints];
+                _appCollectionSafeAreaConstraints = nil;
+                self.collectionView.translatesAutoresizingMaskIntoConstraints = _appCollectionOriginalTranslatesAutoresizingMask;
+                self.collectionView.autoresizingMask = _appCollectionOriginalAutoresizingMask;
+                self.collectionView.frame = self.view.bounds;
+            }
+            // [self logAppCollectionLayout:@"skip-nonportrait"];
+            return;
+        }
+    }
+    // Removing the collection view on re-entry also removes its parent constraints.
+    // Reuse them while attached, and recreate them after the next mounting.
+    if (_appCollectionSafeAreaConstraints.count > 0 && _appCollectionSafeAreaConstraints.firstObject.active) {
+        if (_appCollectionSafeAreaConstraints[0].constant != horizontalInset) {
+            _appCollectionSafeAreaConstraints[0].constant = horizontalInset;
+        }
+        if (_appCollectionSafeAreaConstraints[1].constant != -horizontalInset) {
+            _appCollectionSafeAreaConstraints[1].constant = -horizontalInset;
+        }
+        // [self logAppCollectionLayout:@"constraints-updated"];
+        return;
+    }
+    if (_appCollectionSafeAreaConstraints.count == 0) {
+        _appCollectionOriginalAutoresizingMask = self.collectionView.autoresizingMask;
+        _appCollectionOriginalTranslatesAutoresizingMask = self.collectionView.translatesAutoresizingMaskIntoConstraints;
+    }
+    [NSLayoutConstraint deactivateConstraints:_appCollectionSafeAreaConstraints ?: @[]];
+    self.collectionView.translatesAutoresizingMaskIntoConstraints = NO;
+    _appCollectionSafeAreaConstraints = @[
+        [self.collectionView.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor constant:horizontalInset],
+        [self.collectionView.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor constant:-horizontalInset],
+        [self.collectionView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [self.collectionView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+    ];
+    [NSLayoutConstraint activateConstraints:_appCollectionSafeAreaConstraints];
+    // [self logAppCollectionLayout:@"constraints-created"];
+}
+
+/*
+- (void)logAppCollectionLayout:(NSString *)phase {
+#if DEBUG && !TARGET_OS_TV
+    // On by default for this investigation. Disable with launch arguments:
+    // -VLAppCollectionLayoutDiagnostics NO
+    NSNumber *enabled = [NSUserDefaults.standardUserDefaults objectForKey:@"VLAppCollectionLayoutDiagnostics"];
+    if (enabled != nil && !enabled.boolValue) { return; }
+    UIWindow *window = self.viewIfLoaded.window;
+    UIInterfaceOrientation orientation = UIInterfaceOrientationUnknown;
+    UIInterfaceOrientation legacyOrientation = UIInterfaceOrientationUnknown;
+    if (@available(iOS 13.0, *)) {
+        legacyOrientation = window.windowScene.interfaceOrientation;
+        orientation = legacyOrientation;
+    }
+    if (@available(iOS 26.0, *)) {
+        orientation = window.windowScene.effectiveGeometry.interfaceOrientation;
+    }
+    NSUInteger activeConstraints = 0;
+    for (NSLayoutConstraint *constraint in _appCollectionSafeAreaConstraints) {
+        if (constraint.active) { activeConstraints++; }
+    }
+    UICollectionViewCell *visibleCell = self.collectionView.visibleCells.firstObject;
+    NSString *state = [NSString stringWithFormat:
+        @"iOS=%@ main=%d phone=%d fold=%d entered=%d hidden=%d orientation=%ld legacy=%ld "
+         "view=%@ parent=%@ sameView=%d window=%@ viewBounds=%@ safe=%@ "
+         "collectionFrame=%@ collectionBounds=%@ insets=%@ adjustedInsets=%@ "
+         "constraints=%lu/%lu left=%.3f right=%.3f translates=%d ambiguous=%d "
+         "apps=%lu expectedCardWidth=%.3f visibleCellFrame=%@",
+        UIDevice.currentDevice.systemVersion, NSThread.isMainThread, PublicUtils.isIPhone,
+        PublicUtils.isFoldableIPhone, _enteredAppView, self.collectionView.hidden,
+        (long)orientation, (long)legacyOrientation,
+        NSStringFromClass(self.view.class), NSStringFromClass(self.collectionView.superview.class),
+        self.collectionView == self.view, NSStringFromCGRect(window.bounds),
+        NSStringFromCGRect(self.view.bounds), NSStringFromCGRect(self.view.safeAreaLayoutGuide.layoutFrame),
+        NSStringFromCGRect(self.collectionView.frame), NSStringFromCGRect(self.collectionView.bounds),
+        NSStringFromUIEdgeInsets(self.collectionView.contentInset),
+        NSStringFromUIEdgeInsets(self.collectionView.adjustedContentInset),
+        (unsigned long)activeConstraints, (unsigned long)_appCollectionSafeAreaConstraints.count,
+        _appCollectionSafeAreaConstraints.firstObject.constant,
+        _appCollectionSafeAreaConstraints.count > 1 ? _appCollectionSafeAreaConstraints[1].constant : 0,
+        self.collectionView.translatesAutoresizingMaskIntoConstraints, self.collectionView.hasAmbiguousLayout,
+        (unsigned long)self.sortedAppList.count, [self appCollectionCellSize].width,
+        NSStringFromCGRect(visibleCell.frame)];
+    if ([_appCollectionLayoutDiagnosticStates[phase] isEqualToString:state]) { return; }
+    if (_appCollectionLayoutDiagnosticStates == nil) {
+        _appCollectionLayoutDiagnosticStates = [NSMutableDictionary dictionary];
+    }
+    _appCollectionLayoutDiagnosticStates[phase] = state;
+    NSLog(@"[AppCollectionLayout] %@ %@", phase, state);
+#endif
+}
+ */
+
+- (void)refreshAppCollectionLayout {
+    /*
+    if (!PublicUtils.isIPhone || self.collectionView.superview != self.view) {
+        [self logAppCollectionLayout:@"refresh-skipped"];
+        return;
+    } */
+    [self constrainIPhoneAppViewToSafeArea];
+    [self adjustScrollViewForSafeArea:self.collectionView];
+    // Resolve the collection's new bounds before preparing its cell positions.
+    [self.view setNeedsLayout];
+    [self.view layoutIfNeeded];
+    [self.collectionView.collectionViewLayout invalidateLayout];
+    [self.collectionView layoutIfNeeded];
+    // [self logAppCollectionLayout:@"refresh-completed"];
 }
 
 // Adjust the subviews for the safe area on the iPhone X.
@@ -2172,23 +2331,22 @@ static NSMutableSet* hostList;
 
 -(void)viewDidLayoutSubviews{
     [super viewDidLayoutSubviews];
+    [self constrainIPhoneAppViewToSafeArea];
+    // [self logAppCollectionLayout:@"parent-layout-completed"];
     [self updateLegacyCompactProfilesNavigationIcon];
     [self updateHosts];
     // if (@available(iOS 13.0, *)) [GamepadNavigationIllustrationHud showInKeyWindow];
 }
 
-// this will also be called back when device orientation changes
-//- (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator {
-//    [super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];
-//    
-//    double delayInSeconds = 0.7;
-//    // Convert the delay into a dispatch_time_t value
-//    dispatch_time_t delayTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
-//    // Perform some task after the delay
-//    dispatch_after(delayTime, dispatch_get_main_queue(), ^{// Code to execute after the delay
-//        [self updateResolutionAccordingly];
-//    });
-//}
+- (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator {
+    [super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];
+    if (!PublicUtils.isIPhone || PublicUtils.isFoldableIPhone) { return; }
+    [coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+        [self refreshAppCollectionLayout];
+    } completion:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+        [self refreshAppCollectionLayout];
+    }];
+}
 
 -(void) fillResolutionTable:(CMVideoDimensions *)resolutionTable externalDisplayMode:(NSInteger)externalDisplayMode{
     UIWindow *window = self.view.window;
@@ -2353,6 +2511,7 @@ static NSMutableSet* hostList;
 - (void)viewDidAppear:(BOOL)animated
 {
     [super viewDidAppear:NO];
+    [self refreshAppCollectionLayout];
 
     _viewJustAppeared = true;
 
@@ -2470,6 +2629,7 @@ static NSMutableSet* hostList;
     // for that which would normally fire beginForegroundRefresh.
     
     [self.view addSubview:self.collectionView];
+    [self constrainIPhoneAppViewToSafeArea];
     [self initHostCollection];
     if(!_enteredAppView) [self switchToHostView];
     else if (@available(iOS 13.0, *)) [ControllerNavigator setUINavigationDelegate:self];
@@ -2653,6 +2813,7 @@ static NSMutableSet* hostList;
     }
 
     [self.collectionView reloadData];
+    [self refreshAppCollectionLayout];
 }
 
 - (bool)isInAppView{
@@ -2696,21 +2857,19 @@ static NSMutableSet* hostList;
     return cell;
 }
 
-- (CGSize)collectionView:(UICollectionView *)collectionView
-                  layout:(UICollectionViewLayout *)collectionViewLayout
-  sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
+- (CGSize)appCollectionCellSize {
     CGSize cellSize;
     if(PublicUtils.isIPhone) cellSize.height = 0.365*MIN(CGRectGetHeight([[UIScreen mainScreen] bounds]),CGRectGetWidth([[UIScreen mainScreen] bounds]));
     else cellSize.height = 0.272*MIN(CGRectGetHeight([[UIScreen mainScreen] bounds]),CGRectGetWidth([[UIScreen mainScreen] bounds]));
-    TemporaryApp* app = self.sortedAppList[indexPath.row];
-    UIAppView* appView = [[UIAppView alloc] initWithApp:app cache:_boxArtCache andCallback:self];
-
-    cellSize.width = cellSize.height * (appView
-                                        .bounds.size.width/appView
-                                        .bounds.size.height);
-    // cardSize.width =
-    
+    CGSize defaultSize = UIAppView.defaultSize;
+    cellSize.width = cellSize.height * defaultSize.width / defaultSize.height;
     return cellSize;
+}
+
+- (CGSize)collectionView:(UICollectionView *)collectionView
+                  layout:(UICollectionViewLayout *)collectionViewLayout
+  sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
+    return [self appCollectionCellSize];
 }
 
 - (NSInteger)numberOfSectionsInCollectionView:(UICollectionView *)collectionView {
@@ -2901,11 +3060,16 @@ static NSMutableSet* hostList;
     if(self.hostCollectionVC.view.superview == nil){
         [self.view addSubview:self.hostCollectionVC.view];
         CGFloat leftPadding = PublicUtils.isIPhone ? 30 : 0;
+        CGFloat rightPadding = 0;
+        if(PublicUtils.isFoldableIPhone) {
+            leftPadding = 15;
+            rightPadding = -15;
+        }
         self.hostCollectionVC.view.translatesAutoresizingMaskIntoConstraints = NO;
         [NSLayoutConstraint activateConstraints:@[
             [self.hostCollectionVC.view.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:0],
             [self.hostCollectionVC.view.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor constant:leftPadding],
-            [self.hostCollectionVC.view.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor constant:0],
+            [self.hostCollectionVC.view.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor constant:rightPadding],
         ]];
     }
     

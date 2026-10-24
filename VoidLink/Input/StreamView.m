@@ -960,12 +960,14 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
             bool hasMovableWidget = false;
                         
             for (NSInteger i = 0; i < profile.buttonStatesEncoded.count; i++) {
+                if(PublicUtils.isSimulator) continue;
                 NSData* buttonStateEncoded = profile.buttonStatesEncoded[i];
                 OnScreenButtonState* buttonState = [self->oscProfileMan unarchiveButtonStateEncoded:buttonStateEncoded];
                 if(buttonState.widgetType == CustomOnScreenWidget){
                     OnScreenWidgetView* widgetView = [OnScreenWidgetView widgetWithCmdString:buttonState.name buttonLabel:buttonState.alias shape:buttonState.widgetShape profile:profile]; //reconstruct widgetView
                     
-                    if(PublicUtils.isTVOS && widgetView.widgetType == WidgetTypeEnumTouchPad) continue;
+                    if(PublicUtils.isTVOS
+                       && widgetView.widgetType == WidgetTypeEnumTouchPad) continue;
                     
                     widgetView.functionalWidgetDelegate = (id<OnScreenFunctionalWidgetDelegate>)self->_streamFrameVC;
                     widgetView.motionHandler = motionHandler;
