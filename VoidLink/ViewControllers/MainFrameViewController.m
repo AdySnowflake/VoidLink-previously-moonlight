@@ -1483,8 +1483,8 @@ static NSMutableSet* hostList;
     }
 }
 
-- (UIInterfaceOrientation)appViewInterfaceOrientation {
 #if !TARGET_OS_TV
+- (UIInterfaceOrientation)appViewInterfaceOrientation {
     if (@available(iOS 26.0, *)) {
         return self.view.window.windowScene.effectiveGeometry.interfaceOrientation;
     } else if (@available(iOS 13.0, *)) {
@@ -1492,10 +1492,8 @@ static NSMutableSet* hostList;
     } else {
         return UIApplication.sharedApplication.statusBarOrientation;
     }
-#else
-    return UIInterfaceOrientationUnknown;
-#endif
 }
+#endif
 
 - (void)constrainIPhoneAppViewToSafeArea {
     /*

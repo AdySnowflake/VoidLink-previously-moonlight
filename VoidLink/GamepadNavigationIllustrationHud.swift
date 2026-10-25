@@ -44,7 +44,7 @@ final class GamepadNavigationIllustrationHud: UIView {
     private static var bottomRightInset: CGPoint {
         guard let hud = currentHud else {return .zero}
 
-        #if compiler(>=6.4)
+        #if compiler(>=6.4) && !os(tvOS)
         if #available(iOS 27.1, *) {
             if PublicUtils.isFoldableIPhone,let window = hud.window {
                 let isStreaming = (ControllerNavigator.radialMenuDelegate as? MainFrameViewController)?.isStreaming() == true
