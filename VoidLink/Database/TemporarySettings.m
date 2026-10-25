@@ -52,6 +52,7 @@
     self.statsOverlayEnabled = settings.statsOverlayEnabled;
     self.keyboardToggleFingers = settings.keyboardToggleFingers;
     self.mousePointerVelocityFactor = settings.mousePointerVelocityFactor;
+    self.zoomViewportPointerVelocityFactor = settings.zoomViewportPointerVelocityFactor ?: @(1);
     self.gyroSensitivity = settings.gyroSensitivity;
     self.localVolume = settings.localVolume;
     self.micVolume = settings.micVolume;
@@ -137,6 +138,7 @@
     self.touchMoveEventInterval = settings.touchMoveEventInterval;
     self.touchPointerVelocityFactor = settings.touchPointerVelocityFactor;
     self.mousePointerVelocityFactor = settings.mousePointerVelocityFactor;
+    self.zoomViewportPointerVelocityFactor = settings.zoomViewportPointerVelocityFactor ?: @(1);
     self.gyroSensitivity = settings.gyroSensitivity;
     self.localVolume = settings.localVolume;
     self.micVolume = settings.micVolume;

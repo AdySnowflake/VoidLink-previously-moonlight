@@ -322,9 +322,16 @@ static const float QUICK_TAP_TIME_INTERVAL = 0.2;
         firstTouchMoved = true;
     }
     
-    CGFloat velocityFactor = currentSettings.mousePointerVelocityFactor.floatValue;
-    CGVector delta = CGVectorMake((currentLocation.x - latestMousePointerLocation.x) * velocityFactor * 1.5,
-                                  (currentLocation.y - latestMousePointerLocation.y) * velocityFactor * 1.5);
+    BOOL zoomViewport = currentSettings.trackpadGestureMode.intValue == TrackpadGestureModeZoomViewport;
+    CGFloat velocityFactor;
+    if (zoomViewport) {
+        velocityFactor = currentSettings.zoomViewportPointerVelocityFactor.floatValue * (PublicUtils.isIPhone ? 3.880 : 4.875 * 0.875);
+    } else {
+        velocityFactor = currentSettings.mousePointerVelocityFactor.floatValue * (PublicUtils.isIPhone ? 4.3605 : 2.6325 * 1.2);
+    }
+
+    CGVector delta = CGVectorMake((currentLocation.x - latestMousePointerLocation.x) * velocityFactor,
+                                  (currentLocation.y - latestMousePointerLocation.y) * velocityFactor);
     latestMousePointerLocation = currentLocation;
     
     if(touchPointSpawnedAtUpperScreenEdge) return; // we're done here. this touch event will not be sent to the remote PC.

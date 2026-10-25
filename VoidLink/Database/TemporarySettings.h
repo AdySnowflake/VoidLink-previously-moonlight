@@ -44,6 +44,7 @@ static NSString * const PortraitStreamOffsetDefaultsKey = @"portraitStreamVertic
 @property (nonatomic, retain) NSNumber * micVolume;
 @property (nonatomic, retain) NSNumber * emulatedControllerType;
 @property (nonatomic, retain) NSNumber * mousePointerVelocityFactor;
+@property (nonatomic, retain) NSNumber * zoomViewportPointerVelocityFactor;
 @property (nonatomic, retain) NSNumber * pointerVelocityModeDivider;
 @property (nonatomic, retain) NSString * uniqueId;
 @property (nonatomic, retain) NSNumber * resolutionSelected;

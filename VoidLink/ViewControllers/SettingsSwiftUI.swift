@@ -323,6 +323,7 @@ enum SettingsItemID: String, Hashable, Identifiable {
 
     case touchMode = "touchModeStack"
     case mousePointerVelocity = "mousePointerVelocityStack"
+    case zoomViewportPointerVelocity = "zoomViewportPointerVelocityStack"
     case trackpadGestureSensitivity = "trackpadGestureSensitivityStack"
     case cursorInertia = "cursorInertiaStack"
     case cursorInertiaDeceleration = "cursorInertiaDecelerationStack"
@@ -455,6 +456,7 @@ enum SettingsItemID: String, Hashable, Identifiable {
         case .pictureInPicture: return "Enable PiP"
         case .touchMode: return "Touch Mode"
         case .mousePointerVelocity: return "Cursor Velocity"
+        case .zoomViewportPointerVelocity: return "Cursor Velocity (View Zoom)"
         case .trackpadGestureSensitivity: return "Gesture Sensitivity"
         case .cursorInertia: return "Cursor Inertia"
         case .cursorInertiaDeceleration: return "Deceleration"
@@ -1227,6 +1229,7 @@ final class SettingsItemRegistry: ObservableObject {
 
     let touchMode = SettingsItemModel<Int>(id: .touchMode, value: 1)
     let mousePointerVelocity = SettingsItemModel<Double>(id: .mousePointerVelocity, value: 100)
+    let zoomViewportPointerVelocity = SettingsItemModel<Double>(id: .zoomViewportPointerVelocity, value: 100)
     let trackpadGestureSensitivity = SettingsItemModel<Double>(id: .trackpadGestureSensitivity, value: 1)
     let pointerVelocityDivider = SettingsItemModel<Double>(id: .pointerVelocityDivider, value: 100)
     let pointerVelocityFactor = SettingsItemModel<Double>(id: .pointerVelocityFactor, value: 100)
@@ -1363,6 +1366,7 @@ final class SettingsItemRegistry: ObservableObject {
             // Touch Control
             touchMode.objectWillChange,
             mousePointerVelocity.objectWillChange,
+            zoomViewportPointerVelocity.objectWillChange,
             trackpadGestureSensitivity.objectWillChange,
             pointerVelocityDivider.objectWillChange,
             pointerVelocityFactor.objectWillChange,
@@ -1899,6 +1903,9 @@ final class SettingsSession: NSObject, ObservableObject {
         itemRegistry.touchMode.value = snapshot.touchMode.intValue
         itemRegistry.mousePointerVelocity.value = settingsVelocitySliderPosition(
             for: CGFloat(snapshot.mousePointerVelocityFactor.doubleValue)
+        )
+        itemRegistry.zoomViewportPointerVelocity.value = settingsVelocitySliderPosition(
+            for: CGFloat(snapshot.zoomViewportPointerVelocityFactor.doubleValue)
         )
         itemRegistry.trackpadGestureSensitivity.value = min(3, max(0.05, snapshot.trackpadGestureSensitivity.doubleValue))
         itemRegistry.pointerVelocityDivider.value = snapshot.pointerVelocityModeDivider.doubleValue * 100
@@ -2620,7 +2627,19 @@ final class SettingsSession: NSObject, ObservableObject {
                     let display = settingsVelocityDisplayPercent(for: model.value)
                     return "\(Int(display))%"
                 },
-                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.relative.rawValue }
+                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.relative.rawValue
+                    && $0.itemRegistry.trackpadGestures.value != TrackpadGestureMode.zoomViewport.rawValue }
+            ),
+            sliderItem(
+                \.zoomViewportPointerVelocity,
+                range: 0...300,
+                clampedTo: 0...300,
+                valueText: { _, model in
+                    let display = settingsVelocityDisplayPercent(for: model.value)
+                    return "\(Int(display))%"
+                },
+                isVisible: { $0.itemRegistry.touchMode.value == TouchMode.relative.rawValue
+                    && $0.itemRegistry.trackpadGestures.value == TrackpadGestureMode.zoomViewport.rawValue }
             ),
             sliderItem(
                 \.trackpadGestureSensitivity,
@@ -4810,6 +4829,7 @@ final class SettingsSession: NSObject, ObservableObject {
 
         settings.touchMode = NSNumber(value: itemRegistry.touchMode.value)
         settings.mousePointerVelocityFactor = NSNumber(value: settingsVelocityFactor(for: itemRegistry.mousePointerVelocity.value))
+        settings.zoomViewportPointerVelocityFactor = NSNumber(value: settingsVelocityFactor(for: itemRegistry.zoomViewportPointerVelocity.value))
         settings.trackpadGestureSensitivity = NSNumber(value: itemRegistry.trackpadGestureSensitivity.value)
         settings.pointerVelocityModeDivider = NSNumber(value: itemRegistry.pointerVelocityDivider.value / 100)
         settings.touchPointerVelocityFactor = NSNumber(value: settingsVelocityFactor(for: itemRegistry.pointerVelocityFactor.value))

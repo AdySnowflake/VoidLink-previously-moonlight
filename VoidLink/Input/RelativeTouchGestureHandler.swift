@@ -296,7 +296,7 @@ import UIKit
 
     // MARK: - Cursor output
 
-    /// Moves the cursor by a touch delta measured in screen points (already multiplied by the pointer velocity factor).
+    /// Applies a cursor delta with sensitivity and device/mode velocity multipliers already applied.
     @objc func moveCursor(by delta: CGVector) {
         let streamDelta = CGVector(dx: delta.dx, dy: delta.dy)
         if canZoomViewport {
@@ -305,8 +305,8 @@ import UIKit
             let rect = videoRect
             if rect.width > 0, rect.height > 0 {
                 let referenceScale = 32766.0 / max(rect.width, rect.height)
-                absoluteRemainder.dx += streamDelta.dx * 2.5 * referenceScale
-                absoluteRemainder.dy += streamDelta.dy * 2.5 * referenceScale
+                absoluteRemainder.dx += streamDelta.dx * referenceScale
+                absoluteRemainder.dy += streamDelta.dy * referenceScale
                 let deltaX = Int16(clamping: Int(absoluteRemainder.dx.rounded(.towardZero)))
                 let deltaY = Int16(clamping: Int(absoluteRemainder.dy.rounded(.towardZero)))
                 if deltaX != 0 || deltaY != 0 {
@@ -322,8 +322,8 @@ import UIKit
             return
         }
 
-        relativeRemainder.dx += streamDelta.dx * 1.35
-        relativeRemainder.dy += streamDelta.dy * 1.35
+        relativeRemainder.dx += streamDelta.dx
+        relativeRemainder.dy += streamDelta.dy
         let deltaX = relativeRemainder.dx.rounded(.towardZero)
         let deltaY = relativeRemainder.dy.rounded(.towardZero)
         guard deltaX != 0 || deltaY != 0 else { return }
