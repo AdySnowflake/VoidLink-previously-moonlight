@@ -19,7 +19,7 @@ class ThemeManager: NSObject {
     
     @objc class func setPublicUIStyle() -> UIColor {
         if #available(iOS 13.0, *) {
-            let traitCollection = UIScreen.main.traitCollection
+            let traitCollection = PublicUtils.currentScreen.traitCollection
             if _privateUserInterfaceStyle == .unspecified {
                 _userInterfaceStyle = traitCollection.userInterfaceStyle
             } else {

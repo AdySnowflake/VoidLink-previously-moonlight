@@ -240,12 +240,8 @@ class OSCProfilesManager: NSObject {
         persistEncodedProfiles(encodedProfiles(from: profilesDecoded))
     }
 
-    private func isIPhone() -> Bool {
-        UIDevice.current.userInterfaceIdiom == .phone
-    }
-
     func importDefaultTemplates(selectedIndex: UInt32? = nil) {
-        guard let filePath = Bundle.main.path(forResource: isIPhone() ? "widgetTemplatesIPhone" : "widgetTemplates", ofType: "bin") else {
+        guard let filePath = Bundle.main.path(forResource: (PublicUtils.isIPhone && !PublicUtils.isFoldableRAMCached) ? "widgetTemplatesIPhone" : "widgetTemplates", ofType: "bin") else {
             return
         }
 
@@ -528,8 +524,8 @@ class OSCProfilesManager: NSObject {
         return buttonStatesEncoded
     }
 
-    private func getReferenceLen() -> CGFloat {
-        let screenBounds = UIScreen.main.bounds
+    private func getReferenceLen(for widget: OnScreenWidgetView) -> CGFloat {
+        let screenBounds = widget.sizeReferenceScreenBounds
         let screenWidthInPoints = screenBounds.width
         let screenHeightInPoints = screenBounds.height
         let longSideLen = max(screenWidthInPoints, screenHeightInPoints)
@@ -541,16 +537,22 @@ class OSCProfilesManager: NSObject {
     }
 
     private func normalizeSizeWidthFactor(with widget: OnScreenWidgetView) -> CGFloat {
-        widget.bounds.size.width / getReferenceLen() * 10000
+        let referenceLen = getReferenceLen(for: widget)
+        guard referenceLen > 0 else { return widget.widthFactor }
+        return widget.bounds.size.width / referenceLen * 10000
     }
 
     private func normalizeSizeHeightFactor(with widget: OnScreenWidgetView) -> CGFloat {
-        widget.bounds.size.height / getReferenceLen() * 10000
+        let referenceLen = getReferenceLen(for: widget)
+        guard referenceLen > 0 else { return widget.heightFactor }
+        return widget.bounds.size.height / referenceLen * 10000
     }
 
     private func normalizeComponentSizeFactor(with widget: OnScreenWidgetView) -> CGFloat {
         if widget.isStickWheel || widget.isDisplacementBasedStickPad {
-            return widget.denormalizedComponentSizeFactor * widget.baselineDiameter / getReferenceLen() * 10000
+            let referenceLen = getReferenceLen(for: widget)
+            guard referenceLen > 0 else { return widget.componentSizeFactor }
+            return widget.denormalizedComponentSizeFactor * widget.baselineDiameter / referenceLen * 10000
         }
         return 1
     }

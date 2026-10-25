@@ -1699,8 +1699,8 @@ static NSMutableSet* hostList;
 
 - (bool)isIPhonePortrait{
     bool isIPhone = ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPhone);
-    CGFloat screenHeightInPoints = CGRectGetHeight([[UIScreen mainScreen] bounds]);
-    CGFloat screenWidthInPoints = CGRectGetWidth([[UIScreen mainScreen] bounds]);
+    CGFloat screenHeightInPoints = CGRectGetHeight([[PublicUtils screenForView:self.viewIfLoaded] bounds]);
+    CGFloat screenWidthInPoints = CGRectGetWidth([[PublicUtils screenForView:self.viewIfLoaded] bounds]);
     bool isPortrait = screenHeightInPoints > screenWidthInPoints;
     return isIPhone && isPortrait;
    // return isPortrait;
@@ -2134,15 +2134,15 @@ static NSMutableSet* hostList;
         default:
             settings.sdrPerformanceWorkaround = true;
             settings.framePacingMode = @(FramePacingModeQueue);
-            if([UIScreen mainScreen].maximumFramesPerSecond > 110) settings.asyncFrameDequeue = false;
-            if([UIScreen mainScreen].maximumFramesPerSecond < 65) settings.asyncFrameDequeue = false;
+            if([PublicUtils screenForView:self.viewIfLoaded].maximumFramesPerSecond > 110) settings.asyncFrameDequeue = false;
+            if([PublicUtils screenForView:self.viewIfLoaded].maximumFramesPerSecond < 65) settings.asyncFrameDequeue = false;
             break;
     }
     
-    if([UIScreen mainScreen].maximumFramesPerSecond > 110) settings.framerate = @(120);
-    if([UIScreen mainScreen].maximumFramesPerSecond < 65) settings.framerate = @(60);
+    if([PublicUtils screenForView:self.viewIfLoaded].maximumFramesPerSecond > 110) settings.framerate = @(120);
+    if([PublicUtils screenForView:self.viewIfLoaded].maximumFramesPerSecond < 65) settings.framerate = @(60);
 
-    // if([UIScreen mainScreen].maximumFramesPerSecond < 65) settings.touchMoveEventInterval = @(60);
+    // if([PublicUtils screenForView:self.viewIfLoaded].maximumFramesPerSecond < 65) settings.touchMoveEventInterval = @(60);
     settings.onscreenControls = @(OnScreenControlsLevelCustom);
     settings.pencilTickIntervalUs = @(1750);
     settings.pencilTipOffsetX = @(0);
@@ -2525,7 +2525,7 @@ static NSMutableSet* hostList;
     [[self revealViewController] setPrimaryViewController:self];
     self.revealViewController.isStreaming = false; // tell the revealViewController streaming is finished
     //[self.settingsButton setEnabled:![self isIPhonePortrait]]; //make sure settings button is disabled in iphone portrait mode.
-    //recordedScreenWidth = CGRectGetWidth([[UIScreen mainScreen] bounds]); // Get the screen's bounds (in points), update recorded screen width
+    //recordedScreenWidth = CGRectGetWidth([[PublicUtils screenForView:self.viewIfLoaded] bounds]); // Get the screen's bounds (in points), update recorded screen width
 // #endif
     
     [self.navigationController setNavigationBarHidden:NO animated:NO];
@@ -2857,8 +2857,10 @@ static NSMutableSet* hostList;
 
 - (CGSize)appCollectionCellSize {
     CGSize cellSize;
-    if(PublicUtils.isIPhone) cellSize.height = 0.365*MIN(CGRectGetHeight([[UIScreen mainScreen] bounds]),CGRectGetWidth([[UIScreen mainScreen] bounds]));
-    else cellSize.height = 0.272*MIN(CGRectGetHeight([[UIScreen mainScreen] bounds]),CGRectGetWidth([[UIScreen mainScreen] bounds]));
+    UIScreen* referenceScreen = PublicUtils.isFoldableRAMCached ? UIScreen.screens.firstObject : [PublicUtils screenForView:self.viewIfLoaded];
+    CGRect referenceBounds = [referenceScreen bounds];
+    if(PublicUtils.isFoldableRAMCached || PublicUtils.isIPhone) cellSize.height = 0.365*MIN(referenceBounds.size.height,referenceBounds.size.width);
+    else cellSize.height = 0.272*MIN(referenceBounds.size.height,referenceBounds.size.width);
     CGSize defaultSize = UIAppView.defaultSize;
     cellSize.width = cellSize.height * defaultSize.width / defaultSize.height;
     return cellSize;
@@ -2911,8 +2913,8 @@ static NSMutableSet* hostList;
 - (void)handleMenuResize:(UILongPressGestureRecognizer *)gesture {
     CGPoint locationInView = [gesture locationInView:self.view];
     CGPoint locationInSuperView = [gesture locationInView:self.revealViewController.view];
-    CGFloat screenHeight = [UIScreen mainScreen].bounds.size.height;
-    CGFloat screenWidth = [UIScreen mainScreen].bounds.size.width;
+    CGFloat screenHeight = [PublicUtils screenForView:self.viewIfLoaded].bounds.size.height;
+    CGFloat screenWidth = [PublicUtils screenForView:self.viewIfLoaded].bounds.size.width;
 
     menuSeparator = [self findMenuSeparator];
     if(menuSeparator.hidden || menuSeparator == nil) return;
@@ -2921,7 +2923,7 @@ static NSMutableSet* hostList;
         if(locationInView.x < 30) {
             snapshot = [[UIView alloc] init];
             snapshot.backgroundColor = [UIColor systemBlueColor];
-            screenHeight = [UIScreen mainScreen].bounds.size.height;
+            screenHeight = [PublicUtils screenForView:self.viewIfLoaded].bounds.size.height;
             snapshot.frame = CGRectMake(locationInSuperView.x,0, 2, screenHeight);
             [self.revealViewController.view addSubview:snapshot];
         }
@@ -3037,8 +3039,10 @@ static NSMutableSet* hostList;
 
 - (CGSize)getHostCardSize{
     CGSize cardSize;
-    if(PublicUtils.isIPhone) cardSize.height = 0.37*MIN(CGRectGetHeight([[UIScreen mainScreen] bounds]),CGRectGetWidth([[UIScreen mainScreen] bounds]));
-    else cardSize.height = 0.25*MIN(CGRectGetHeight([[UIScreen mainScreen] bounds]),CGRectGetWidth([[UIScreen mainScreen] bounds]));
+    UIScreen* referenceScreen = PublicUtils.isFoldableRAMCached ? UIScreen.screens.firstObject : [PublicUtils screenForView:self.viewIfLoaded];
+    CGRect referenceBounds = [referenceScreen bounds];
+    if(PublicUtils.isFoldableRAMCached || PublicUtils.isIPhone) cardSize.height = 0.37*MIN(referenceBounds.size.width, referenceBounds.size.height);
+    else cardSize.height = 0.25*MIN(referenceBounds.size.width, referenceBounds.size.height);
     TemporaryHost* dummyHost = [[TemporaryHost alloc] init];
     HostCardView* dummyCard = [[HostCardView alloc] initWithHost:dummyHost];
     cardSize.width = cardSize.height * (dummyCard.size.width/dummyCard.size.height);

@@ -72,7 +72,7 @@ import UIKit
         pencilTickEnabled = settings.pencilTickMode.intValue != PencilTickMode.disabled.rawValue
         pencilTipOffset = CGPoint(x: CGFloat(settings.pencilTipOffsetX?.floatValue ?? 0),
                                   y: CGFloat(settings.pencilTipOffsetY?.floatValue ?? 0))
-        // initialMoveEventIndexLimit = UIScreen.main.maximumFramesPerSecond > 60 ? 4 : 2
+        // initialMoveEventIndexLimit = PublicUtils.currentScreen.maximumFramesPerSecond > 60 ? 4 : 2
         initialMoveEventIndexLimit = 0
         super.init()
         setupPressureLUT()
@@ -169,9 +169,9 @@ import UIKit
     }
 
     private var previousTipLocation: CGPoint?
-    private var refreshRate: CGFloat = {
-        return CGFloat(UIScreen.main.maximumFramesPerSecond)
-    }()
+    private var refreshRate: CGFloat {
+        return CGFloat(PublicUtils.screen(for: streamView).maximumFramesPerSecond)
+    }
     
     private func speed(of touch:UITouch) -> CGFloat {
         guard let previousTipLocation else { return 0 }

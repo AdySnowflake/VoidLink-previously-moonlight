@@ -279,6 +279,7 @@ static BOOL VLIsExternalDisplaySession(UISceneSession *session) {
 #else
         self.window = [[UIWindow alloc] initWithWindowScene:windowScene];
 #endif
+        [PublicUtils refreshCurrentScreenForWindow:self.window];
         [PublicUtils prepareFoldableIPhoneDetectionInWindow:self.window completion:^{
             [self finishConnectingMainAppScene];
         }];
@@ -420,6 +421,7 @@ static BOOL VLIsExternalDisplaySession(UISceneSession *session) {
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {
+    [PublicUtils refreshCurrentScreenForWindow:self.window];
 #if TARGET_OS_TV
     if (scene == self.window.windowScene &&
         [self.window.rootViewController isKindOfClass:[VoidLinkControllerRootViewController class]]) {
@@ -427,6 +429,16 @@ static BOOL VLIsExternalDisplaySession(UISceneSession *session) {
     }
 #endif
 }
+
+- (void)windowScene:(UIWindowScene *)windowScene didUpdateEffectiveGeometry:(UIWindowSceneGeometry *)previousEffectiveGeometry API_AVAILABLE(ios(26.0), tvos(26.0)) {
+    [PublicUtils refreshCurrentScreenForWindow:self.window];
+}
+
+#if !TARGET_OS_TV
+- (void)windowScene:(UIWindowScene *)windowScene didUpdateCoordinateSpace:(id<UICoordinateSpace>)previousCoordinateSpace interfaceOrientation:(UIInterfaceOrientation)previousInterfaceOrientation traitCollection:(UITraitCollection *)previousTraitCollection {
+    [PublicUtils refreshCurrentScreenForWindow:self.window];
+}
+#endif
 
 - (void)sceneDidDisconnect:(UIScene *)scene {
     Log(LOG_I, @"SceneDelegate: Scene disconnected: %@, role: %@", scene.title, scene.session.role);

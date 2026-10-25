@@ -1327,7 +1327,7 @@ struct WidgetPickerView: View {
         let poolTipFontSize = isPadPortrait ? 11.0 : metrics.tipFontSize
         let poolChipHeight = isPadPortrait ? 36.0 : metrics.chipHeight
         let poolChipFontSize = isPadPortrait ? 12.0 : metrics.chipFontSize
-        let poolGridWidth: CGFloat? = isPadPortrait ? min(240, UIScreen.main.bounds.width * 0.34) : nil
+        let poolGridWidth: CGFloat? = isPadPortrait ? min(240, PublicUtils.currentScreen.bounds.width * 0.34) : nil
 
         return VStack(alignment: .leading, spacing: metrics.poolSectionSpacing) {
             VStack(alignment: .leading, spacing: poolHeaderSpacing) {

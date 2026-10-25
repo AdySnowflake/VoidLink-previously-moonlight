@@ -156,7 +156,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
     keyboardToggleTip.layer.cornerRadius = 10;
     keyboardToggleTip.clipsToBounds = true;
     
-    designatedSoftKeyboardHeight = settings.softKeyboardHeight * PublicUtils.screenHeight;
+    designatedSoftKeyboardHeight = settings.softKeyboardHeight * [PublicUtils screenForView:self].bounds.size.height;
     keyboardHeightDesignatedForLandscape = designatedSoftKeyboardHeight != 0;
     
     // if(touchMode == TouchModeNativeOnly) [self addGestureRecognizer:keyboardToggleRecognizer]; //keep legacy approach in pure native mode
@@ -349,7 +349,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
     CGRect keyboardFrame = cursorKeyboardFrame;
     CGFloat occlusion = 0;
     if (container && !CGRectIsEmpty(keyboardFrame)) {
-        UIScreen* screen = self.window.screen ?: UIScreen.mainScreen;
+        UIScreen* screen = [PublicUtils screenForView:self];
         CGRect keyboardInContainer = [screen.coordinateSpace convertRect:keyboardFrame toCoordinateSpace:container];
         CGRect scrollFrame = scrollView.frame;
         if (CGRectIntersectsRect(keyboardInContainer, scrollFrame)) {
@@ -405,7 +405,8 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
         NSDictionary *userInfo = notification.userInfo;
         // Get the keyboard size from the notification
         CGRect keyboardFrame = [userInfo[UIKeyboardFrameEndUserInfoKey] CGRectValue];
-        CGFloat screenHeight = PublicUtils.screenHeight;
+        CGFloat screenHeight = [PublicUtils screenForView:self].bounds.size.height;
+        designatedSoftKeyboardHeight = settings.softKeyboardHeight * screenHeight;
         CGFloat totalKeyboardHeight = keyboardFrame.size.height;
         CGFloat toolbarHeight = settings.showKeyboardToolbar ? GenericUtils.inputAccessoryBarHeight : 0;
         
@@ -433,7 +434,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
             totalKeyboardHeight = useDesignatedKeyboardHeight ? designatedSoftKeyboardHeight+toolbarHeight : totalKeyboardHeight;
         }
         
-        HeightViewLiftedTo = totalKeyboardHeight - keyboardToggleRecognizer.lowestTouchPointHeight + PublicUtils.screenHeight * (useDesignatedKeyboardHeight ? 0.1 : 0.15); // lift the StreamView to the height of lowest touch point of multi-finger tap gesture, while reserving the view of 1/10 screen height for remote typing.
+        HeightViewLiftedTo = totalKeyboardHeight - keyboardToggleRecognizer.lowestTouchPointHeight + [PublicUtils screenForView:self].bounds.size.height * (useDesignatedKeyboardHeight ? 0.1 : 0.15); // lift the StreamView to the height of lowest touch point of multi-finger tap gesture, while reserving the view of 1/10 screen height for remote typing.
         if(HeightViewLiftedTo < 0) HeightViewLiftedTo = 0;  // set HeightViewLiftedTo to 0 if it is high enough and not going to be covered by keyboard.
         CGRect liftedStreamFrame = self.frame;
         liftedStreamFrame.origin.y -= HeightViewLiftedTo;
@@ -960,7 +961,6 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
             bool hasMovableWidget = false;
                         
             for (NSInteger i = 0; i < profile.buttonStatesEncoded.count; i++) {
-                if(PublicUtils.isSimulator) continue;
                 NSData* buttonStateEncoded = profile.buttonStatesEncoded[i];
                 OnScreenButtonState* buttonState = [self->oscProfileMan unarchiveButtonStateEncoded:buttonStateEncoded];
                 if(buttonState.widgetType == CustomOnScreenWidget){

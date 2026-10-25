@@ -221,7 +221,7 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
     }
 
     private func getCurrentOrientation() -> UIInterfaceOrientationMask {
-        let bounds = UIScreen.main.bounds
+        let bounds = PublicUtils.screen(for: viewIfLoaded).bounds
         return bounds.width > bounds.height ? .landscape : [.portrait, .portraitUpsideDown]
     }
 
@@ -422,6 +422,7 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
             
             if buttonState.widgetType == 1 {
                 let widgetView = OnScreenWidgetView.widget(cmdString: buttonState.name, buttonLabel: buttonState.alias, shape: buttonState.widgetShape, profile: oscProfile)
+                guard let widgetView = widgetView else {continue}
                 widgetView.sequence = (buttonState.sequence == -1 || folder != nil) ? {
                     sequence += 1
                     return sequence
@@ -1298,6 +1299,8 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
             shape: params["shape"] as? String ?? "",
             profile: profile
         )
+        
+        guard let newWidget = newWidget else {return}
 
         newWidget.sequence = widget.sequence
         newWidget.autoDockIdleDuration = widget.autoDockIdleDuration
@@ -1376,6 +1379,9 @@ final class LayoutOnScreenControlsViewController: UIViewController, OnScreenWidg
             shape: params["shape"] as? String ?? "",
             profile: profile
         )
+        
+        guard let widgetView = widgetView else {return}
+        
         view.insertSubview(widgetView, belowSubview: widgetPanelStack)
         widgetView.isHidden = true
         widgetView.sequence = widgetView.getAvailableSequence()

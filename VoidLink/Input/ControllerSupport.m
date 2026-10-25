@@ -203,7 +203,7 @@ static __weak ControllerSupport *VLSharedControllerSupport = nil;
 }
 
 - (bool)isLandscapeNow {
-    return CGRectGetWidth([[UIScreen mainScreen]bounds]) > CGRectGetHeight([[UIScreen mainScreen]bounds]);
+    return CGRectGetWidth([[PublicUtils currentScreen]bounds]) > CGRectGetHeight([[PublicUtils currentScreen]bounds]);
 }
 
 #if !TARGET_OS_TV

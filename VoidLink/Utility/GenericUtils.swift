@@ -983,7 +983,7 @@ import UIKit
 
         let container = CALayer()
         container.frame = view.bounds
-        container.contentsScale = UIScreen.main.scale
+        container.contentsScale = PublicUtils.screen(for: view).scale
 
         let step: CGFloat = 0.05
         let totalSteps = Int(1.0 / step)
@@ -1004,7 +1004,7 @@ import UIKit
             // 数值
             if true {
                 let t = CATextLayer()
-                t.contentsScale = UIScreen.main.scale
+                t.contentsScale = PublicUtils.screen(for: view).scale
                 t.font = UIFont.systemFont(ofSize: 13, weight: .medium)
                 t.fontSize = 13
                 t.foregroundColor = UIColor.red.cgColor

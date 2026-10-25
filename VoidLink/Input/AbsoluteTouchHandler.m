@@ -80,8 +80,8 @@ static int mouseButtonForCursorMove = BUTTON_LEFT;
     
     // upper screen check
     _edgeTolerance = settings.edgeSlidingSensitivity.floatValue;
-    slideGestureVerticalThreshold = CGRectGetHeight([[UIScreen mainScreen] bounds]) * 0.4;
-    screenWidthWithThreshold = CGRectGetWidth([[UIScreen mainScreen] bounds]) - _edgeTolerance;
+    slideGestureVerticalThreshold = CGRectGetHeight([[PublicUtils currentScreen] bounds]) * 0.4;
+    screenWidthWithThreshold = CGRectGetWidth([[PublicUtils currentScreen] bounds]) - _edgeTolerance;
     self->touchPointSpawnedAtUpperScreenEdge = false;
         
     leftClickDelay = ((CGFloat)settings.leftClickDelayMs.intValue)/1000;
@@ -118,6 +118,9 @@ static int mouseButtonForCursorMove = BUTTON_LEFT;
     }
     
     CGPoint initialPoint = [[touches anyObject] locationInView:streamView];
+    UIView *edgeReferenceView = streamView;
+    slideGestureVerticalThreshold = CGRectGetHeight(edgeReferenceView.bounds) * 0.4;
+    screenWidthWithThreshold = CGRectGetWidth(edgeReferenceView.bounds) - _edgeTolerance;
     if(initialPoint.y < slideGestureVerticalThreshold && (initialPoint.x < _edgeTolerance || initialPoint.x > screenWidthWithThreshold)) {
         self->touchPointSpawnedAtUpperScreenEdge = true;
         return; // we're done here. this touch event will not be sent to the remote PC.

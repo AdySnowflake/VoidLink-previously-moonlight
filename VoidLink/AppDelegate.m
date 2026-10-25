@@ -74,7 +74,7 @@ static NSString* DB_NAME = @"Limelight_iOS.sqlite";
     if (@available(iOS 13.0, *)) {
         // Scene delegate will handle window creation
     } else {
-        self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
+        self.window = [[UIWindow alloc] initWithFrame:[[PublicUtils currentScreen] bounds]];
         
         NSString *storyboardName;
         if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {

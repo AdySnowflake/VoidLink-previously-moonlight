@@ -71,7 +71,42 @@ import GameController
     @MainActor @objc public private(set) static var isFoldableIPhone: Bool = {
         return cachedFoldableIPhone ?? false
     }()
+    
+    private static let foldableRAMCacheLock = NSLock()
+    private static var foldableRAMCacheValue: Bool?
 
+    /// Resolve once on the main actor; subsequent callers only read memory.
+    @objc public static var isFoldableRAMCached: Bool {
+        foldableRAMCacheLock.lock()
+        let cached = foldableRAMCacheValue
+        foldableRAMCacheLock.unlock()
+        if let cached { return cached }
+
+        if Thread.isMainThread {
+            return MainActor.assumeIsolated { initializeFoldableRAMCache() }
+        }
+        // Do not hold the cache lock while waiting for the main queue. This is
+        // a computed getter so Swift's static-let initialization lock cannot
+        // deadlock a simultaneous first read on the main thread.
+        return DispatchQueue.main.sync {
+            MainActor.assumeIsolated { initializeFoldableRAMCache() }
+        }
+    }
+
+    @MainActor private static func initializeFoldableRAMCache() -> Bool {
+        foldableRAMCacheLock.lock()
+        defer { foldableRAMCacheLock.unlock() }
+        if let cached = foldableRAMCacheValue { return cached }
+        let result: Bool
+        if #available(iOS 27.0, *) {
+            result = isFoldableIPhone
+        } else {
+            result = false
+        }
+        foldableRAMCacheValue = result
+        return result
+    }
+    
     /// Mirrors UIKit's hinge states without requiring availability checks at readers.
     @objc(VLHingeStatus) public enum HingeStatus: Int {
         case unknown = 0
@@ -97,6 +132,7 @@ import GameController
     @MainActor @objc(prepareFoldableIPhoneDetectionInWindow:completion:)
     public static func prepareFoldableIPhoneDetection(in window: UIWindow, completion: @escaping () -> Void) {
         if foldableIPhoneDetectionFinished {
+            _ = initializeFoldableRAMCache()
             completion()
             // Foldable devices still observe live poses without gating startup.
             if isFoldableIPhone { installHingeStatusObservation(in: window) }
@@ -174,6 +210,7 @@ import GameController
         foldableIPhoneDetectionFinished = true
         foldableIPhoneDetectionTimeout?.cancel()
         foldableIPhoneDetectionTimeout = nil
+        _ = initializeFoldableRAMCache()
         let callbacks = foldableIPhoneDetectionCallbacks
         foldableIPhoneDetectionCallbacks.removeAll()
         callbacks.forEach { $0() }
@@ -300,7 +337,7 @@ import GameController
         if #available(iOS 13.0, *) {
             guard let windowScene = UIApplication.shared.connectedScenes
                 .compactMap({ $0 as? UIWindowScene })
-                .first(where: { $0.activationState == .foregroundActive })
+                .first(where: { $0.session.role == .windowApplication && $0.activationState == .foregroundActive })
             else {return false}
             return windowScene.interfaceOrientation.isLandscape
         }
@@ -391,19 +428,91 @@ import GameController
         return view.bounds.width > view.bounds.height
     }
     
-    @objc public static var screenWidth: CGFloat {
-        return UIScreen.main.bounds.width
-    }
-    
-    @objc public static var screenHeight: CGFloat {
-        return UIScreen.main.bounds.height
-    }
-    
-    @objc public static var refreshRate: CGFloat = {
-        return CGFloat(UIScreen.main.maximumFramesPerSecond)
-    }()
+    private static let currentScreenLock = NSLock()
+    private static var publishedCurrentScreen: UIScreen?
 
-        
+    private static func publishCurrentScreen(_ screen: UIScreen) {
+        currentScreenLock.lock()
+        publishedCurrentScreen = screen
+        currentScreenLock.unlock()
+    }
+
+    /// The local application screen, independent of external display scenes.
+    /// UI readers resolve it live. Worker threads read the last published screen
+    /// without traversing UIKit scenes or synchronously waiting for the main queue.
+    @objc public static var currentScreen: UIScreen {
+        if Thread.isMainThread, #available(iOS 13.0, tvOS 13.0, *) {
+            let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+                .filter { $0.session.role == .windowApplication && $0.activationState != .unattached }
+            let active = scenes.filter { $0.activationState == .foregroundActive }
+            let scene = active.first { $0.windows.contains { $0.isKeyWindow } }
+                ?? active.first
+                ?? scenes.first { $0.activationState == .foregroundInactive }
+            if let screen = scene?.screen {
+                publishCurrentScreen(screen)
+                return screen
+            }
+        }
+        currentScreenLock.lock()
+        let screen = publishedCurrentScreen
+        currentScreenLock.unlock()
+        // Only startup and pre-scene systems need this legacy fallback.
+        return screen ?? UIScreen.main
+    }
+
+    @objc(refreshCurrentScreenForWindow:)
+    public static func refreshCurrentScreen(for window: UIWindow?) {
+        guard Thread.isMainThread, let window else { return }
+        if #available(iOS 13.0, tvOS 13.0, *) {
+            guard let scene = window.windowScene, scene.session.role == .windowApplication else { return }
+            publishCurrentScreen(scene.screen)
+        } else {
+            publishCurrentScreen(window.screen)
+        }
+        // In a multi-window app, a geometry callback from an inactive window
+        // must not displace the foreground key scene's default screen.
+        _ = currentScreen
+    }
+
+    /// Prefer the caller's window, including an explicitly external render view.
+    @objc(screenForView:)
+    public static func screen(for view: UIView?) -> UIScreen {
+        if Thread.isMainThread, let window = view?.window {
+            if #available(iOS 13.0, tvOS 13.0, *), let scene = window.windowScene {
+                return scene.screen
+            }
+            return window.screen
+        }
+        return currentScreen
+    }
+
+    @objc public static var externalScreen: UIScreen? {
+        guard Thread.isMainThread else { return nil }
+        if #available(iOS 13.0, tvOS 13.0, *) {
+            return UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+                .first { scene in
+                    guard scene.activationState != .unattached else { return false }
+                    if #available(iOS 16.0, tvOS 16.0, *), scene.session.role == .windowExternalDisplayNonInteractive {
+                        return true
+                    }
+                    return scene.session.role == .windowExternalDisplay
+                }?.screen
+        }
+        return UIScreen.screens.first { $0 !== currentScreen }
+    }
+
+    @objc public static var screenWidth: CGFloat {
+        return currentScreen.bounds.width
+    }
+
+    @objc public static var screenHeight: CGFloat {
+        return currentScreen.bounds.height
+    }
+
+    @objc public static var refreshRate: CGFloat {
+        return CGFloat(currentScreen.maximumFramesPerSecond)
+    }
+
     @objc(parentViewControllerForView:)
     static func parentViewController(for view: UIView?) -> UIViewController? {
         var responder: UIResponder? = view

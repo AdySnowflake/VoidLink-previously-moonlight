@@ -86,12 +86,6 @@ private typealias VLDeviceMotion = CMDeviceMotion
     private var accelControlStarted: Bool = false
 #if !os(tvOS)
     private let motionManager = CMMotionManager()
-    private let isFoldable: Bool = {
-        if #available(iOS 27.0, *) {
-            return MainActor.assumeIsolated { PublicUtils.isFoldableIPhone }
-        }
-        return false
-    }()
 #endif
     private weak var activeGCController:GCController?
     private var synthesizePhysicalStick:Bool = false
@@ -299,7 +293,7 @@ private typealias VLDeviceMotion = CMDeviceMotion
 
     private var canUseViewMotion: Bool {
 #if compiler(>=6.4)
-        if #available(iOS 27.0, *), isFoldable, !PublicUtils.isRunningOnMacAsiPadApp {
+        if #available(iOS 27.0, *), PublicUtils.isFoldableRAMCached, !PublicUtils.isRunningOnMacAsiPadApp {
             return motionReferenceView?.window != nil
         }
 #endif

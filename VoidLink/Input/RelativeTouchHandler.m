@@ -78,8 +78,8 @@ static const float QUICK_TAP_TIME_INTERVAL = 0.2;
     
     // upper screen check
     _edgeTolerance = settings.edgeSlidingSensitivity.floatValue;
-    slideGestureVerticalThreshold = CGRectGetHeight([[UIScreen mainScreen] bounds]) * 0.4;
-    screenWidthWithThreshold = CGRectGetWidth([[UIScreen mainScreen] bounds]) - _edgeTolerance;
+    slideGestureVerticalThreshold = CGRectGetHeight([[PublicUtils currentScreen] bounds]) * 0.4;
+    screenWidthWithThreshold = CGRectGetWidth([[PublicUtils currentScreen] bounds]) - _edgeTolerance;
     self->touchPointSpawnedAtUpperScreenEdge = false;
     
     gestureHandler = [[RelativeTouchGestureHandler alloc] initWithStreamView:view touchMode:TouchModeRelative settings:settings];
@@ -175,6 +175,9 @@ static const float QUICK_TAP_TIME_INTERVAL = 0.2;
     
     //check if touch point is spawned on the left or right upper half screen edges, this is the highest priority
     CGPoint initialPoint = [self locationOfTouch:[touches anyObject]];
+    UIView *edgeReferenceView = streamView.streamFrameTopLayerView ?: streamView;
+    slideGestureVerticalThreshold = CGRectGetHeight(edgeReferenceView.bounds) * 0.4;
+    screenWidthWithThreshold = CGRectGetWidth(edgeReferenceView.bounds) - _edgeTolerance;
     if(initialPoint.y < slideGestureVerticalThreshold && (initialPoint.x < _edgeTolerance || initialPoint.x > screenWidthWithThreshold)) {
         self->touchPointSpawnedAtUpperScreenEdge = true;
         return;

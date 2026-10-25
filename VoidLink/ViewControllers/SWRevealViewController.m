@@ -787,11 +787,11 @@ const int FrontViewPositionNone = 0xff;
     
     // This is what Apple used to tell us to set as the initial frame, which is of course totally irrelevant
     // with view controller containment patterns, let's leave it for the sake of it!
-    // CGRect frame = [[UIScreen mainScreen] applicationFrame];
+    // CGRect frame = [[PublicUtils screenForView:self.viewIfLoaded] applicationFrame];
     
     // On iOS7 the applicationFrame does not return the whole screen. This is possibly a bug.
     // As a workaround we use the screen bounds, this still works on iOS6, any zero based frame would work anyway!
-    CGRect frame = [[UIScreen mainScreen] bounds];
+    CGRect frame = [[PublicUtils screenForView:self.viewIfLoaded] bounds];
 
     // create a custom content view for the controller
     _contentView = [[SWRevealView alloc] initWithFrame:frame controller:self];

@@ -2353,7 +2353,7 @@ final class SettingsSession: NSObject, ObservableObject {
             SettingsPickerOption(value: 30, title: "30 FPS".localized),
             SettingsPickerOption(value: 60, title: "60 FPS".localized)
         ]
-        if UIScreen.main.maximumFramesPerSecond > 62 {
+        if PublicUtils.currentScreen.maximumFramesPerSecond > 62 {
             options.append(.init(value: 120, title: "120 FPS".localized))
         }
         guard itemRegistry.framePacing.value == FramePacingMode.interpolation.rawValue,
@@ -4054,16 +4054,7 @@ final class SettingsSession: NSObject, ObservableObject {
     }
 
     private var externalDisplayScreen: UIScreen? {
-#if !os(tvOS)
-        if #available(iOS 16.0, *) {
-            if let externalScene = UIApplication.shared.connectedScenes
-                .compactMap({ $0 as? UIWindowScene })
-                .first(where: { $0.session.role == .windowExternalDisplayNonInteractive }) {
-                return externalScene.screen
-            }
-        }
-#endif
-        return UIScreen.screens.first(where: { $0 !== UIScreen.main })
+        PublicUtils.externalScreen
     }
 
     private var targetScreen: UIScreen {
@@ -4071,7 +4062,7 @@ final class SettingsSession: NSObject, ObservableObject {
            let externalDisplayScreen {
             return externalDisplayScreen
         }
-        return presentingController?.view.window?.screen ?? UIScreen.main
+        return presentingController?.view.window?.screen ?? PublicUtils.currentScreen
     }
 
     /// Mirrors UIKit's resolution-table inputs while Settings is attached to
@@ -4085,7 +4076,7 @@ final class SettingsSession: NSObject, ObservableObject {
         let externalScreen = externalDisplayScreen
         let usesExternalDisplay = displayMode == ExternalDisplayMode.extended.rawValue && externalScreen != nil
         let displayScreen = usesExternalDisplay
-            ? (externalScreen ?? UIScreen.main)
+            ? (externalScreen ?? PublicUtils.currentScreen)
             : window.screen
         let displayBounds = usesExternalDisplay ? displayScreen.bounds : window.bounds
         cachedDisplaySizes[displayMode] = CGSize(

@@ -1673,7 +1673,7 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
     if (@available(iOS 13.0, *)) {
         UIView *renderView = self.metalViewController ? self.metalViewController.view : _streamVideoRenderView;
         BOOL shouldRoute = _externalDisplayRoutingActive && [self isAirPlayEnabled] &&
-            renderView && self.view.window.windowScene.screen == UIScreen.mainScreen;
+            renderView && [self.view.window.windowScene.session.role isEqualToString:UIWindowSceneSessionRoleApplication];
         if (shouldRoute) {
             UIView *localContainer = self.metalViewController ? self.view : _streamView;
             [SceneDelegate setExternalDisplayRenderView:renderView localContainer:localContainer];

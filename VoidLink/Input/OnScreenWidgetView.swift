@@ -12,8 +12,8 @@ import ObjectiveC.runtime
 
 @objc class OnScreenWidgetView: UIButton {
     @objc(widgetWithCmdString:buttonLabel:shape:profile:)
-    class func widget(cmdString: String, buttonLabel: String, shape: String, profile: OSCProfile) -> OnScreenWidgetView {
-        return OnScreenWidgetView(cmdString: cmdString, buttonLabel: buttonLabel, shape: shape, profile: profile)!
+    class func widget(cmdString: String, buttonLabel: String, shape: String, profile: OSCProfile) -> OnScreenWidgetView? {
+        return OnScreenWidgetView(cmdString: cmdString, buttonLabel: buttonLabel, shape: shape, profile: profile)
     }
 
     @objc public static var mapping: [Int16:OnScreenWidgetView] = [:]
@@ -145,18 +145,23 @@ import ObjectiveC.runtime
     }
     
     @objc public var componentSizeFactor: CGFloat = 2.88 {
-        didSet{
-            if self.isStickWheel {
-                self.setupStickWheelLayers()
-            }
-            if self.isDisplacementBasedStickPad {
-                stickThumbSize = self.getDiameter(lengthFactor: self.componentSizeFactor)/4
-                self.denormalizedComponentSizeFactor = stickThumbSize*4/baselineDiameter
-                stickAnchorLayer.removeFromSuperlayer()
-                stickThumb.removeFromSuperlayer()
-                self.showStickIndicator()
-                self.updateStickIndicator()
-            }
+        didSet {
+            guard sizeReferenceScreenBounds.width > 0 else { return }
+            updateComponentSize()
+        }
+    }
+
+    private func updateComponentSize() {
+        if self.isStickWheel {
+            self.setupStickWheelLayers()
+        }
+        if self.isDisplacementBasedStickPad {
+            stickThumbSize = self.getDiameter(lengthFactor: self.componentSizeFactor)/4
+            self.denormalizedComponentSizeFactor = stickThumbSize*4/baselineDiameter
+            stickAnchorLayer.removeFromSuperlayer()
+            stickThumb.removeFromSuperlayer()
+            self.showStickIndicator()
+            self.updateStickIndicator()
         }
     }
 
@@ -451,7 +456,7 @@ import ObjectiveC.runtime
     @objc static public var isTweakingHighlight: Bool = false
     
     // discreteWheels
-    private var tickCycle: UInt8 = UIScreen.main.maximumFramesPerSecond > 110 ? 20 : 10
+    private var tickCycle: UInt8 = PublicUtils.currentScreen.maximumFramesPerSecond > 110 ? 20 : 10
     private var tickFlag: UInt8 = 0
 
     @objc public var folded: Bool = false
@@ -837,7 +842,8 @@ import ObjectiveC.runtime
     }
     
     @objc public func resizeWidgetView(){
-        guard let superview = superview else { return }
+        guard let superview = superview,
+              sizeReferenceScreenBounds.width > 0 else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         
@@ -937,31 +943,45 @@ import ObjectiveC.runtime
         }
     }
     
+    // Shared with profile serialization so loading and saving use the same screen.
+    // Before attachment there is no reliable screen; defer sizing until didMoveToWindow.
+    var sizeReferenceScreenBounds: CGRect {
+        if #available(iOS 13.0, tvOS 13.0, *) {
+            return window?.windowScene?.screen.bounds ?? .zero
+        }
+        return window?.screen.bounds ?? .zero
+    }
+
     // 仅在加载控件时调用
     private func denormalizeSize(sizeFactor:CGFloat) -> CGFloat {
-        let longSideLen = max(UIScreen.main.bounds.width, UIScreen.main.bounds.height)
-        let shortSideLen = min(UIScreen.main.bounds.width, UIScreen.main.bounds.height)
+        let screenBounds = sizeReferenceScreenBounds
+        let longSideLen = max(screenBounds.width, screenBounds.height)
+        let shortSideLen = min(screenBounds.width, screenBounds.height)
         
-        var referenceLen = UIScreen.main.bounds.width
+        var referenceLen = screenBounds.width
         if(self.sizeReference == WidgetSizeReference.longSide.rawValue) {referenceLen = longSideLen}
         if(self.sizeReference == WidgetSizeReference.shortSide.rawValue) {referenceLen = shortSideLen}
         
+        print("referenceLen \(referenceLen) \(CACurrentMediaTime())")
+
         // return CGFloat(Int(sizeFactor/10000*screenWidthInPoints/2)*2);
         // print("referenceLen \(referenceLen), \(CACurrentMediaTime())")
         return nearestEven(sizeFactor/10000*referenceLen);
     }
     
     private func getBaselineLenths(){
-        let longSideLen = max(UIScreen.main.bounds.width, UIScreen.main.bounds.height)
-        let shortSideLen = min(UIScreen.main.bounds.width, UIScreen.main.bounds.height)
+        let screenBounds = sizeReferenceScreenBounds
+        let longSideLen = max(screenBounds.width, screenBounds.height)
+        let shortSideLen = min(screenBounds.width, screenBounds.height)
         
-        baselineDiameter = self.sizeReference == WidgetSizeReference.longSide.rawValue ? 60 : 60*shortSideLen/longSideLen
+        let shortToLongRatio = longSideLen > 0 ? shortSideLen/longSideLen : 1
+        baselineDiameter = self.sizeReference == WidgetSizeReference.longSide.rawValue ? 60 : 60*shortToLongRatio
         
-        baselineWidth = self.sizeReference == WidgetSizeReference.longSide.rawValue ? 70 : 70*shortSideLen/longSideLen
-        baselineHeight = self.sizeReference == WidgetSizeReference.longSide.rawValue ? 65 : 65*shortSideLen/longSideLen
+        baselineWidth = self.sizeReference == WidgetSizeReference.longSide.rawValue ? 70 : 70*shortToLongRatio
+        baselineHeight = self.sizeReference == WidgetSizeReference.longSide.rawValue ? 65 : 65*shortToLongRatio
         
-        baselineWidthLargeSquare = self.sizeReference == WidgetSizeReference.longSide.rawValue ? 170 : 170*shortSideLen/longSideLen
-        baselineHeightLargeSquare = self.sizeReference == WidgetSizeReference.longSide.rawValue ? 150 : 150*shortSideLen/longSideLen
+        baselineWidthLargeSquare = self.sizeReference == WidgetSizeReference.longSide.rawValue ? 170 : 170*shortToLongRatio
+        baselineHeightLargeSquare = self.sizeReference == WidgetSizeReference.longSide.rawValue ? 150 : 150*shortToLongRatio
     }
     
     private func getDiameter(lengthFactor:CGFloat) -> CGFloat {
@@ -4350,6 +4370,15 @@ import ObjectiveC.runtime
         return OnScreenWidgetView.mapping.keys.max() ?? -1
     }
 
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        guard window != nil else { return }
+        // Factors may have been assigned while the workspace itself was detached.
+        // Resolve them now against this window scene, including after a screen move.
+        resizeWidgetView()
+        updateComponentSize()
+    }
+
     override func didMoveToSuperview() {
         super.didMoveToSuperview()
         OnScreenWidgetView.installAutoDockIfNeeded()
@@ -4411,7 +4440,7 @@ import ObjectiveC.runtime
             frame: CGRect(
                 x: 0,
                 y: 0,
-                width: UIScreen.main.bounds.width * 2,
+                width: PublicUtils.currentScreen.bounds.width * 2,
                 height: 2
             )
         )
@@ -4429,7 +4458,7 @@ import ObjectiveC.runtime
                 x: 0,
                 y: 0,
                 width: 2,
-                height: UIScreen.main.bounds.height * 2
+                height: PublicUtils.currentScreen.bounds.height * 2
             )
         )
         v.backgroundColor = .blue
@@ -4447,6 +4476,9 @@ import ObjectiveC.runtime
 
     private static func updateStreamViewGuidelines(for widget:OnScreenWidgetView){
         if !widget.moveableButtonLongPressed() {return}
+        let screenBounds = PublicUtils.screen(for: widget).bounds
+        horizontalGuideline.bounds.size = CGSize(width: screenBounds.width * 2, height: 2)
+        verticalGuideline.bounds.size = CGSize(width: 2, height: screenBounds.height * 2)
         if horizontalGuideline.superview == nil {
             widget.addSubview(horizontalGuideline)
             widget.addSubview(verticalGuideline)
