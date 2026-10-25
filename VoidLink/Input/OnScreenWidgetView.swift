@@ -13,7 +13,7 @@ import ObjectiveC.runtime
 @objc class OnScreenWidgetView: UIButton {
     @objc(widgetWithCmdString:buttonLabel:shape:profile:)
     class func widget(cmdString: String, buttonLabel: String, shape: String, profile: OSCProfile) -> OnScreenWidgetView {
-        return OnScreenWidgetView(cmdString: cmdString, buttonLabel: buttonLabel, shape: shape, profile: profile)
+        return OnScreenWidgetView(cmdString: cmdString, buttonLabel: buttonLabel, shape: shape, profile: profile)!
     }
 
     @objc public static var mapping: [Int16:OnScreenWidgetView] = [:]
@@ -469,7 +469,7 @@ import ObjectiveC.runtime
     @objc static weak var deepestButton: OnScreenWidgetView?
     @objc static var autoDockEnabledFolders: Set<OnScreenWidgetView>?
 
-    @objc init(cmdString: String, buttonLabel: String, shape:String, profile:OSCProfile) {
+    @objc init?(cmdString: String, buttonLabel: String, shape:String, profile:OSCProfile) {
 
         self.cmdString = cmdString
         self.touchPadString = ""
@@ -553,6 +553,8 @@ import ObjectiveC.runtime
         
         // helps widget panel to hide/show stacks
         self.accessWidgetAttributes()
+        
+        if PublicUtils.isSimulator && self.widgetType == .touchPad {return nil}
         
         if self.widgetType == WidgetTypeEnum.button {
             if !self.touchPadString.isEmpty {
@@ -3897,6 +3899,7 @@ import ObjectiveC.runtime
                 self.alpha = OnScreenWidgetView.autoDockInitialAlpha
             } completion: { _ in
                 self.isUserInteractionEnabled = true
+                self.superview?.bringSubviewToFront(self)
                 self.autoDockStopSettledAlphaTimer()
                 self.autoDockSettledAlphaTimer = Timer.scheduledTimer(withTimeInterval: OnScreenWidgetView.autoDockSettledAlphaDelay, repeats: false) { [weak self] _ in
                     guard let self, self.autoDockIsDocked else { return }

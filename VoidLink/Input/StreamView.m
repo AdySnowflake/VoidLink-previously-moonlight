@@ -966,6 +966,8 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
                 if(buttonState.widgetType == CustomOnScreenWidget){
                     OnScreenWidgetView* widgetView = [OnScreenWidgetView widgetWithCmdString:buttonState.name buttonLabel:buttonState.alias shape:buttonState.widgetShape profile:profile]; //reconstruct widgetView
                     
+                    if(!widgetView) continue;
+                    
                     if(PublicUtils.isTVOS
                        && widgetView.widgetType == WidgetTypeEnumTouchPad) continue;
                     

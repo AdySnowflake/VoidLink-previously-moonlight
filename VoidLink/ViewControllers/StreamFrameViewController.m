@@ -779,6 +779,7 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
     else [safeTimer pause];
     
     _motionHandler = [MotionHandler sharedWithProfile: nil];
+    _motionHandler.motionReferenceView = self.view;
     _motionHandler.gyroBiasX = _settings.gyroBiasX.doubleValue;
     _motionHandler.gyroBiasY = _settings.gyroBiasY.doubleValue;
     _motionHandler.gyroBiasZ = _settings.gyroBiasZ.doubleValue;
@@ -1407,6 +1408,9 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
 - (void)willMoveToParentViewController:(UIViewController *)parent {
     // Only cleanup when we're being destroyed
     if (parent == nil) {
+        [_motionHandler stopMotionUpdateWithInterruptNoneGyroInput:YES];
+        [_motionHandler stopAccelUpdate];
+        _motionHandler.motionReferenceView = nil;
         _externalDisplayRoutingActive = NO;
         [self reloadAirPlayConfig];
         [_streamView cleanUp];

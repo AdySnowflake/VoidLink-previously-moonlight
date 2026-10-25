@@ -5261,6 +5261,9 @@ final class SettingsSession: NSObject, ObservableObject {
                     let calibrationProfile = (profile.mutableCopy() as? OSCProfile) ?? profile
                     calibrationProfile.useBuiltinGyro = self.itemRegistry.gyroSource.value == SettingsGyroSource.builtIn.rawValue
                     let motionHandler = MotionHandler.shared(profile: calibrationProfile)
+                    if motionHandler.motionReferenceView?.window == nil {
+                        motionHandler.motionReferenceView = presenter.view
+                    }
                     motionHandler.calibrateGyroBias(duration: 5) {
                         let dataManager = DataManager()
                         guard let settings = dataManager.retrieveSettings() else { return }

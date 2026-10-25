@@ -26,6 +26,14 @@
 #endif
 @import AudioToolbox;
 
+// This is an SDK check, not just a runtime availability check: Xcode 26.6
+// must never parse references to CMBodyIdentifiable or deviceMotionBody.
+#if TARGET_OS_IOS && !TARGET_OS_MACCATALYST && __has_include(<CoreMotion/CMBody.h>) && defined(__IPHONE_27_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_27_0
+#define VL_HAS_DEVICE_MOTION_BODY 1
+#else
+#define VL_HAS_DEVICE_MOTION_BODY 0
+#endif
+
 static const double MOUSE_SPEED_DIVISOR = 1.25;
 static __weak ControllerSupport *VLSharedControllerSupport = nil;
 
@@ -93,6 +101,11 @@ static __weak ControllerSupport *VLSharedControllerSupport = nil;
     uint64_t _authoredHapticsGeneration;
 
     __weak MotionHandler* motionHandler;
+#if !TARGET_OS_TV
+    BOOL _isFoldable;
+    BOOL _usesViewDeviceMotion;
+    NSTimeInterval _deviceMotionPreviousTimestamp;
+#endif
 }
 
 +(ControllerSupport*) sharedInstance
@@ -194,9 +207,59 @@ static __weak ControllerSupport *VLSharedControllerSupport = nil;
 }
 
 #if !TARGET_OS_TV
+- (UIView *)builtInMotionReferenceView
+{
+    // Use the same root streaming view as MotionHandler. Do not load a view
+    // while the controller support is being created or torn down.
+    if ([_delegate isKindOfClass:UIViewController.class]) {
+        return ((UIViewController *)_delegate).viewIfLoaded;
+    }
+    return nil;
+}
+
+- (void)configureDeviceMotionForController:(VoidController *)controller
+{
+    if (!controller.motionManager) {
+        controller.motionManager = [[CMMotionManager alloc] init];
+    }
+#if VL_HAS_DEVICE_MOTION_BODY
+    if (@available(iOS 27.0, *)) {
+        UIView *view = [self builtInMotionReferenceView];
+        BOOL useViewMotion = _isFoldable && !PublicUtils.isRunningOnMacAsiPadApp && view.window != nil;
+        UIView *body = useViewMotion ? view : nil;
+        if (_usesViewDeviceMotion != useViewMotion || controller.motionManager.deviceMotionBody != body) {
+            // A timer may have started before the streaming view entered its window.
+            // Restart on a source change and wait for a fresh sample in that frame.
+            _deviceMotionPreviousTimestamp = controller.motionManager.deviceMotion.timestamp;
+            [controller.motionManager stopDeviceMotionUpdates];
+            controller.motionManager.deviceMotionBody = body;
+            _usesViewDeviceMotion = useViewMotion;
+            controller.lastDeviceAccelSample = (CMAcceleration){};
+            controller.lastDeviceGyroSample = (CMRotationRate){};
+        }
+    }
+#endif
+    controller.motionManager.deviceMotionUpdateInterval = 1.0 / controller.reportRateHz;
+    if (controller.motionManager.isDeviceMotionAvailable && !controller.motionManager.isDeviceMotionActive) {
+        [controller.motionManager startDeviceMotionUpdates];
+    }
+}
+
+- (CMDeviceMotion *)deviceMotionSampleForController:(VoidController *)controller
+{
+    [self configureDeviceMotionForController:controller];
+    CMDeviceMotion *sample = controller.motionManager.deviceMotion;
+    // Ignore nil and the cached sample from before a coordinate-source change.
+    return sample != nil && sample.timestamp > _deviceMotionPreviousTimestamp ? sample : nil;
+}
+
 - (UIInterfaceOrientation)currentInterfaceOrientation
 {
     if (@available(iOS 13.0, *)) {
+        UIWindowScene *streamScene = [self builtInMotionReferenceView].window.windowScene;
+        if (streamScene.interfaceOrientation != UIInterfaceOrientationUnknown) {
+            return streamScene.interfaceOrientation;
+        }
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
             if (![scene isKindOfClass:UIWindowScene.class]) {
                 continue;
@@ -263,9 +326,7 @@ static __weak ControllerSupport *VLSharedControllerSupport = nil;
 #if !TARGET_OS_TV //tvOS has no device motion
         if(voidController == _oscController){
             //Player has no controller *or* no motion for controller 1 *or* wants to override controller 1 motion with device motion
-            if(!voidController.motionManager) {
-                voidController.motionManager = [[CMMotionManager alloc] init];
-            }
+            [self configureDeviceMotionForController:voidController];
             
             switch (motionType) {
                 case LI_MOTION_TYPE_ACCEL: {
@@ -274,19 +335,21 @@ static __weak ControllerSupport *VLSharedControllerSupport = nil;
                     // Reset the last motion sample
                     CMAcceleration emptyDeviceAccelSample = {};
                     voidController.lastDeviceAccelSample = emptyDeviceAccelSample;
-                    voidController.motionManager.deviceMotionUpdateInterval = 1.0 / voidController.reportRateHz;
-                    [voidController.motionManager startDeviceMotionUpdates];
                     {NSLog(@"setup device built-in accelTimer");
                         voidController.hasAccelerometer = YES;
                         voidController.accelTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 / voidController.reportRateHz repeats:YES block:^(NSTimer *timer) {
-                            CMAcceleration deviceAccelSample = voidController.motionManager.deviceMotion.userAcceleration;
-                            //userAcceleration does not contain gravity, add gravity to x, y and z values:
-                            deviceAccelSample.x += voidController.motionManager.deviceMotion.gravity.x;
-                            deviceAccelSample.y += voidController.motionManager.deviceMotion.gravity.y;
-                            deviceAccelSample.z += voidController.motionManager.deviceMotion.gravity.z;
+                            CMDeviceMotion *motion = [self deviceMotionSampleForController:voidController];
+                            if (motion == nil) { return; }
+                            CMAcceleration deviceAccelSample = motion.userAcceleration;
+                            // Total acceleration, using one sample in one coordinate frame.
+                            deviceAccelSample.x += motion.gravity.x;
+                            deviceAccelSample.y += motion.gravity.y;
+                            deviceAccelSample.z += motion.gravity.z;
                             // NSLog(@"sending device accel %f", CACurrentMediaTime());
 
-                            UIInterfaceOrientation interfaceOrientation = [self currentInterfaceOrientation];
+                            // View-relative data already uses upright axes. Do not rotate it again.
+                            UIInterfaceOrientation interfaceOrientation = self->_usesViewDeviceMotion
+                                ? UIInterfaceOrientationPortrait : [self currentInterfaceOrientation];
                             CMAcceleration mappedDeviceAccelSample = {};
                             switch (interfaceOrientation) {
                                 case UIInterfaceOrientationLandscapeLeft:
@@ -339,78 +402,46 @@ static __weak ControllerSupport *VLSharedControllerSupport = nil;
                     // Reset the last motion sample
                     CMRotationRate emptyDeviceGyroSample = {};
                     voidController.lastDeviceGyroSample = emptyDeviceGyroSample;
-                    [voidController.motionManager startDeviceMotionUpdates];
-                    
                     NSLog(@"setup device built-in gyro gyroTimer");
                     voidController.hasGyroscope = YES;
                     voidController.gyroTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 / voidController.reportRateHz repeats:YES block:^(NSTimer *timer) {
                         
-                        // Don't send duplicate samples
-                        CMRotationRate lastDeviceGyroSample = voidController.lastDeviceGyroSample;
-                        CMRotationRate deviceGyroSample = voidController.motionManager.deviceMotion.rotationRate;
-                        if (memcmp(&deviceGyroSample, &lastDeviceGyroSample, sizeof(deviceGyroSample)) == 0) {
-                                return;
-                        }
-                        voidController.lastDeviceGyroSample = deviceGyroSample;
-                        
-                        // Convert rad/s to deg/s
-                        
-                        UIInterfaceOrientation interfaceOrientation = [self currentInterfaceOrientation];
-                        
+                        CMDeviceMotion *motion = [self deviceMotionSampleForController:voidController];
+                        if (motion == nil) { return; }
+                        CMRotationRate deviceGyroSample = motion.rotationRate;
+                        UIInterfaceOrientation interfaceOrientation = self->_usesViewDeviceMotion
+                            ? UIInterfaceOrientationPortrait : [self currentInterfaceOrientation];
+                        CMRotationRate mappedDeviceGyroSample = {};
                         switch (interfaceOrientation) {
-                            case UIInterfaceOrientationLandscapeLeft:
-                                LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
-                                                            LI_MOTION_TYPE_GYRO,
-                                                            self->_gyroEnabledFlag ? deviceGyroSample.y * 57.2957795f * self->_gyroSensitivity : 0,
-                                                            self->_gyroEnabledFlag ? deviceGyroSample.z * 57.2957795f * self->_gyroSensitivity : 0,
-                                                            self->_gyroEnabledFlag ? deviceGyroSample.x * 57.2957795f * self->_gyroSensitivity : 0);
-                                break;
                             case UIInterfaceOrientationLandscapeRight:
-                                LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
-                                                            LI_MOTION_TYPE_GYRO,
-                                                            self->_gyroEnabledFlag ? deviceGyroSample.y * -57.2957795f * self->_gyroSensitivity : 0,
-                                                            self->_gyroEnabledFlag ? deviceGyroSample.z * 57.2957795f * self->_gyroSensitivity : 0,
-                                                            self->_gyroEnabledFlag ? deviceGyroSample.x * -57.2957795f * self->_gyroSensitivity : 0);
+                                mappedDeviceGyroSample = (CMRotationRate){-deviceGyroSample.y, deviceGyroSample.z, -deviceGyroSample.x};
                                 break;
                             case UIInterfaceOrientationPortrait:
-                                LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
-                                                            LI_MOTION_TYPE_GYRO,
-                                                            self->_gyroEnabledFlag ? deviceGyroSample.x * 57.2957795f * self->_gyroSensitivity : 0,
-                                                            self->_gyroEnabledFlag ? deviceGyroSample.z * 57.2957795f * self->_gyroSensitivity : 0,
-                                                            self->_gyroEnabledFlag ? deviceGyroSample.y * -57.2957795f * self->_gyroSensitivity : 0);
+                                mappedDeviceGyroSample = (CMRotationRate){deviceGyroSample.x, deviceGyroSample.z, -deviceGyroSample.y};
                                 break;
                             case UIInterfaceOrientationPortraitUpsideDown:
-                                LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
-                                                            LI_MOTION_TYPE_GYRO,
-                                                            self->_gyroEnabledFlag ? deviceGyroSample.x * -57.2957795f * self->_gyroSensitivity : 0,
-                                                            self->_gyroEnabledFlag ? deviceGyroSample.z * 57.2957795f * self->_gyroSensitivity : 0,
-                                                            self->_gyroEnabledFlag ? deviceGyroSample.y * 57.2957795f * self->_gyroSensitivity : 0);
+                                mappedDeviceGyroSample = (CMRotationRate){-deviceGyroSample.x, deviceGyroSample.z, deviceGyroSample.y};
                                 break;
+                            case UIInterfaceOrientationLandscapeLeft:
                             default:
-                                LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
-                                                            LI_MOTION_TYPE_GYRO,
-                                                            self->_gyroEnabledFlag ? deviceGyroSample.y * 57.2957795f * self->_gyroSensitivity : 0,
-                                                            self->_gyroEnabledFlag ? deviceGyroSample.z * 57.2957795f * self->_gyroSensitivity : 0,
-                                                            self->_gyroEnabledFlag ? deviceGyroSample.x * 57.2957795f * self->_gyroSensitivity : 0);
+                                mappedDeviceGyroSample = (CMRotationRate){deviceGyroSample.y, deviceGyroSample.z, deviceGyroSample.x};
                                 break;
                         }
-                        
-                        /*
-                        if(UIApplication.sharedApplication.windows.firstObject.windowScene.interfaceOrientation == 4){//check for landscape left or landscape right
-                            LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
-                                                        LI_MOTION_TYPE_GYRO,
-                                                        self->_gyroEnabledFlag ? deviceGyroSample.y * 57.2957795f * self->_gyroSensitivity : 0,
-                                                        self->_gyroEnabledFlag ? deviceGyroSample.z * 57.2957795f * self->_gyroSensitivity : 0,
-                                                        self->_gyroEnabledFlag ? deviceGyroSample.x * 57.2957795f * self->_gyroSensitivity : 0);
+                        // Convert rad/s to deg/s and include the enable state before deduplication.
+                        double scale = self->_gyroEnabledFlag ? 57.2957795f * self->_gyroSensitivity : 0;
+                        mappedDeviceGyroSample.x *= scale;
+                        mappedDeviceGyroSample.y *= scale;
+                        mappedDeviceGyroSample.z *= scale;
+                        CMRotationRate lastDeviceGyroSample = voidController.lastDeviceGyroSample;
+                        if (memcmp(&mappedDeviceGyroSample, &lastDeviceGyroSample, sizeof(mappedDeviceGyroSample)) == 0) {
+                            return;
                         }
-                        else{
-                            LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
-                                                        LI_MOTION_TYPE_GYRO,
-                                                        self->_gyroEnabledFlag ? deviceGyroSample.y * -57.2957795f * self->_gyroSensitivity : 0,
-                                                        self->_gyroEnabledFlag ? deviceGyroSample.z * 57.2957795f * self->_gyroSensitivity : 0,
-                                                        self->_gyroEnabledFlag ? deviceGyroSample.x * -57.2957795f * self->_gyroSensitivity : 0);
-                        }
-                        */
+                        voidController.lastDeviceGyroSample = mappedDeviceGyroSample;
+                        LiSendControllerMotionEvent((uint8_t)voidController.controllerNumber,
+                                                    LI_MOTION_TYPE_GYRO,
+                                                    mappedDeviceGyroSample.x,
+                                                    mappedDeviceGyroSample.y,
+                                                    mappedDeviceGyroSample.z);
                     }];
                     break;
                 }
@@ -1995,6 +2026,9 @@ double rc_expo(double x, double expo) {
         VLSharedControllerSupport = self;
     }
     
+#if !TARGET_OS_TV
+    _isFoldable = PublicUtils.isFoldableIPhone;
+#endif
     NSLog(@"controller support init");
         
     _delegate = delegate;
@@ -2230,6 +2264,18 @@ double rc_expo(double x, double expo) {
             voidController.gyroTimer = nil;
         // }
     }
+#if !TARGET_OS_TV
+    if (voidController == _oscController) {
+        [voidController.motionManager stopDeviceMotionUpdates];
+#if VL_HAS_DEVICE_MOTION_BODY
+        if (@available(iOS 27.0, *)) {
+            voidController.motionManager.deviceMotionBody = nil;
+        }
+#endif
+        _usesViewDeviceMotion = NO;
+        _deviceMotionPreviousTimestamp = 0;
+    }
+#endif
 }
 
 - (void)applyGyroModeSetting {
