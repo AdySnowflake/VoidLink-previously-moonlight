@@ -856,7 +856,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
 
 - (WidgetSizeReference)getCurrentWidgetSizeReference{
     if(_widgetSizeTransition == WidgetSizeTransitionKeepWidgetSize) return longSide;
-    else if(_widgetSizeTransition == WidgetSizeTransitionTransitionWithOrientation) return self.bounds.size.width > self.bounds.size.height ? longSide : shortSide;
+    else if(_widgetSizeTransition == WidgetSizeTransitionTransitionWithOrientation) return _streamFrameTopLayerView.bounds.size.width > _streamFrameTopLayerView.bounds.size.height ? longSide : shortSide;
     else return longSide;
 }
 

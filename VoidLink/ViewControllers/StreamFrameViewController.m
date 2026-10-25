@@ -2490,33 +2490,8 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
         [self resetMagnifierStreamViewWithAnimated:NO]; // the portrait stream position depends on the new size
     }];
     
-    // handle view size change for on-screen widgets
-    CGSize oldSize = self.view.bounds.size;
-    CGFloat scaleX = size.width  / oldSize.width;
-    CGFloat scaleY = size.height / oldSize.height;
-    for(OnScreenWidgetView* widget in OnScreenWidgetView.mapping.allValues){
-        CGPoint oldCenter = widget.center;
-        CGPoint oldStoredCenter = widget.storedCenter;
-        
-        if(widget.autoDockEnabled){
-            widget.autoDockIdleDuration = fmax(widget.autoDockIdleDuration, 2.0);
-            [widget autoDockStopCountdown];
-        }
-        dispatch_time_t delayTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC));
-        dispatch_after(delayTime, dispatch_get_main_queue(), ^{
-            if(widget.autoDockEnabled){
-                OnScreenWidgetView.autoDockRestoreInitByViewResize = true;
-                [widget restoreFromAutoDockWithAnimated:true];
-            }
-        });
-        
-        [coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext>  _Nonnull context) {
-            widget.center = CGPointMake(oldCenter.x * scaleX,oldCenter.y * scaleY);
-            widget.storedCenter = CGPointMake(oldStoredCenter.x * scaleX,oldStoredCenter.y * scaleY);
-        } completion:nil];
-    }
+    [OnScreenWidgetView transitionWidgetsInView:self.view toSize:size coordinator:coordinator];
 
-    
     dispatch_time_t delay = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC));
     dispatch_after(delay, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         [self->_streamMan setNeedRequeuing:true];
