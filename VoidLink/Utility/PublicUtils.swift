@@ -291,6 +291,8 @@ import GameController
         return availableBundleIds.contains(Bundle.main.bundleIdentifier ?? "")
     }()
     
+    @objc public static var appDidEnterBackground: Bool = false
+    
     @objc public static func isLandscape() -> Bool {
 #if os(tvOS)
         return true

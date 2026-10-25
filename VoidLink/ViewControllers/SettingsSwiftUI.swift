@@ -407,6 +407,7 @@ enum SettingsItemID: String, Hashable, Identifiable {
     case duckOtherApps = "duckOtherAppStack"
     case muteInBackground = "muteInBackgroundStack"
     case audioConfig = "audioConfigStack"
+    case audioBufferLimit = "audioBufferLimitStack"
 
     // MARK: Others
 
@@ -520,6 +521,7 @@ enum SettingsItemID: String, Hashable, Identifiable {
         case .duckOtherApps: return "Duck Other Apps"
         case .muteInBackground: return "Mute in Background"
         case .audioConfig: return "Audio Configuration"
+        case .audioBufferLimit: return "Audio Buffer Limit"
         case .statsOverlay: return "Statistics Overlay"
         case .unlockDisplayOrientation: return "90° Display Rotation"
         case .portraitStreamOffset: return "Portrait Stream Position"
@@ -1312,6 +1314,7 @@ final class SettingsItemRegistry: ObservableObject {
     let duckOtherApps = SettingsItemModel<Bool>(id: .duckOtherApps, value: false)
     let muteInBackground = SettingsItemModel<Bool>(id: .muteInBackground, value: false)
     let audioConfig = SettingsItemModel<Int>(id: .audioConfig, value: AudioConfig.stereo.rawValue)
+    let audioBufferLimit = SettingsItemModel<Double>(id: .audioBufferLimit, value: 80)
 
     // MARK: Others
 
@@ -1438,6 +1441,7 @@ final class SettingsItemRegistry: ObservableObject {
             duckOtherApps.objectWillChange,
             muteInBackground.objectWillChange,
             audioConfig.objectWillChange,
+            audioBufferLimit.objectWillChange,
 
             // Others
             statsOverlay.objectWillChange,
@@ -1963,6 +1967,7 @@ final class SettingsSession: NSObject, ObservableObject {
         itemRegistry.duckOtherApps.value = snapshot.duckOtherApps
         itemRegistry.muteInBackground.value = snapshot.muteInBackground
         itemRegistry.audioConfig.value = settingsSanitizedAudioConfig(snapshot.audioConfig.intValue)
+        itemRegistry.audioBufferLimit.value = min(200, max(20, snapshot.audioBufferLimitMs.doubleValue))
 
         // MARK: Others
 
@@ -3347,7 +3352,7 @@ final class SettingsSession: NSObject, ObservableObject {
         [
             toggleItem(
                 \.audioOnPC,
-                isEnabled: { _ in !self.isStreaming },
+                isVisible: { _ in !self.isStreaming }
             ),
             sliderItem(
                 \.localVolume,
@@ -3423,6 +3428,21 @@ final class SettingsSession: NSObject, ObservableObject {
                 options: { $0.audioConfigOptions },
                 distribution: .proportionalToContent,
                 hasInfo: true
+            ),
+            sliderItem(
+                \.audioBufferLimit,
+                setValue: { session, model, newValue in
+                    let value = min(300, max(35, newValue))
+                    model.value = value
+                    guard session.settingsExpandedInStreamView else { return }
+                    Connection.setAudioBufferLimitMs(Int32(value))
+                },
+                range: 35...300,
+                clampedTo: 35...300,
+                valueText: { _, model in "\(Int(model.value)) ms" },
+                isVisible: { session in
+                    session.itemRegistry.audioConfig.value == AudioConfig.stereo.rawValue
+                }
             )
         ]
     }
@@ -4854,6 +4874,7 @@ final class SettingsSession: NSObject, ObservableObject {
         settings.duckOtherApps = itemRegistry.duckOtherApps.value
         settings.muteInBackground = itemRegistry.muteInBackground.value
         settings.audioConfig = NSNumber(value: settingsSanitizedAudioConfig(itemRegistry.audioConfig.value))
+        settings.audioBufferLimitMs = NSNumber(value: Int(min(200, max(20, itemRegistry.audioBufferLimit.value.rounded()))))
 
         // MARK: Others
 

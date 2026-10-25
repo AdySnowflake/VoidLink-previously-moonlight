@@ -5468,6 +5468,29 @@
         }
       }
     },
+    "Audio Buffer Limit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频缓冲上限"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音訊緩衝上限"
+          }
+        },
+        "zh-HK" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音訊緩衝上限"
+          }
+        }
+      }
+    },
     "Audio Configuration" : {
       "extractionState" : "manual",
       "localizations" : {

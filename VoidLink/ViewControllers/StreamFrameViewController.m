@@ -1710,6 +1710,7 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
     //[self.pipController startPictureInPicture];
     //sleep(1);
     if(_settings.framePacingMode.intValue == FramePacingModeQueue) appDidEnterBackgroundWithoutPip = true;
+    PublicUtils.appDidEnterBackground = true;
     
     NSLog(@"applicationWillResignActive %f", CACurrentMediaTime());
     [_streamView saveStreamingGameProfileChanges];
@@ -1727,6 +1728,10 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
 }
 
 - (void)applicationDidBecomeActive:(NSNotification *)notification {
+    [Connection resetSysAudioPlaybackCooldown];
+    appDidEnterBackgroundWithoutPip = false;
+    PublicUtils.appDidEnterBackground = false;
+    
     if(!PublicUtils.isIPhone){
         for(OnScreenWidgetView* widget in OnScreenWidgetView.mapping.allValues){
             if(widget.parentSequence != -1 && !widget.autoDockEnabled) continue;
@@ -1744,7 +1749,6 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
         }
     }
     
-    appDidEnterBackgroundWithoutPip = false;
     [_streamMan setNeedRequeuing:true];
     // dispatch_time_t delay = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(15 * NSEC_PER_SEC));
     // dispatch_after(delay, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -1780,7 +1784,11 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
 
 // This fires when the home button is pressed
 - (void)applicationDidEnterBackground:(UIApplication *)application {
-    NSLog(@"did enter background, %d, %@, %d", _settings.enablePIP, self.pipController, self.pipController.isPictureInPictureActive);
+    [Connection resetSysAudioPlaybackCooldown];
+    // NSLog(@"did enter background, %d, %@, %d", _settings.enablePIP, self.pipController, self.pipController.isPictureInPictureActive);
+    
+    PublicUtils.appDidEnterBackground = true;
+    
     if (_settings.enablePIP && self.pipController && self.pipController.isPictureInPictureActive) {
         //Log(LOG_I, @"PIP is active, not terminating stream");
         appDidEnterBackgroundWithoutPip = false;
