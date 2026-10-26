@@ -1372,9 +1372,7 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
         CGFloat aspectRatio = [aspectRatioNum doubleValue];
         Log(LOG_I, @"Updating StreamView aspect ratio to %.4f", aspectRatio);
         _streamView.streamAspectRatio = aspectRatio;
-#if !TARGET_OS_TV
-        _streamView.pencilHandler.streamAspectRatio = aspectRatio;
-#endif
+        [self applyRestingStreamViewOffsetIfAtRest];
     }
 }
 

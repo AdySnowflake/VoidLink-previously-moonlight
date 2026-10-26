@@ -66,7 +66,8 @@ import UIKit
 
     @objc init(streamView: UIView, settings: TemporarySettings) {
         self.streamView = streamView
-        streamAspectRatio = settings.width.floatValue/settings.height.floatValue
+        streamAspectRatio = (streamView as? StreamView).map { Float($0.streamAspectRatio) }
+            ?? settings.width.floatValue/settings.height.floatValue
         tickInterval = TimeInterval(settings.pencilTickIntervalUs.floatValue/1000000)
         manualTick = settings.pencilTickMode.intValue == PencilTickMode.manualTick.rawValue
         pencilTickEnabled = settings.pencilTickMode.intValue != PencilTickMode.disabled.rawValue
@@ -248,6 +249,9 @@ import UIKit
     
     func getVideoAreaSize()-> CGSize {
         guard let streamView = streamView else { return CGSize(width: 0, height: 0) }
+        if let streamView = streamView as? StreamView {
+            return streamView.inputGeometry.videoRect.size
+        }
         if streamView.bounds.size.width > streamView.bounds.size.height * CGFloat(streamAspectRatio) {
             return CGSizeMake(streamView.bounds.size.height * CGFloat(streamAspectRatio), streamView.bounds.size.height);
         } else {

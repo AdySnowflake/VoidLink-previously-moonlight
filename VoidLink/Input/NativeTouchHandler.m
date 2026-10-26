@@ -44,7 +44,6 @@
     CGFloat screenWidthWithThreshold;
     CGFloat _edgeTolerance;
     
-    CGRect streamViewBounds;
     
     int64_t moveEventIntervalNSec;
 }
@@ -54,7 +53,6 @@
     self->streamView = view;
     self->activateCoordSelector = profile.pointerVelocityModeDivider != 1.0;
     self->moveEventIntervalNSec =  (int64_t)(settings.touchMoveEventInterval.intValue * 1000);;
-    self->streamViewBounds = view.bounds;
 
     self->pointerIdDict = [NSMutableDictionary dictionary];
     self->pointerIdPool = [NSMutableSet set];
@@ -103,33 +101,25 @@
     return self;
 }
 
-- (CGSize) getVideoAreaSize {
-    if (self->streamViewBounds.size.width > self->streamViewBounds.size.height * streamView.streamAspectRatio) {
-        return CGSizeMake(self->streamViewBounds.size.height * streamView.streamAspectRatio, self->streamViewBounds.size.height);
-    } else {
-        return CGSizeMake(self->streamViewBounds.size.width, self->streamViewBounds.size.width / streamView.streamAspectRatio);
-    }
-}
-
-
-- (CGPoint) adjustCoordinatesForVideoArea:(CGPoint)point {
+- (CGPoint)adjustCoordinatesForVideoArea:(CGPoint)point geometry:(StreamInputGeometry)geometry {
+    CGRect streamViewBounds = geometry.bounds;
     // These are now relative to the StreamView, however we need to scale them
     // further to make them relative to the actual video portion.
-    float x = point.x - self->streamViewBounds.origin.x;
-    float y = point.y - self->streamViewBounds.origin.y;
+    float x = point.x - streamViewBounds.origin.x;
+    float y = point.y - streamViewBounds.origin.y;
     
     // For some reason, we don't seem to always get to the bounds of the window
     // so we'll subtract 1 pixel if we're to the left/below of the origin and
     // and add 1 pixel if we're to the right/above. It should be imperceptible
     // to the user but it will allow activation of gestures that require contact
     // with the edge of the screen (like Aero Snap).
-    if (x < self->streamViewBounds.size.width / 2) {
+    if (x < streamViewBounds.size.width / 2) {
         x--;
     }
     else {
         x++;
     }
-    if (y < self->streamViewBounds.size.height / 2) {
+    if (y < streamViewBounds.size.height / 2) {
         y--;
     }
     else {
@@ -137,9 +127,9 @@
     }
     
     // This logic mimics what iOS does with AVLayerVideoGravityResizeAspect
-    CGSize videoSize = [self getVideoAreaSize];
-    CGPoint videoOrigin = CGPointMake(self->streamViewBounds.size.width / 2 - videoSize.width / 2,
-                                      self->streamViewBounds.size.height / 2 - videoSize.height / 2);
+    CGSize videoSize = geometry.videoRect.size;
+    CGPoint videoOrigin = CGPointMake(streamViewBounds.size.width / 2 - videoSize.width / 2,
+                                      streamViewBounds.size.height / 2 - videoSize.height / 2);
     
     // Confine the cursor to the video region. We don't just discard events outside
     // the region because we won't always get one exactly when the mouse leaves the region.
@@ -217,8 +207,10 @@
     
     targetCoords = activateCoordSelector ? [self selectCoordsFor:touch] : [touch locationInView:streamView];
 
-    CGPoint location = [self adjustCoordinatesForVideoArea:targetCoords];
-    CGSize videoSize = [self getVideoAreaSize];
+    StreamInputGeometry geometry = streamView.inputGeometry;
+    CGSize videoSize = geometry.videoRect.size;
+    if (videoSize.width <= 0 || videoSize.height <= 0) return;
+    CGPoint location = [self adjustCoordinatesForVideoArea:targetCoords geometry:geometry];
     CGFloat normalizedX = location.x / videoSize.width;
     CGFloat normalizedY = location.y / videoSize.height;
     uint8_t pointerId = [self retrievePointerIdFromDict:touch];

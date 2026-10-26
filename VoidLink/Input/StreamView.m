@@ -39,6 +39,7 @@
 @interface StreamView() <X1KitMouseDelegate, UITextFieldDelegate, UIPointerInteractionDelegate, InputAccessoryBarDelegate>
 #endif
 @property (weak, nonatomic) StreamFrameViewController* streamFrameVC;
+@property (assign, atomic, readwrite) StreamInputGeometry inputGeometry;
 @end
 
 
@@ -64,7 +65,6 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
     
     bool isPencilHovering;
     NSMutableSet* keysDown;
-    float streamAspectRatio;
     
     // iOS 13.4 mouse support
     NSInteger lastMouseButtonMask;
@@ -108,6 +108,41 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
     OSCProfilesManager* oscProfileMan;
 }
 
+@synthesize streamAspectRatio = _streamAspectRatio;
+
+- (void)updateInputGeometry {
+    StreamInputGeometry geometry = StreamInputGeometryMake(self.bounds, _streamAspectRatio);
+    StreamInputGeometry previous = self.inputGeometry;
+    if (!CGRectEqualToRect(geometry.bounds, previous.bounds) ||
+        !CGRectEqualToRect(geometry.videoRect, previous.videoRect)) {
+        self.inputGeometry = geometry;
+    }
+}
+
+- (void)setStreamAspectRatio:(CGFloat)aspectRatio {
+    if (!(aspectRatio > 0) || !isfinite(aspectRatio)) return;
+    _streamAspectRatio = aspectRatio;
+    [self updateInputGeometry];
+#if !TARGET_OS_TV
+    self.pencilHandler.streamAspectRatio = aspectRatio;
+#endif
+}
+
+- (void)setBounds:(CGRect)bounds {
+    [super setBounds:bounds];
+    [self updateInputGeometry];
+}
+
+- (void)setFrame:(CGRect)frame {
+    [super setFrame:frame];
+    [self updateInputGeometry];
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    [self updateInputGeometry];
+}
+
 - (void) setupStreamViewWithControllerSupport:(ControllerSupport*)controllerSupport
      interactionDelegate:(id<UserInteractionDelegate>)interactionDelegate
             streamConfig:(StreamConfiguration*)streamConfig
@@ -126,8 +161,10 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
 
     self->_streamFrameTopLayerView = topLayerView;
     self->_interactionDelegate = interactionDelegate;
-    self->streamAspectRatio = (float)streamConfig.width / (float)streamConfig.height;
-    self.streamAspectRatio = self->streamAspectRatio;
+    // A settings/viewport reconfiguration must not restore the pre-resolution-change ratio.
+    if (!(self.streamAspectRatio > 0)) {
+        self.streamAspectRatio = (CGFloat)streamConfig.width / (CGFloat)streamConfig.height;
+    }
     _widgetSizeTransition = WidgetSizeTransitionKeepWidgetSize;
     
     settings = [[[DataManager alloc] init] getSettings];
@@ -1122,11 +1159,7 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
 
 
 - (CGSize) getVideoAreaSize {
-    if (self.bounds.size.width > self.bounds.size.height * streamAspectRatio) {
-        return CGSizeMake(self.bounds.size.height * streamAspectRatio, self.bounds.size.height);
-    } else {
-        return CGSizeMake(self.bounds.size.width, self.bounds.size.width / streamAspectRatio);
-    }
+    return self.inputGeometry.videoRect.size;
 }
 
 - (CGPoint) adjustCoordinatesForVideoArea:(CGPoint)point {
@@ -1766,13 +1799,8 @@ static CGFloat previousRollAngle = 0;
     }
     
     // This logic mimics what iOS does with AVLayerVideoGravityResizeAspect
-    CGSize videoSize;
+    CGSize videoSize = [self getVideoAreaSize];
     CGPoint videoOrigin;
-    if (self.bounds.size.width > self.bounds.size.height * streamAspectRatio) {
-        videoSize = CGSizeMake(self.bounds.size.height * streamAspectRatio, self.bounds.size.height);
-    } else {
-        videoSize = CGSizeMake(self.bounds.size.width, self.bounds.size.width / streamAspectRatio);
-    }
     videoOrigin = CGPointMake(self.bounds.size.width / 2 - videoSize.width / 2,
                               self.bounds.size.height / 2 - videoSize.height / 2);
     
