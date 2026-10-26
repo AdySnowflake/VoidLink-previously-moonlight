@@ -471,7 +471,7 @@ import ObjectiveC.runtime
     }
     @objc public var standardFoldingInterval: TimeInterval = 0.05
     static weak var capturer: OnScreenWidgetView?
-    @objc static weak var deepestButton: OnScreenWidgetView?
+    // @objc static weak var deepestButton: OnScreenWidgetView?
     @objc static var autoDockEnabledFolders: Set<OnScreenWidgetView>?
 
     @objc init?(cmdString: String, buttonLabel: String, shape:String, profile:OSCProfile) {
@@ -971,15 +971,33 @@ import ObjectiveC.runtime
         guard oldSize.width > 0, oldSize.height > 0, size.width > 0, size.height > 0 else { return }
         let widgets = mapping.values.filter { $0.superview === view }
         let id = UUID()
-        let origins = widgets.map { ($0, $0.center, $0.storedCenter) }
+        let updatingEditor = editMode
+        let origins = widgets.map { ($0, $0.center, $0.storedCenter, $0.initialCenter, $0.layoutChanges) }
         for widget in widgets {
             widget.viewportTransitionID = id
-            widget.autoDockStopCountdown()
+            // The editor shares geometry updates, but has no streaming auto-dock restore.
+            guard !updatingEditor else { continue }
+            if widget.autoDockEnabled {
+                widget.autoDockIdleDuration = max(widget.autoDockIdleDuration, 2.0)
+                widget.autoDockStopCountdown()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak widget, weak view] in
+                guard let widget, let view, widget.superview === view,
+                      widget.viewportTransitionID == id, widget.autoDockEnabled else { return }
+                OnScreenWidgetView.autoDockRestoreInitByViewResize = true
+                widget.restoreFromAutoDock(animated: true)
+            }
         }
         let update: (CGSize, TimeInterval, UIView.AnimationCurve) -> Void = { target, duration, curve in
-            for (widget, center, storedCenter) in origins where widget.viewportTransitionID == id {
+            for (widget, center, storedCenter, initialCenter, history) in origins where widget.viewportTransitionID == id {
                 guard widget.superview === view else { continue }
                 let scale = CGSize(width: target.width / oldSize.width, height: target.height / oldSize.height)
+                if updatingEditor {
+                    widget.initialCenter = CGPoint(x: initialCenter.x * scale.width, y: initialCenter.y * scale.height)
+                    widget.layoutChanges = history.map {
+                        CGPoint(x: $0.x * scale.width, y: $0.y * scale.height)
+                    }
+                }
                 widget.updateViewportGeometry(
                     to: target,
                     center: CGPoint(x: center.x * scale.width, y: center.y * scale.height),
@@ -991,17 +1009,17 @@ import ObjectiveC.runtime
             update(size, context.isAnimated ? context.transitionDuration : 0, context.completionCurve)
         }, completion: { context in
             // A cancelled interactive transition must also restore the sizing basis.
-            update(context.isCancelled ? oldSize : size, 0, context.completionCurve)
+            if context.isCancelled {
+                update(oldSize, 0, context.completionCurve)
+            }
             for widget in widgets where widget.viewportTransitionID == id {
                 widget.viewportSizeOverride = nil
-                if !widget.autoDockIsDocked && !widget.touchBegan { widget.restartAutoDockCountdown() }
             }
         })
         if !registered {
             update(size, 0, .linear)
             for widget in widgets where widget.viewportTransitionID == id {
                 widget.viewportSizeOverride = nil
-                if !widget.autoDockIsDocked && !widget.touchBegan { widget.restartAutoDockCountdown() }
             }
         }
     }
@@ -1250,7 +1268,7 @@ import ObjectiveC.runtime
         let aspectRatio = longSideLen / max(shortSideLen, 1)
         let aspectProgress = min(max((aspectRatio - 1) / 1.6, 0), 1)
         let radiusRatio = 0.34 - aspectProgress * 0.08
-        let minRadius: CGFloat = min(16, shortSideLen/2)
+        let minRadius: CGFloat = min((PublicUtils.isFoldableRAMCached || !PublicUtils.isIPhone) ? 0 : 16, shortSideLen/2)
         let maxRadius: CGFloat = 30
         return min(max(shortSideLen * radiusRatio, minRadius), maxRadius)
     }
@@ -4052,7 +4070,6 @@ import ObjectiveC.runtime
         
         if let deepstButton = OnScreenWidgetView.deepestButton {
             self.superview?.insertSubview(self, belowSubview: deepstButton)
-            OnScreenWidgetView.deepestButton = self
         }
         
         guard let hostView = superview,
@@ -4099,7 +4116,7 @@ import ObjectiveC.runtime
                 self.alpha = OnScreenWidgetView.autoDockInitialAlpha
             } completion: { _ in
                 self.isUserInteractionEnabled = true
-                self.superview?.bringSubviewToFront(self)
+                // self.superview?.bringSubviewToFront(self)
                 self.autoDockStopSettledAlphaTimer()
                 self.autoDockSettledAlphaTimer = Timer.scheduledTimer(withTimeInterval: OnScreenWidgetView.autoDockSettledAlphaDelay, repeats: false) { [weak self] _ in
                     guard let self, self.autoDockIsDocked else { return }
@@ -4321,7 +4338,7 @@ import ObjectiveC.runtime
         guard folder.isFolder else {return}
         
         if !folded {
-            OnScreenWidgetView.deepestButton = OnScreenWidgetView.getDeepestButton()
+            // OnScreenWidgetView.deepestButton = OnScreenWidgetView.getDeepestButton()
         }
         
         OnScreenWidgetView.profileChangedDuringStreaming = true
@@ -4529,7 +4546,7 @@ import ObjectiveC.runtime
         isRestoringFolderStates = false
     }
     
-    @objc static func getDeepestButton() -> OnScreenWidgetView?{
+    @objc static weak var deepestButton: OnScreenWidgetView?{
         var maxIndex: Int = Int.max
         var deepestButton: OnScreenWidgetView?
         for widget in OnScreenWidgetView.mapping.values.filter({ $0.widgetType == .button}){
@@ -4542,7 +4559,6 @@ import ObjectiveC.runtime
             }
             else {continue}
         }
-        OnScreenWidgetView.deepestButton = deepestButton
         return deepestButton
     }
     

@@ -1064,8 +1064,8 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
                 [self->oscProfileMan replaceSelectedProfileWith:profile overwriteDefault:YES];
             }
             
-            OnScreenWidgetView.deepestButton = nil;
-            UIView* deepestButton = [OnScreenWidgetView getDeepestButton];
+            // OnScreenWidgetView.deepestButton = nil;
+            UIView* deepestButton = OnScreenWidgetView.deepestButton;
             NSMutableSet* motionControlButtons = [NSMutableSet new];
             if(deepestButton){
                 for (UIView *subview in self->_streamFrameTopLayerView.subviews) {
@@ -1083,10 +1083,12 @@ static NSString * const KeyboardInputSentinel = @"\u200B";
             }
         }
         
-        OnScreenWidgetView.unfoldedExclusiveFolderSequence = profile.unfoldedExclusiveFolderSequence;
-        [OnScreenWidgetView setPostExclusiveUnfoldeds:profile.postExclusiveUnfoldedSequences];
-        [OnScreenWidgetView restoreFoldedStates];
-        
+        if(reloadWidgets && !OnScreenWidgetView.editMode){
+            OnScreenWidgetView.unfoldedExclusiveFolderSequence = profile.unfoldedExclusiveFolderSequence;
+            [OnScreenWidgetView setPostExclusiveUnfoldeds:profile.postExclusiveUnfoldedSequences];
+            [OnScreenWidgetView restoreFoldedStates];
+        }
+
         NSLog(@"hasLegacyWidget %d %f", hasLegacyWidget, CACurrentMediaTime());
         // legacy widgets
         if(!OnScreenWidgetView.editMode && (hasLegacyWidget || !reloadWidgets)){
