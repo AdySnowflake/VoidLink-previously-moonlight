@@ -143,7 +143,7 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
      *     - streamVideoRenderView (where stream view is rendered)
      */
     UIWindow *_deviceWindow;
-    dispatch_block_t _delayedRemoveExtScreen;
+    NSUInteger _viewResizeGeneration;
     VideoDecoderRenderer *_videoRenderer;
     BOOL _isRestoringFromPiP;
     SafeTimer* safeTimer;
@@ -1686,17 +1686,27 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
 
 - (void) handleViewResize{
     viewIsBeingResized = true;
-    
-    _streamView.bounds = _deviceWindow.bounds;
-    _streamView.frame = _deviceWindow.frame;
+
+    // Resolve geometry in the content parent's coordinate space after transition.
+    // A zoomed view's frame cannot be used to establish its unscaled size.
+    [_scrollView setZoomScale:1.0f animated:NO];
+    _scrollView.frame = self.view.bounds;
+    CGSize viewportSize = self.view.bounds.size;
+    if (_streamView.superview == _scrollView && _scrollView) {
+        viewportSize = _scrollView.bounds.size;
+    }
+    CGRect contentBounds = CGRectMake(0, 0, viewportSize.width, viewportSize.height);
+    _streamView.bounds = contentBounds;
+    _streamView.center = CGPointMake(viewportSize.width / 2, viewportSize.height / 2);
+    _scrollView.contentSize = viewportSize;
     
     if(![self isAirPlaying]){
-        _streamVideoRenderView.bounds = _deviceWindow.bounds;
-        _streamVideoRenderView.frame = _deviceWindow.frame;
+        _streamVideoRenderView.bounds = contentBounds;
+        _streamVideoRenderView.frame = _streamView.bounds;
 
         // Handle resize for meetal renderer
         if ([_settings.renderingBackend intValue] == RENDER_METAL && self.metalViewController) {
-            self.metalViewController.view.frame = _deviceWindow.bounds;
+            self.metalViewController.view.frame = self.view.bounds;
             [self.metalViewController.view setNeedsLayout];
             [self.metalViewController.view layoutIfNeeded];
             Log(LOG_I, @"Updated Metal view bounds after resize");
@@ -2484,10 +2494,32 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
 
 - (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator {
     [super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];
-    
-    [self resetMagnifierStreamViewWithAnimated:false];
+
+    NSUInteger resizeGeneration = ++_viewResizeGeneration;
+    // Keep the video container's current size during UIKit's rotation animation.
+    // Its final geometry is applied below, without interpolating the video frame.
+    _scrollView.autoresizingMask = UIViewAutoresizingNone;
+    [UIView performWithoutAnimation:^{
+        [self resetMagnifierStreamViewWithAnimated:NO];
+    }];
     [coordinator animateAlongsideTransition:nil completion:^(id<UIViewControllerTransitionCoordinatorContext>  _Nonnull context) {
-        [self resetMagnifierStreamViewWithAnimated:NO]; // the portrait stream position depends on the new size
+        if (resizeGeneration != self->_viewResizeGeneration) return;
+        // Use the final viewport, including the restored viewport on cancellation.
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.05 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            if (resizeGeneration != self->_viewResizeGeneration) return;
+            [CATransaction begin];
+            [CATransaction setDisableActions:YES];
+            [UIView performWithoutAnimation:^{
+                [self.view layoutIfNeeded];
+                [self handleViewResize];
+                // Reconfiguration restores the container's flexible autoresizing mask.
+                [self reConfigStreamViewRealtimeAndReloadSettings:YES reloadOnscreenWidgets:NO];
+                [self updateMagnifierViewportMetrics];
+                [self resetMagnifierStreamViewWithAnimated:NO];
+            }];
+            [CATransaction commit];
+        });
     }];
     
     [OnScreenWidgetView transitionWidgetsInView:self.view toSize:size coordinator:coordinator];
@@ -2497,26 +2529,6 @@ static __weak StreamFrameViewController *VLSharedStreamFrameViewController = nil
         [self->_streamMan setNeedRequeuing:true];
     });
 
-    /*
-    if (_isRestoringFromPiP) {
-        Log(LOG_I, @"View size changed during PiP restore, skipping redundant reconfiguration.");
-        return;
-    } */
-
-    // Log(LOG_I, @"View size changed, terminating stream");
-
-    double delayInSeconds = 0.2;
-    if (_delayedRemoveExtScreen) {
-        dispatch_block_cancel(_delayedRemoveExtScreen);
-    }
-        
-    dispatch_block_t block = dispatch_block_create(0, ^{
-        [self handleViewResize];
-        [self reConfigStreamViewRealtimeAndReloadSettings:YES reloadOnscreenWidgets:NO];
-    });
-    _delayedRemoveExtScreen = block;
-    dispatch_time_t delayTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
-    dispatch_after(delayTime, dispatch_get_main_queue(), block);
 }
 
 - (void)controllerArrivalWithPlayerIndex:(int8_t)index{

@@ -1153,9 +1153,6 @@ import ObjectiveC.runtime
     // 仅在加载控件时调用
     private func denormalizeSize(sizeFactor:CGFloat) -> CGFloat {
         let referenceLen = sizeReferenceLength
-
-        print("referenceLen \(referenceLen) \(CACurrentMediaTime())")
-
         // return CGFloat(Int(sizeFactor/10000*screenWidthInPoints/2)*2);
         // print("referenceLen \(referenceLen), \(CACurrentMediaTime())")
         return nearestEven(sizeFactor/10000*referenceLen);
