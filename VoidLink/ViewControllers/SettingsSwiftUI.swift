@@ -3451,13 +3451,13 @@ final class SettingsSession: NSObject, ObservableObject {
             sliderItem(
                 \.audioBufferLimit,
                 setValue: { session, model, newValue in
-                    let value = min(300, max(35, newValue))
+                    let value = min(300, max(50, newValue))
                     model.value = value
                     guard session.settingsExpandedInStreamView else { return }
                     Connection.setAudioBufferLimitMs(Int32(value))
                 },
-                range: 35...300,
-                clampedTo: 35...300,
+                range: 50...300,
+                clampedTo: 50...300,
                 valueText: { _, model in "\(Int(model.value)) ms" },
                 isVisible: { session in
                     session.itemRegistry.audioConfig.value == AudioConfig.stereo.rawValue
