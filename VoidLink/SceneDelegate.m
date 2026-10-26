@@ -9,10 +9,8 @@
 #else
 #define VL_HAS_EXTERNAL_DISPLAY_ACCESSORY 0
 #endif
-#if TARGET_OS_TV
 #import "MainFrameViewController.h"
 #import "SWRevealViewController.h"
-#endif
 
 NSNotificationName const VoidLinkTvOSRemoteMenuTappedNotification = @"VoidLinkTvOSRemoteMenuTappedNotification";
 NSNotificationName const VoidLinkTvOSRemotePlayPauseTappedNotification = @"VoidLinkTvOSRemotePlayPauseTappedNotification";
@@ -339,6 +337,25 @@ static BOOL VLIsExternalDisplaySession(UISceneSession *session) {
 #endif
     self.window.rootViewController = [[VoidLinkControllerRootViewController alloc] initWithContentViewController:initialViewController];
     [self.window makeKeyAndVisible];
+#if !TARGET_OS_TV
+    // Keep the actual menu's geometry listener alive even before its first reveal.
+    if ([initialViewController isKindOfClass:SWRevealViewController.class]) {
+        SWRevealViewController *reveal = (SWRevealViewController *)initialViewController;
+        if ([reveal.rearViewController isKindOfClass:SettingsViewController.class]) {
+            SettingsViewController *settings = (SettingsViewController *)reveal.rearViewController;
+            UIViewController *front = reveal.frontViewController;
+            if ([front isKindOfClass:UINavigationController.class]) {
+                front = ((UINavigationController *)front).viewControllers.firstObject;
+            }
+            if ([front isKindOfClass:MainFrameViewController.class]) {
+                settings.mainFrameViewController = (MainFrameViewController *)front;
+                ((MainFrameViewController *)front).settingsViewController = settings;
+            }
+            [settings loadViewIfNeeded];
+        }
+    }
+    [self notifyResolutionGeometryChangedForScene:self.window.windowScene];
+#endif
 #if VL_HAS_EXTERNAL_DISPLAY_ACCESSORY
     if (@available(iOS 27.0, *)) {
         UISceneConfiguration *configuration = [[UISceneConfiguration alloc]
@@ -432,13 +449,23 @@ static BOOL VLIsExternalDisplaySession(UISceneSession *session) {
 
 - (void)windowScene:(UIWindowScene *)windowScene didUpdateEffectiveGeometry:(UIWindowSceneGeometry *)previousEffectiveGeometry API_AVAILABLE(ios(26.0), tvos(26.0)) {
     [PublicUtils refreshCurrentScreenForWindow:self.window];
+    [self notifyResolutionGeometryChangedForScene:windowScene];
 }
 
 #if !TARGET_OS_TV
 - (void)windowScene:(UIWindowScene *)windowScene didUpdateCoordinateSpace:(id<UICoordinateSpace>)previousCoordinateSpace interfaceOrientation:(UIInterfaceOrientation)previousInterfaceOrientation traitCollection:(UITraitCollection *)previousTraitCollection {
     [PublicUtils refreshCurrentScreenForWindow:self.window];
+    [self notifyResolutionGeometryChangedForScene:windowScene];
 }
 #endif
+
+- (void)notifyResolutionGeometryChangedForScene:(UIWindowScene *)windowScene {
+    if (self.window && self.window.windowScene == windowScene &&
+        [windowScene.session.role isEqualToString:UIWindowSceneSessionRoleApplication]) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:PublicUtils.windowGeometryDidChangeNotification
+                                                          object:self.window];
+    }
+}
 
 - (void)sceneDidDisconnect:(UIScene *)scene {
     Log(LOG_I, @"SceneDelegate: Scene disconnected: %@, role: %@", scene.title, scene.session.role);

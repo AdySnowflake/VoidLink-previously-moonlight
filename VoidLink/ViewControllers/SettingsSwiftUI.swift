@@ -1773,7 +1773,18 @@ fileprivate final class SettingsBlockInteractionState: ObservableObject {
 }
 
 @available(iOS 13.0, tvOS 13.0, *)
+private struct SettingsVideoResolution {
+    let presetDimensions: CMVideoDimensions
+    let interpolation: InterpolationResolutionConfiguration
+    let streamDimensions: CMVideoDimensions
+    let selection: Int
+    let framePacingMode: Int
+    let streamDimensionScale: Double
+}
+
+@available(iOS 13.0, tvOS 13.0, *)
 final class SettingsSession: NSObject, ObservableObject {
+    private static let customResolutionBasisKey = "SettingsCustomResolutionBasis.v1"
     @Published var isStreaming = false
     @Published private(set) var isGameProfileModified = false
     @Published private(set) var isTouchMouseZoomViewportEnabled = false
@@ -1836,6 +1847,7 @@ final class SettingsSession: NSObject, ObservableObject {
     fileprivate weak var presentingController: UIViewController?
     private var cachedDisplaySizes: [Int: CGSize] = [:]
     private var cachedSafeAreaSizes: [Int: CGSize] = [:]
+    private weak var lastResolutionWindow: UIWindow?
     private var isPersistingSettings = false
     private var portraitStreamOffsetChangedInMenu = false
     private var screenConnectionNotificationTokens: [NSObjectProtocol] = []
@@ -1885,6 +1897,15 @@ final class SettingsSession: NSObject, ObservableObject {
         lastPresetResolution = persistedResolution == 5 ? 1 : min(max(persistedResolution, 0), 4)
         customWidth = snapshot.width.intValue
         customHeight = snapshot.height.intValue
+        if persistedResolution == 5,
+           let basis = UserDefaults.standard.dictionary(forKey: Self.customResolutionBasisKey),
+           basis["submittedWidth"] as? Int == snapshot.width.intValue,
+           basis["submittedHeight"] as? Int == snapshot.height.intValue,
+           let width = basis["width"] as? Int, width >= 256,
+           let height = basis["height"] as? Int, height >= 256 {
+            customWidth = width
+            customHeight = height
+        }
         itemRegistry.frameRate.value = [30, 60, 120].contains(snapshot.framerate.intValue) ? snapshot.framerate.intValue : 60
         let bitrateIndex = settingsBitrateIndex(for: Double(snapshot.bitrate.intValue))
         itemRegistry.bitrate.value = settingsBitrateTable[bitrateIndex]
@@ -2049,6 +2070,20 @@ final class SettingsSession: NSObject, ObservableObject {
                 queue: .main
             ) { [weak self] _ in
                 self?.refreshResolutionGeometry()
+            },
+            NotificationCenter.default.addObserver(
+                forName: PublicUtils.hingeStatusDidChangeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                self?.refreshResolutionGeometryAfterWindowChange(notification)
+            },
+            NotificationCenter.default.addObserver(
+                forName: PublicUtils.windowGeometryDidChangeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                self?.refreshResolutionGeometryAfterWindowChange(notification)
             }
         ]
         
@@ -2383,7 +2418,8 @@ final class SettingsSession: NSObject, ObservableObject {
 
     var resolutionText: String {
         _ = resolutionGeometryRevision
-        return "\(chosenWidth) × \(chosenHeight)"
+        let dimensions = resolveVideoResolution().presetDimensions
+        return "\(dimensions.width) × \(dimensions.height)"
     }
 
     var bitrateText: String {
@@ -2391,16 +2427,12 @@ final class SettingsSession: NSObject, ObservableObject {
     }
 
     var interpolationText: String {
-        let dimensions = interpolationConfiguration.dimensions
+        let dimensions = resolveVideoResolution().interpolation.dimensions
         return "   \(dimensions.width) × \(dimensions.height)"
     }
 
     var streamDimensionText: String {
-        let dimensions = FrameInterpolator.scaledStreamDimensions(
-            presetDimensions: chosenDimensions,
-            interpolationDimensions: interpolationConfiguration.dimensions,
-            scale: Float(itemRegistry.streamDimensionScale.value)
-        )
+        let dimensions = resolveVideoResolution().streamDimensions
         return "   \(dimensions.width) × \(dimensions.height)"
     }
 
@@ -4057,20 +4089,25 @@ final class SettingsSession: NSObject, ObservableObject {
         PublicUtils.externalScreen
     }
 
+    private var resolutionWindow: UIWindow? {
+        presentingController?.viewIfLoaded?.window ?? lastResolutionWindow
+    }
+
     private var targetScreen: UIScreen {
         if itemRegistry.externalDisplayMode.value == ExternalDisplayMode.extended.rawValue,
            let externalDisplayScreen {
             return externalDisplayScreen
         }
-        return presentingController?.view.window?.screen ?? PublicUtils.currentScreen
+        return resolutionWindow?.screen ?? PublicUtils.currentScreen
     }
 
     /// Mirrors UIKit's resolution-table inputs while Settings is attached to
     /// a window. Persistence happens after dismissal, when that window may no
     /// longer exist, so retain the last measured pixel sizes per display mode.
-    private func refreshDynamicResolutionSizeCache() {
+    private func refreshDynamicResolutionSizeCache(for sourceWindow: UIWindow? = nil) {
         guard !isPersistingSettings else { return }
-        guard let window = presentingController?.viewIfLoaded?.window else { return }
+        guard let window = sourceWindow ?? resolutionWindow else { return }
+        lastResolutionWindow = window
 
         let displayMode = itemRegistry.externalDisplayMode.value
         let externalScreen = externalDisplayScreen
@@ -4080,14 +4117,14 @@ final class SettingsSession: NSObject, ObservableObject {
             : window.screen
         let displayBounds = usesExternalDisplay ? displayScreen.bounds : window.bounds
         cachedDisplaySizes[displayMode] = CGSize(
-            width: displayBounds.width * displayScreen.scale,
-            height: displayBounds.height * displayScreen.scale
+            width: displayBounds.width * displayScreen.nativeScale,
+            height: displayBounds.height * displayScreen.nativeScale
         )
 
         let insets = window.safeAreaInsets
         cachedSafeAreaSizes[displayMode] = CGSize(
-            width: (window.bounds.width - insets.left - insets.right) * window.screen.scale,
-            height: window.bounds.height * window.screen.scale
+            width: (window.bounds.width - insets.left - insets.right) * window.screen.nativeScale,
+            height: window.bounds.height * window.screen.nativeScale
         )
     }
 
@@ -4100,8 +4137,8 @@ final class SettingsSession: NSObject, ObservableObject {
         let screen = targetScreen
         let bounds = displayMode == ExternalDisplayMode.extended.rawValue
             ? screen.bounds
-            : (presentingController?.view.window?.bounds ?? screen.bounds)
-        return CGSize(width: bounds.width * screen.scale, height: bounds.height * screen.scale)
+            : (resolutionWindow?.bounds ?? screen.bounds)
+        return CGSize(width: bounds.width * screen.nativeScale, height: bounds.height * screen.nativeScale)
     }
 
     private var availableSafeAreaSize: CGSize {
@@ -4110,13 +4147,13 @@ final class SettingsSession: NSObject, ObservableObject {
         if let cachedSize = cachedSafeAreaSizes[displayMode] {
             return cachedSize
         }
-        guard let window = presentingController?.view.window else {
+        guard let window = resolutionWindow else {
             return availableDisplaySize
         }
         let insets = window.safeAreaInsets
         return CGSize(
-            width: (window.bounds.width - insets.left - insets.right) * window.screen.scale,
-            height: window.bounds.height * window.screen.scale
+            width: (window.bounds.width - insets.left - insets.right) * window.screen.nativeScale,
+            height: window.bounds.height * window.screen.nativeScale
         )
     }
 
@@ -4124,8 +4161,33 @@ final class SettingsSession: NSObject, ObservableObject {
         CMVideoDimensions(width: Int32(chosenWidth), height: Int32(chosenHeight))
     }
 
-    private var interpolationConfiguration: InterpolationResolutionConfiguration {
-        FrameInterpolator.resolutionConfiguration(for: chosenDimensions, level: Float(itemRegistry.interpolationLevel.value))
+    /// The single source for display, bitrate estimation and persisted launch dimensions.
+    /// Measure once and derive interpolation/scaling from that same preset snapshot.
+    private func resolveVideoResolution(for window: UIWindow? = nil) -> SettingsVideoResolution {
+        refreshDynamicResolutionSizeCache(for: window)
+        let wasPersisting = isPersistingSettings
+        isPersistingSettings = true
+        defer { isPersistingSettings = wasPersisting }
+
+        let preset = chosenDimensions
+        let interpolation = FrameInterpolator.resolutionConfiguration(
+            for: preset, level: Float(itemRegistry.interpolationLevel.value)
+        )
+        let pacing = itemRegistry.framePacing.value
+        let scale = itemRegistry.streamDimensionScale.value
+        let submitted = pacing == FramePacingMode.interpolation.rawValue
+            ? FrameInterpolator.scaledStreamDimensions(
+                presetDimensions: preset,
+                interpolationDimensions: interpolation.dimensions,
+                scale: Float(scale)
+            )
+            : preset
+        return SettingsVideoResolution(
+            presetDimensions: preset, interpolation: interpolation,
+            streamDimensions: submitted,
+            selection: itemRegistry.usesCustomResolution.value ? 5 : itemRegistry.resolution.value,
+            framePacingMode: pacing, streamDimensionScale: scale
+        )
     }
 
     func setCustomResolution(_ enabled: Bool) {
@@ -4136,6 +4198,7 @@ final class SettingsSession: NSObject, ObservableObject {
             return
         }
 
+        let suggestedDimensions = resolveVideoResolution().presetDimensions
         let alert = UIAlertController(
             title: "Enter Custom Resolution".localized,
             message: nil,
@@ -4144,12 +4207,12 @@ final class SettingsSession: NSObject, ObservableObject {
         alert.addTextField {
             $0.placeholder = "Video Width".localized
             $0.keyboardType = .numberPad
-            $0.text = self.customWidth > 0 ? "\(self.customWidth)" : nil
+            $0.text = suggestedDimensions.width > 0 ? "\(suggestedDimensions.width)" : nil
         }
         alert.addTextField {
             $0.placeholder = "Video Height".localized
             $0.keyboardType = .numberPad
-            $0.text = self.customHeight > 0 ? "\(self.customHeight)" : nil
+            $0.text = suggestedDimensions.height > 0 ? "\(suggestedDimensions.height)" : nil
         }
         alert.addAction(UIAlertAction(title: "Cancel".localized, style: .cancel) { _ in
             self.itemRegistry.usesCustomResolution.value = false
@@ -4236,7 +4299,7 @@ final class SettingsSession: NSObject, ObservableObject {
     }
 
     func updateBitrateForCurrentResolutionAndFrameRate() {
-        let dimensions = chosenStreamDimensionsForBitrate
+        let dimensions = resolveVideoResolution().streamDimensions
         let fps = Double(itemRegistry.frameRate.value)
         let frameRateFactor = (fps <= 60 ? fps : sqrt(fps / 60) * 60) / 30
         let resolutionFactor = defaultBitrateResolutionFactor(
@@ -4245,18 +4308,6 @@ final class SettingsSession: NSObject, ObservableObject {
         let defaultBitrate = (resolutionFactor * frameRateFactor).rounded() * 1000
         let bitrate = min(defaultBitrate, 100_000)
         setBitrateSliderPosition(Double(settingsBitrateIndex(for: bitrate)))
-    }
-
-    private var chosenStreamDimensionsForBitrate: CMVideoDimensions {
-        let presetDimensions = chosenDimensions
-        guard itemRegistry.framePacing.value == FramePacingMode.interpolation.rawValue else {
-            return presetDimensions
-        }
-        return FrameInterpolator.scaledStreamDimensions(
-            presetDimensions: presetDimensions,
-            interpolationDimensions: interpolationConfiguration.dimensions,
-            scale: Float(itemRegistry.streamDimensionScale.value)
-        )
     }
 
     private func defaultBitrateResolutionFactor(pixels: Int) -> Double {
@@ -4610,11 +4661,71 @@ final class SettingsSession: NSObject, ObservableObject {
         themeRevision &+= 1
     }
 
-    func refreshResolutionGeometry() {
-        // if itemRegistry.externalDisplayMode.value == ExternalDisplayMode.duplicated.rawValue || UIScreen.screens.count == 1 {
-            refreshDynamicResolutionSizeCache()
-            resolutionGeometryRevision &+= 1
-        // }
+    private func refreshResolutionGeometryAfterWindowChange(_ notification: Notification) {
+        // All hinge poses and ordinary window geometry changes use the reporting
+        // window, including when the settings menu has no attached view.
+        guard let window = notification.object as? UIWindow else { return }
+        refreshResolutionGeometry(for: window)
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let window else { return }
+            self?.refreshResolutionGeometry(for: window)
+        }
+    }
+
+    func refreshResolutionGeometry(for window: UIWindow? = nil) {
+        guard !isPersistingSettings else { return }
+        let resolution = resolveVideoResolution(for: window)
+        resolutionGeometryRevision &+= 1
+
+        // A detached settings session may have an old isStreaming value. Prefer
+        // the owner's live state and never change launch dimensions mid-stream.
+        let streaming = (presentingController as? SettingsViewController)?
+            .mainFrameViewController?.isStreaming() ?? isStreaming
+        guard !streaming,
+              let size = cachedDisplaySizes[itemRegistry.externalDisplayMode.value],
+              size.width > 0, size.height > 0 else { return }
+
+        let dataManager = DataManager()
+        guard let settings = dataManager.retrieveSettings() else { return }
+        if writeVideoResolution(to: settings, resolution: resolution) {
+            dataManager.saveData()
+        }
+    }
+
+    /// Shared by geometry refresh and menu persistence; scale the base exactly once.
+    @discardableResult
+    private func writeVideoResolution(
+        to settings: Settings,
+        resolution: SettingsVideoResolution
+    ) -> Bool {
+        let preset = resolution.presetDimensions
+        guard preset.width > 0, preset.height > 0 else { return false }
+        let submitted = resolution.streamDimensions
+        guard submitted.width > 0, submitted.height > 0 else { return false }
+        let selected = resolution.selection
+        let scale = resolution.streamDimensionScale
+        let interpolation = resolution.interpolation
+        let changed = settings.width?.intValue != Int(submitted.width)
+            || settings.height?.intValue != Int(submitted.height)
+            || settings.resolutionSelected?.intValue != selected
+            || settings.interpolationMaximumDimension?.intValue != interpolation.maximumDimension
+            || settings.interpolationMaximumPixelCount?.intValue != interpolation.maximumPixelCount
+            || settings.streamDimensionScale?.doubleValue != scale
+            || settings.framePacingMode?.intValue != resolution.framePacingMode
+        settings.width = NSNumber(value: submitted.width)
+        settings.height = NSNumber(value: submitted.height)
+        settings.resolutionSelected = NSNumber(value: selected)
+        settings.interpolationMaximumDimension = NSNumber(value: interpolation.maximumDimension)
+        settings.interpolationMaximumPixelCount = NSNumber(value: interpolation.maximumPixelCount)
+        settings.streamDimensionScale = NSNumber(value: scale)
+        settings.framePacingMode = NSNumber(value: resolution.framePacingMode)
+        if selected == 5 {
+            UserDefaults.standard.set([
+                "width": Int(preset.width), "height": Int(preset.height),
+                "submittedWidth": Int(submitted.width), "submittedHeight": Int(submitted.height)
+            ], forKey: Self.customResolutionBasisKey)
+        }
+        return changed
     }
     
     func refreshSectionHitTesting() {
@@ -4764,6 +4875,7 @@ final class SettingsSession: NSObject, ObservableObject {
     /// remains only as an integration bridge; persistence itself is not
     /// section-specific.
     func persistSettings() {
+        let resolution = resolveVideoResolution()
         isPersistingSettings = true
         defer { isPersistingSettings = false }
 
@@ -4787,7 +4899,7 @@ final class SettingsSession: NSObject, ObservableObject {
             portraitStreamOffsetChangedInMenu = false
         }
         guard let settings = dataManager.retrieveSettings() else { return }
-        let interpolationConfiguration = self.interpolationConfiguration
+        let interpolationConfiguration = resolution.interpolation
         let backgroundSessionTimerValue = itemRegistry.backgroundSessionTimer.value >= 61
             ? Int(INT16_MAX)
             : Int(itemRegistry.backgroundSessionTimer.value)
@@ -4798,9 +4910,7 @@ final class SettingsSession: NSObject, ObservableObject {
         // MARK: Video
 
         if !isStreaming {
-            settings.width = NSNumber(value: chosenWidth)
-            settings.height = NSNumber(value: chosenHeight)
-            settings.resolutionSelected = NSNumber(value: itemRegistry.usesCustomResolution.value ? 5 : itemRegistry.resolution.value)
+            writeVideoResolution(to: settings, resolution: resolution)
         }
         
         settings.framerate = NSNumber(value: itemRegistry.frameRate.value)
@@ -4808,10 +4918,10 @@ final class SettingsSession: NSObject, ObservableObject {
         settings.preferredCodec = Int32(itemRegistry.codec.value)
         settings.enableHdr = itemRegistry.hdr.value
         settings.enableYUV444 = itemRegistry.yuv444.value
-        settings.framePacingMode = NSNumber(value: itemRegistry.framePacing.value)
+        settings.framePacingMode = NSNumber(value: resolution.framePacingMode)
         settings.interpolationMaximumDimension = NSNumber(value: interpolationConfiguration.maximumDimension)
         settings.interpolationMaximumPixelCount = NSNumber(value: interpolationConfiguration.maximumPixelCount)
-        settings.streamDimensionScale = NSNumber(value: itemRegistry.streamDimensionScale.value)
+        settings.streamDimensionScale = NSNumber(value: resolution.streamDimensionScale)
         settings.frameQueueSize = NSNumber(value: Int(itemRegistry.frameQueueSize.value))
         settings.asyncFrameDequeue = itemRegistry.asyncFrameDequeue.value
         settings.enablePIP = itemRegistry.pictureInPicture.value

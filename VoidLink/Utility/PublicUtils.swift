@@ -118,6 +118,7 @@ import GameController
     /// Updated on the main thread before hingeStatusDidChangeNotification is posted.
     @MainActor @objc public private(set) static var hingeStatus: HingeStatus = .unknown
     @objc public static let hingeStatusDidChangeNotification = Notification.Name("VoidLinkHingeStatusDidChange")
+    @objc public static let windowGeometryDidChangeNotification = Notification.Name("VoidLinkWindowGeometryDidChange")
 
     @MainActor private static var foldableIPhoneDetectionStarted = false
     @MainActor private static var foldableIPhoneDetectionFinished = cachedFoldableIPhone != nil
@@ -189,7 +190,7 @@ import GameController
                 finishFoldableIPhoneDetection(true)
                 // Angle updates within the same state do not require UI rebuilds.
                 if didChange {
-                    NotificationCenter.default.post(name: hingeStatusDidChangeNotification, object: nil)
+                    NotificationCenter.default.post(name: hingeStatusDidChangeNotification, object: window)
                 }
             }
             objc_setAssociatedObject(window, &hingeInteractionAssociationKey, interaction, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
