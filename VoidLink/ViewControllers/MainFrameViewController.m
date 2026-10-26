@@ -2595,11 +2595,9 @@ static NSMutableSet* hostList;
 {
     [super viewWillAppear:NO];
 
-#if TARGET_OS_TV
     // StreamFrameViewController hides the navigation bar. Restore it before
     // rebuilding the collection views so their first layout uses final safe-area geometry.
     [self.navigationController setNavigationBarHidden:NO animated:NO];
-#endif
 
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(updateTheme)
