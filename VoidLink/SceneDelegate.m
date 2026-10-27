@@ -302,6 +302,17 @@ static BOOL VLIsExternalDisplaySession(UISceneSession *session) {
 
 // Construct every business view only after the shared device cache is ready.
 - (void)finishConnectingMainAppScene {
+#if !TARGET_OS_TV
+    if (@available(iOS 17.0, *)) {
+        if ([ThemeManager pinsSystemStyleForFoldable]) {
+            // Observe above the pinned windows so System still follows Control Center.
+            [self.window.windowScene registerForTraitChanges:@[UITraitUserInterfaceStyle.class]
+                                                withHandler:^(__kindof id<UITraitEnvironment> environment, UITraitCollection *previousCollection) {
+                [ThemeManager systemUserInterfaceStyleDidChange:environment.traitCollection.userInterfaceStyle];
+            }];
+        }
+    }
+#endif
 #if TARGET_OS_TV
     SettingsViewController *tvOSSettingsViewController = nil;
 #endif
@@ -439,6 +450,9 @@ static BOOL VLIsExternalDisplaySession(UISceneSession *session) {
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {
     [PublicUtils refreshCurrentScreenForWindow:self.window];
+    if ([ThemeManager pinsSystemStyleForFoldable] && scene == self.window.windowScene) {
+        [ThemeManager systemUserInterfaceStyleDidChange:self.window.windowScene.traitCollection.userInterfaceStyle];
+    }
 #if TARGET_OS_TV
     if (scene == self.window.windowScene &&
         [self.window.rootViewController isKindOfClass:[VoidLinkControllerRootViewController class]]) {
