@@ -270,6 +270,8 @@ private let settingsLegacyHelpByStackIdentifier: [String: SettingsLegacyHelpCont
     // Drawing Toolkit
     "pencilTickStack": .init(messageKey: "pencilTickStackTip", learnMoreURLKey: "PencilProPackURL"),
     "pencilModeStack": .init(messageKey: "pencilModeStackTip", learnMoreURLKey: nil),
+    "doubleTapShortcutStack": .init(messageKey: "doubleTapShortcutStackTip", learnMoreURLKey: nil),
+    "squeezeShortcutStack": .init(messageKey: "squeezeShortcutStackTip", learnMoreURLKey: nil),
 
     // Gestures
     "softKeyboardGestureStack": .init(messageKey: "softKeyboardGestureStackTip", learnMoreURLKey: "softKeyboardGestureStackDoc"),
@@ -5982,6 +5984,20 @@ final class SettingsSession: NSObject, ObservableObject {
                 forKey: "controllerGyroSwitchButtonStackTip",
                 (ControllerElement(rawValue: profile.controllerGyroSwitchToggle) ?? .null).displayName,
                 (ControllerElement(rawValue: profile.controllerGyroSwitchHold) ?? .null).displayName,
+            )
+        } else if id == .doubleTapShortcut {
+            let profile = OSCProfilesManager.sharedManager(CGRect.zero).getSelectedProfile()
+            message = LocalizationHelper.localizedString(
+                forKey: "doubleTapShortcutStackTip",
+                profile.brushShortcut.isEmpty ? "Null".localized : profile.brushShortcut,
+                profile.eraserShortcut.isEmpty ? "Null".localized : profile.eraserShortcut
+            )
+        } else if id == .squeezeShortcut {
+            let profile = OSCProfilesManager.sharedManager(CGRect.zero).getSelectedProfile()
+            message = LocalizationHelper.localizedString(
+                forKey: "squeezeShortcutStackTip",
+                profile.squeezeStartShortcut.isEmpty ? "Null".localized : profile.squeezeStartShortcut,
+                profile.squeezeEndShortcut.isEmpty ? "Null".localized : profile.squeezeEndShortcut
             )
         } else if id == .controllerNavigation, let snapshot = DataManager().getSettings() {
             message = LocalizationHelper.localizedString(
