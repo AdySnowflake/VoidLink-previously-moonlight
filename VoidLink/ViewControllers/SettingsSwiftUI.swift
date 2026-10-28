@@ -2391,8 +2391,8 @@ final class SettingsSession: NSObject, ObservableObject {
             // .init(value: 3, title: "Safe Area".localized),
             .init(value: 4, title: PublicUtils.isTVOS ? "Full-Screen".localized : "FullScr/Window".localized)
         ]
-        if !PublicUtils.isTVOS {
-            options.insert(.init(value: 3, title: "Safe Area".localized), at: 3)
+        if PublicUtils.isIPhone {
+            options.insert(.init(value: 3, title: "Safe Area".localized, isEnabled: !PublicUtils.isIPad), at: 3)
         }
         return options
     }
@@ -4688,25 +4688,54 @@ final class SettingsSession: NSObject, ObservableObject {
 
     func refreshResolutionGeometry(for window: UIWindow? = nil) {
         guard !isPersistingSettings else { return }
-        let resolution = resolveVideoResolution(for: window)
+        refreshDynamicResolutionSizeCache(for: window)
         resolutionGeometryRevision &+= 1
 
-        // A detached settings session may have an old isStreaming value. Prefer
-        // the owner's live state and never change launch dimensions mid-stream.
         let streaming = (presentingController as? SettingsViewController)?
             .mainFrameViewController?.isStreaming() ?? isStreaming
-        guard !streaming,
-              let size = cachedDisplaySizes[itemRegistry.externalDisplayMode.value],
-              size.width > 0, size.height > 0 else { return }
+        guard !streaming, let window = window ?? resolutionWindow else { return }
 
         let dataManager = DataManager()
         guard let settings = dataManager.retrieveSettings() else { return }
-        if writeVideoResolution(to: settings, resolution: resolution) {
+        if writeFullscreenResolution(to: settings, window: window) {
             dataManager.saveData()
         }
     }
 
-    /// Shared by geometry refresh and menu persistence; scale the base exactly once.
+    /// Geometry changes may updates fullscreen dimensions
+    private func writeFullscreenResolution(to settings: Settings, window: UIWindow) -> Bool {
+        guard settings.resolutionSelected?.intValue == 4 else { return false }
+        let externalScreen = settings.externalDisplayMode?.intValue == ExternalDisplayMode.extended.rawValue
+            ? PublicUtils.externalScreen : nil
+        let screen = externalScreen ?? window.screen
+        let bounds = externalScreen?.bounds ?? window.bounds
+        let width = (bounds.width * screen.nativeScale).rounded()
+        let height = (bounds.height * screen.nativeScale).rounded()
+        guard width > 0, height > 0,
+              width <= Double(Int32.max), height <= Double(Int32.max) else { return false }
+        let preset = CMVideoDimensions(width: Int32(width), height: Int32(height))
+        var submitted = preset
+        if settings.framePacingMode?.intValue == FramePacingMode.interpolation.rawValue {
+            let interpolation = FrameInterpolator.interpolatableDimensionsBy(
+                preset,
+                maximumDimension: settings.interpolationMaximumDimension?.intValue ?? 0,
+                maximumPixelCount: settings.interpolationMaximumPixelCount?.intValue ?? 0
+            )
+            submitted = FrameInterpolator.scaledStreamDimensions(
+                presetDimensions: preset,
+                interpolationDimensions: interpolation,
+                scale: settings.streamDimensionScale?.floatValue ?? 1
+            )
+        }
+        guard submitted.width > 0, submitted.height > 0,
+              settings.width?.intValue != Int(submitted.width)
+                || settings.height?.intValue != Int(submitted.height) else { return false }
+        settings.width = NSNumber(value: submitted.width)
+        settings.height = NSNumber(value: submitted.height)
+        return true
+    }
+
+    /// Menu persistence commits the user's selection and its associated video settings.
     @discardableResult
     private func writeVideoResolution(
         to settings: Settings,
