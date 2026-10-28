@@ -2393,8 +2393,8 @@ final class SettingsSession: NSObject, ObservableObject {
             // .init(value: 3, title: "Safe Area".localized),
             .init(value: 4, title: PublicUtils.isTVOS ? "Full-Screen".localized : "FullScr/Window".localized)
         ]
-        if PublicUtils.isIPhone {
-            options.insert(.init(value: 3, title: "Safe Area".localized, isEnabled: !PublicUtils.isIPad), at: 3)
+        if !PublicUtils.isTVOS {
+            options.insert(.init(value: 3, title: "Safe Area".localized), at: 3)
         }
         return options
     }
